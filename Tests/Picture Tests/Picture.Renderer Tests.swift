@@ -67,8 +67,8 @@ extension `Picture Tests`.`A renderer is a value that draws a picture into a ras
         #expect(throws: Picture.Renderer.Error.absent) { try Picture.Renderer.absent.render(Picture.empty, into: &raster) }
         #expect(throws: Picture.Renderer.Error.absent) { try Witness.Context[Picture.Renderer.self].render(Self.picture, into: &raster) }
         Witness.Context.withTest { _ in
-        } operation: { () -> Void in
-            #expect(throws: Picture.Renderer.Error.absent) { try Witness.Context[Picture.Renderer.self].render(Self.picture, into: &raster) }
+        } operation: {
+            _ = #expect(throws: Picture.Renderer.Error.absent) { try Witness.Context[Picture.Renderer.self].render(Self.picture, into: &raster) }
         }
         #expect(raster.pixels == [Tests.pixel(0, 0, 1, 1), Tests.pixel(0, 0, 1, 1)])
     }
@@ -90,7 +90,7 @@ extension `Picture Tests`.`A renderer is a value that draws a picture into a ras
     func `An unimplemented renderer fails with the witness's own error, naming the operation`() {
         var raster = Self.blank()
         var failure: Picture.Renderer.Error?
-        do {
+        do throws(Picture.Renderer.Error) {
             try Picture.Renderer.unimplemented().render(Self.picture, into: &raster)
         } catch {
             failure = error
@@ -105,12 +105,13 @@ extension `Picture Tests`.`A renderer is a value that draws a picture into a ras
     }
 
     @Test
-    func `A renderer and its errors are sendable, and errors compare`() {
+    func `A renderer and its errors are sendable, and errors compare and hash`() {
         func sendable<Value: Sendable>(_: Value.Type) -> Bool { true }
         #expect(sendable(Picture.Renderer.self))
         #expect(sendable(Picture.Renderer.Error.self))
         #expect(Picture.Renderer.Error.absent != .unsupported)
         #expect(Picture.Renderer.Error.path(.width) == .path(.width))
         #expect(Picture.Renderer.Error.path(.width) != .path(.limit))
+        #expect(Set([Picture.Renderer.Error.absent, .absent, .unsupported, .path(.width), .path(.width)]).count == 3)
     }
 }

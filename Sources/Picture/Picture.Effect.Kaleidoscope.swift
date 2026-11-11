@@ -1,6 +1,6 @@
 public import Angle
-public import Raster
 import Numeric
+public import Raster
 
 extension Picture.Effect {
     /// `segments` equal sectors around `center`, the first starting at the direction `rotation`.

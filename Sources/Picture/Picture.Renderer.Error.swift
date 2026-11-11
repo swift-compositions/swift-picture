@@ -2,7 +2,7 @@ public import Witnesses
 
 extension Picture.Renderer {
     /// Why a renderer did not draw a picture.
-    public enum Error: Swift.Error, Sendable, Equatable {
+    public enum Error: Swift.Error, Sendable, Hashable {
         /// No renderer is installed.
         case absent
 

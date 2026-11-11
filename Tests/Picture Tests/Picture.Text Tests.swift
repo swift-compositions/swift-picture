@@ -191,6 +191,8 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
         let wide = try Picture.Text("BB  BB", font: Self.font(), size: 100, measure: 150)
         #expect(wide.lines.map(\.glyphs.count) == [4, 2])
         #expect(wide.lines[0].width == 140)
+        let even = try Picture.Text("B B B B", font: Self.font(), size: 100, measure: 180)
+        #expect(even.lines.map(\.glyphs.count) == [4, 3])
     }
 
     @Test
@@ -249,7 +251,7 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
         #expect(throws: Picture.Text.Error.outline(.absent)) { try Picture.Text("A", font: Self.font(outlines: false), size: 10) }
         let junk = [0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0].map(Byte.init(_:))
         var failure: Picture.Text.Error?
-        do {
+        do throws(Picture.Text.Error) {
             _ = try Picture.Text("A", bytes: junk, size: 10)
         } catch {
             failure = error

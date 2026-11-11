@@ -1,2 +1,5 @@
 @_exported public import Picture
-@_exported public import W3C_PNG
+
+#if PNG
+    @_exported public import W3C_PNG
+#endif

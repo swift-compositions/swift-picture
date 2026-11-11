@@ -8,6 +8,9 @@ let package = Package(
         .library(name: "Picture", targets: ["Picture"]),
         .library(name: "Picture PNG Integration", targets: ["Picture PNG Integration"]),
     ],
+    traits: [
+        .trait(name: "PNG", description: "PNG integration")
+    ],
     dependencies: [
         .package(url: "https://github.com/swift-atoms/swift-angle.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-byte.git", branch: "main"),
@@ -57,7 +60,9 @@ let package = Package(
             name: "Picture PNG Integration",
             dependencies: [
                 .target(name: "Picture"),
-                .product(name: "W3C PNG", package: "swift-w3c-png"),
+                .product(name: "Byte", package: "swift-byte"),
+                .product(name: "IEC 61966", package: "swift-iec-61966"),
+                .product(name: "W3C PNG", package: "swift-w3c-png", condition: .when(traits: ["PNG"])),
             ]
         ),
         .testTarget(

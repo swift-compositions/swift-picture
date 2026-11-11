@@ -7,8 +7,7 @@ extension Picture {
     /// The operation that draws a picture into a raster of working pixels, as a value that can be replaced.
     @Witness
     public struct Renderer: Sendable {
-        public var render:
-            @Sendable (_ picture: borrowing Picture, _ raster: inout Raster<Picture.Pixel>) throws(Picture.Renderer.Error) -> Void
+        public var render: @Sendable (_ picture: borrowing Picture, _ raster: inout Raster<Picture.Pixel>) throws(Picture.Renderer.Error) -> Void
     }
 }
 

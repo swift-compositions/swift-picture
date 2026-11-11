@@ -45,11 +45,13 @@ extension Picture.Text {
         let upright = Picture.Transform(rows: [[scale, 0, 0], [0, -scale, 0]])
         var outlines: [UInt16: Picture.Path] = [:]
         var runs: [Run] = []
+        // swift-linter:disable:next string utf8 scanning
+        // REASON: a font's character map is keyed by code point, so layout is defined over Unicode scalars, not bytes.
         for paragraph in string.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: false) {
             let scalars = Array(paragraph)
             let indices = scalars.map { font.glyphIndex(for: $0.value) ?? 0 }
             for index in indices where outlines[index] == nil {
-                do {
+                do throws(ISO_14496_22.Outline.Error) {
                     outlines[index] = try font.outline(for: index).transformed(by: upright, to: Picture.Space.self)
                 } catch {
                     throw .outline(error)
@@ -59,7 +61,7 @@ extension Picture.Text {
             for position in indices.indices {
                 var advance = Double(font.advanceWidth(for: indices[position]))
                 if position + 1 < indices.count {
-                    do {
+                    do throws(ISO_14496_22.FontFile.ParsingError) {
                         advance += try font.kerning(left: indices[position], right: indices[position + 1]).underlying
                     } catch {
                         throw .font(error)
@@ -115,7 +117,7 @@ extension Picture.Text {
         leading: Double? = nil
     ) throws(Error) {
         let font: ISO_14496_22.FontFile
-        do {
+        do throws(ISO_14496_22.FontFile.ParsingError) {
             font = try ISO_14496_22.FontFile(data: bytes)
         } catch {
             throw .font(error)
@@ -138,22 +140,5 @@ extension Picture.Text {
     /// The whole text as one shape with a fill.
     public func shape(_ fill: Picture.Shape.Fill) -> Picture.Shape {
         Picture.Shape(path, fill: fill)
-    }
-}
-
-extension Picture.Text {
-    /// One line being laid out: a stretch of a paragraph's glyphs.
-    struct Run {
-        let scalars: [Unicode.Scalar]
-        let indices: [UInt16]
-        let starts: [Double]
-        let widths: [Double]
-        let blank: [Bool]
-        let range: Range<Int>
-
-        var width: Double {
-            guard let last = range.last(where: { !blank[$0] }) else { return 0 }
-            return starts[last] - starts[range.lowerBound] + widths[last]
-        }
     }
 }

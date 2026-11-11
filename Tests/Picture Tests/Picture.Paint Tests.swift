@@ -77,7 +77,7 @@ extension `Picture Tests`.`A paint gives a pixel for every point` {
 
     static let ramp = Picture.Gradient([.init(offset: 0, color: .black), .init(offset: 1, color: .white)])
 
-    static func raster(_ pixels: [Picture.Pixel], width: Cardinal, height: Cardinal) throws -> Raster<Picture.Pixel> {
+    static func raster(_ pixels: [Picture.Pixel], width: Cardinal, height: Cardinal) throws(Raster<Picture.Pixel>.Error) -> Raster<Picture.Pixel> {
         try Raster(width: width, height: height, pixels: pixels)
     }
 

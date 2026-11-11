@@ -28,7 +28,7 @@ extension Picture.Image {
     /// The image's pixel at a point of the shape's space.
     public func pixel(at point: Picture.Point) -> Picture.Pixel {
         let inverse: Picture.Transform
-        do { inverse = try placement.inverted() } catch { return .transparent }
+        do throws(Matrix<2, 3, Double>.Error) { inverse = try placement.inverted() } catch { return .transparent }
         if raster.isEmpty {
             guard case .constant(let pixel) = edge else { return .transparent }
             return pixel
