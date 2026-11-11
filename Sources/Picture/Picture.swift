@@ -1,0 +1,59 @@
+public import Geometry
+public import Matrix
+public import W3C_CSS_Compositing
+
+/// A picture as a value: a list of elements, drawn in order, the first at the back.
+public struct Picture: Sendable, Hashable {
+    public var elements: [Element]
+
+    public init(_ elements: [Element] = []) {
+        self.elements = elements
+    }
+}
+
+extension Picture {
+    /// A path in picture space.
+    public typealias Path = Geometry<Double, Space>.Path
+
+    /// A point in picture space.
+    public typealias Point = Geometry<Double, Space>.Point<2>
+
+    /// An affine map of picture space, applied to (x, y, 1).
+    public typealias Transform = Matrix<2, 3, Double>
+
+    /// The pixel a picture is drawn in: premultiplied, linear light, single precision.
+    public typealias Pixel = Compositing.Premultiplied<Float>
+}
+
+extension Picture {
+    /// The picture that draws nothing.
+    public static var empty: Self { Self() }
+
+    /// This picture's elements followed by the other's, so the other is drawn on top.
+    public func appending(_ other: Self) -> Self {
+        Self(elements + other.elements)
+    }
+}
+
+extension Picture {
+    /// This picture, and on top a blurred copy of it that adds its light.
+    public func glow(deviation: Double, strength: Float = 1) -> Self {
+        appending([
+            .layer(Layer(self, effects: [.blur(Effect.Blur(deviation: deviation))], opacity: strength, operator: .lighter))
+        ])
+    }
+
+    /// This picture, and on top, inside a clip, this picture again changed by effects and put in
+    /// place of what was there: a pane that blurs or bends what is behind it.
+    public func backdrop(_ effects: [Effect], clip: Clip) -> Self {
+        appending([
+            .group(Group([.layer(Layer(self, effects: effects, operator: .copy))], clip: clip))
+        ])
+    }
+}
+
+extension Picture: ExpressibleByArrayLiteral {
+    public init(arrayLiteral elements: Element...) {
+        self.init(elements)
+    }
+}

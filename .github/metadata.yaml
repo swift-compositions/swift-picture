@@ -1,0 +1,9 @@
+description: "A picture as a value for Swift: shapes, paints, text as outlines, layers, effects, sprites and 3D scenes, and the contract a renderer draws one through."
+topics:
+  - compositions
+  - picture
+  - graphics
+  - rendering
+homepage: "https://swift-institute.org"
+readme:
+  family: E
