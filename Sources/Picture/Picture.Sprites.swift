@@ -13,7 +13,7 @@ extension Picture {
 
 extension Picture.Sprites {
     /// The light all sprites together add at a point: the sum of each sprite's pixel times its coverage there.
-    public func light(at point: Picture.Point) -> Picture.Pixel {
+    public func light(at point: Picture.Plane.Point<2>) -> Picture.Pixel {
         var total = Picture.Pixel.transparent
         for sprite in sprites {
             let across = point[0] - sprite.center[0]

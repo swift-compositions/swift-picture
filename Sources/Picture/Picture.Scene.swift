@@ -4,10 +4,10 @@ extension Picture {
     /// Meshes seen through a camera and drawn into a rectangle of the picture.
     public struct Scene: Sendable, Hashable {
         public var camera: Camera
-        public var viewport: Geometry<Double, Picture.Space>.Rectangle
+        public var viewport: Picture.Plane.Rectangle
         public var models: [Model]
 
-        public init(camera: Camera, viewport: Geometry<Double, Picture.Space>.Rectangle, models: [Model]) {
+        public init(camera: Camera, viewport: Picture.Plane.Rectangle, models: [Model]) {
             self.camera = camera
             self.viewport = viewport
             self.models = models
@@ -25,7 +25,7 @@ extension Picture.Scene {
         let width = viewport.urx.underlying - left
         let height = viewport.ury.underlying - top
         return Position(
-            point: Picture.Point([left + (normalized[0] + 1) / 2 * width, top + (1 - normalized[1]) / 2 * height]),
+            point: Picture.Plane.Point<2>([left + (normalized[0] + 1) / 2 * width, top + (1 - normalized[1]) / 2 * height]),
             depth: normalized[2]
         )
     }

@@ -12,11 +12,8 @@ public struct Picture: Sendable, Hashable {
 }
 
 extension Picture {
-    /// A path in picture space.
-    public typealias Path = Geometry<Double, Space>.Path
-
-    /// A point in picture space.
-    public typealias Point = Geometry<Double, Space>.Point<2>
+    /// The geometry of picture space: `Double` coordinates in `Picture.Space`.
+    public typealias Plane = Geometry<Double, Space>
 
     /// An affine map of picture space, applied to (x, y, 1).
     public typealias Transform = Matrix<2, 3, Double>

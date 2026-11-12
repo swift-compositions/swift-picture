@@ -11,7 +11,7 @@ extension `Picture Tests`.`An effect reads the sheet at a point it names` {
 
     static let degree = Double.pi / 180
 
-    static func polar(_ radius: Double, _ degrees: Double, around center: Picture.Point = .zero) -> Picture.Point {
+    static func polar(_ radius: Double, _ degrees: Double, around center: Picture.Plane.Point<2> = .zero) -> Picture.Plane.Point<2> {
         let radians = degrees * degree
         return Tests.at(center[0] + radius * cosine(radians), center[1] + radius * sine(radians))
     }

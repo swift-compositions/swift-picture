@@ -43,7 +43,7 @@ extension Picture.Text {
         let descent = -Double(font.descender) * scale
         let step = leading ?? (ascent + descent + Double(font.lineGap) * scale)
         let upright = Picture.Transform(rows: [[scale, 0, 0], [0, -scale, 0]])
-        var outlines: [UInt16: Picture.Path] = [:]
+        var outlines: [UInt16: Picture.Plane.Path] = [:]
         var runs: [Run] = []
         var text: [Unicode.Scalar] = []
         var bytes = string.utf8.makeIterator()
@@ -98,9 +98,9 @@ extension Picture.Text {
                 Glyph(
                     scalar: run.scalars[position],
                     index: run.indices[position],
-                    origin: Picture.Point([indent + run.starts[position] - run.starts[run.range.lowerBound], baseline]),
+                    origin: Picture.Plane.Point<2>([indent + run.starts[position] - run.starts[run.range.lowerBound], baseline]),
                     advance: run.widths[position],
-                    outline: outlines[run.indices[position]] ?? Picture.Path(subpaths: [])
+                    outline: outlines[run.indices[position]] ?? Picture.Plane.Path(subpaths: [])
                 )
             }
             return Line(glyphs: glyphs, baseline: baseline, width: run.width)
@@ -137,8 +137,8 @@ extension Picture.Text {
     }
 
     /// Every glyph's outline at its place, as one path.
-    public var path: Picture.Path {
-        Picture.Path(subpaths: glyphs.flatMap(\.path.subpaths))
+    public var path: Picture.Plane.Path {
+        Picture.Plane.Path(subpaths: glyphs.flatMap(\.path.subpaths))
     }
 
     /// The whole text as one shape with a fill.

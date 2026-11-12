@@ -22,7 +22,7 @@ extension Picture.Effect {
 
 extension Picture.Effect.Displacement {
     /// The offset the field gives at a point.
-    public func offset(at point: Picture.Point) -> Vector<2, Double> {
+    public func offset(at point: Picture.Plane.Point<2>) -> Vector<2, Double> {
         let position = Point::Point<3, Double>([point[0] * frequency, point[1] * frequency, phase])
         let across = Noise<3, Double>(seed: seed)
         let down = Noise<3, Double>(seed: Threefry.Key(seed.first, seed.second &+ 1))
@@ -30,8 +30,8 @@ extension Picture.Effect.Displacement {
     }
 
     /// The point of the sheet read for `point`: the point moved by the field's offset there.
-    public func source(of point: Picture.Point) -> Picture.Point {
+    public func source(of point: Picture.Plane.Point<2>) -> Picture.Plane.Point<2> {
         let offset = offset(at: point)
-        return Picture.Point([point[0] + offset[0], point[1] + offset[1]])
+        return Picture.Plane.Point<2>([point[0] + offset[0], point[1] + offset[1]])
     }
 }

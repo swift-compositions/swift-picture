@@ -10,7 +10,7 @@ extension Picture {
 
 extension Picture.Paint {
     /// The pixel the paint gives at a point.
-    public func pixel(at point: Picture.Point) -> Picture.Pixel {
+    public func pixel(at point: Picture.Plane.Point<2>) -> Picture.Pixel {
         switch self {
         case .solid(let color): color.pixel
         case .linear(let linear): linear.gradient.pixel(at: Float(linear.parameter(at: point)))

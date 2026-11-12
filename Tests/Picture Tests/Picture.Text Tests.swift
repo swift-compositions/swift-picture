@@ -77,7 +77,7 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
         )
     }
 
-    static func corners(_ path: Picture.Path) -> [[[Double]]] {
+    static func corners(_ path: Picture.Plane.Path) -> [[[Double]]] {
         path.subpaths.map { subpath in
             [[subpath.startPoint[0], subpath.startPoint[1]]]
                 + subpath.segments.compactMap { segment in

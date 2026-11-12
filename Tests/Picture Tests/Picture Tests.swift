@@ -6,13 +6,13 @@ enum `Picture Tests` {}
 extension `Picture Tests` {
     typealias Pixel = Picture.Pixel
 
-    static func at(_ x: Double, _ y: Double) -> Picture.Point { .init([x, y]) }
+    static func at(_ x: Double, _ y: Double) -> Picture.Plane.Point<2> { .init([x, y]) }
 
     static func close(_ a: Double, _ b: Double, within tolerance: Double = 1e-9) -> Bool {
         abs(a - b) <= tolerance
     }
 
-    static func close(_ a: Picture.Point, _ b: Picture.Point, within tolerance: Double = 1e-9) -> Bool {
+    static func close(_ a: Picture.Plane.Point<2>, _ b: Picture.Plane.Point<2>, within tolerance: Double = 1e-9) -> Bool {
         close(a[0], b[0], within: tolerance) && close(a[1], b[1], within: tolerance)
     }
 
@@ -29,8 +29,8 @@ extension `Picture Tests` {
         Pixel(color: .init(red: red, green: green, blue: blue), alpha: alpha)
     }
 
-    static func square(_ side: Double) -> Picture.Path {
-        Picture.Path(subpaths: [
+    static func square(_ side: Double) -> Picture.Plane.Path {
+        Picture.Plane.Path(subpaths: [
             .init(
                 startPoint: at(0, 0),
                 segments: [
@@ -204,7 +204,7 @@ extension `Picture Tests`.`A stroke is the outline swift-geometry gives` {
 
     @Test
     func `The outline of a stroke is the path stroked with its pen`() throws {
-        let pen = Picture.Path.Stroke(width: 2, join: .miter(limit: 4), cap: .square)
+        let pen = Picture.Plane.Path.Stroke(width: 2, join: .miter(limit: 4), cap: .square)
         let stroke = Picture.Shape.Stroke(.solid(.black), pen: pen)
         let path = Tests.square(10)
         let outline = try stroke.outline(of: path, tolerance: 0.01)
@@ -219,10 +219,10 @@ extension `Picture Tests`.`A stroke is the outline swift-geometry gives` {
     @Test
     func `A pen the geometry refuses fails with its error`() {
         let stroke = Picture.Shape.Stroke(.solid(.black), pen: .init(width: -1, join: .round, cap: .round))
-        #expect(throws: Picture.Path.Error.width) { try stroke.outline(of: Tests.square(10), tolerance: 0.01) }
+        #expect(throws: Picture.Plane.Path.Error.width) { try stroke.outline(of: Tests.square(10), tolerance: 0.01) }
         let sharp = Picture.Shape.Stroke(.solid(.black), pen: .init(width: 1, join: .miter(limit: 0.5), cap: .butt))
-        #expect(throws: Picture.Path.Error.limit) { try sharp.outline(of: Tests.square(10), tolerance: 0.01) }
+        #expect(throws: Picture.Plane.Path.Error.limit) { try sharp.outline(of: Tests.square(10), tolerance: 0.01) }
         let fine = Picture.Shape.Stroke(.solid(.black), pen: .init(width: 1, join: .round, cap: .butt))
-        #expect(throws: Picture.Path.Error.tolerance) { try fine.outline(of: Tests.square(10), tolerance: 0) }
+        #expect(throws: Picture.Plane.Path.Error.tolerance) { try fine.outline(of: Tests.square(10), tolerance: 0) }
     }
 }

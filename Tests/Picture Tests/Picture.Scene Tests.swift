@@ -13,7 +13,7 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
         Matrix(rows: [[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
     }
 
-    static func viewport() -> Geometry<Double, Picture.Space>.Rectangle {
+    static func viewport() -> Picture.Plane.Rectangle {
         .init(llx: 100, lly: 50, urx: 300, ury: 150)
     }
 

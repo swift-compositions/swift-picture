@@ -11,19 +11,19 @@ extension Picture.Text {
         public let index: UInt16
 
         /// The glyph's own origin: where the pen stood on the baseline.
-        public let origin: Picture.Point
+        public let origin: Picture.Plane.Point<2>
 
         /// The glyph's own advance width at the text's size, without kerning.
         public let advance: Double
 
         /// The glyph's outline around its own origin, at the text's size, upright.
-        public let outline: Picture.Path
+        public let outline: Picture.Plane.Path
     }
 }
 
 extension Picture.Text.Glyph {
     /// The outline at the glyph's place in the text.
-    public var path: Picture.Path {
+    public var path: Picture.Plane.Path {
         outline.transformed(by: .translation(Vector([origin[0], origin[1]])))
     }
 }

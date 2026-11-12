@@ -10,7 +10,7 @@ extension Picture.Renderer {
         case unimplemented(Witness.Unimplemented.Error)
 
         /// A stroke the geometry refuses: a negative or non-finite width, or a miter limit below 1.
-        case path(Picture.Path.Error)
+        case path(Picture.Plane.Path.Error)
 
         /// The picture holds something this renderer does not draw.
         case unsupported
