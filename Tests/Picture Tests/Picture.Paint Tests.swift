@@ -138,6 +138,8 @@ extension `Picture Tests`.`A paint gives a pixel for every point` {
         #expect(image.pixel(at: Tests.at(1.5, 1.5)) == white)
         #expect(image.pixel(at: Tests.at(1, 0.5)) == Tests.pixel(0.5, 0, 0.5, 1))
         #expect(image.pixel(at: Tests.at(0.5, 1)) == Tests.pixel(0.5, 0.5, 0, 1))
+        #expect(image.pixel(at: Tests.at(0.75, 0.5)) == Tests.pixel(0.75, 0, 0.25, 1))
+        #expect(image.pixel(at: Tests.at(1.5, 1.25)) == Tests.pixel(0.75, 0.75, 1, 1))
         #expect(Picture.Paint.image(image).pixel(at: Tests.at(1.5, 0.5)) == blue)
     }
 

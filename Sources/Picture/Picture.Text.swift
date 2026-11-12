@@ -46,8 +46,9 @@ extension Picture.Text {
         var outlines: [UInt16: Picture.Path] = [:]
         var runs: [Run] = []
         // swift-linter:disable:next string utf8 scanning
-        // REASON: a font's character map is keyed by code point, so layout is defined over Unicode scalars, not bytes.
-        for paragraph in string.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: false) {
+        // REASON: ISO/IEC 14496-22 clause 5.2.1, the cmap table, maps Unicode code points to glyphs, so layout reads scalars, not bytes.
+        let text = Array(string.unicodeScalars)
+        for paragraph in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let scalars = Array(paragraph)
             let indices = scalars.map { font.glyphIndex(for: $0.value) ?? 0 }
             for index in indices where outlines[index] == nil {

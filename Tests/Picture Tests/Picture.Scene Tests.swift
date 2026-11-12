@@ -95,6 +95,7 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
         #expect(camera.direction(Vector([2, 0, 0])) == Vector([0, 1, 0]))
         #expect(camera.direction(Vector([0, 2, 0]), in: Self.translation(1, 2, 3)) == Vector([-1, 0, 0]))
         #expect(camera.direction(.zero) == .zero)
+        #expect(camera.direction(Vector([1, 2, 3]), in: .zero) == .zero)
         let stretch = Matrix<4, 4, Double>(rows: [[2, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
         let turned = camera.direction(Vector([1, 1, 0]), in: stretch)
         #expect(Tests.close(turned[0], -1 / 5.0.squareRoot()))
