@@ -111,6 +111,9 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
         #expect(text.glyphs[1].advance == 50)
         #expect(Self.corners(text.glyphs[1].outline) == [[[0, 0], [40, 0], [40, -70], [0, -70], [0, 0]]])
         #expect(Self.origins(text) == [[0, 0], [60, 0], [110, 0]])
+        let wide = try Picture.Text("A\u{1F600}\u{E9}V", font: Self.font(), size: 100)
+        #expect(wide.glyphs.map(\.index) == [1, 0, 0, 2])
+        #expect(wide.glyphs.map(\.scalar) == ["A", "\u{1F600}", "\u{E9}", "V"])
     }
 
     @Test
