@@ -10,7 +10,9 @@ let package = Package(
         .library(name: "Picture PNG Integration", targets: ["Picture PNG Integration"]),
     ],
     traits: [
-        .trait(name: "PNG", description: "PNG integration")
+        .trait(name: "PNG", description: "PNG integration"),
+        .trait(name: "Threads", description: "Picture CPU draws a frame on several threads"),
+        .default(enabledTraits: ["Threads"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swift-atoms/swift-angle.git", branch: "main"),
@@ -62,7 +64,7 @@ let package = Package(
             name: "Picture CPU",
             dependencies: [
                 .target(name: "Picture"),
-                .product(name: "Kernel Thread", package: "swift-kernel"),
+                .product(name: "Kernel Thread", package: "swift-kernel", condition: .when(traits: ["Threads"])),
                 .product(name: "Numeric", package: "swift-numeric"),
             ]
         ),

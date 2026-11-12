@@ -1,5 +1,7 @@
+#if Threads
+    import Kernel_Thread
+#endif
 public import Picture
-import Kernel_Thread
 
 extension Picture.Renderer {
     /// The renderer in pure Swift on as many threads as the machine has logical processors: it draws into a
@@ -20,7 +22,11 @@ extension Picture.Renderer {
     }
 }
 
-/// The logical processors of the machine.
+/// The logical processors of the machine, or one without the `Threads` trait.
 private func processors() -> Int {
-    Int(CPU.Logical.count)
+    #if Threads
+        Int(CPU.Logical.count)
+    #else
+        1
+    #endif
 }
