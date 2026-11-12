@@ -125,6 +125,45 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
     }
 
     @Test
+    func `A light on glass is brightest where the surface faces halfway between the light and the eye`() {
+        let light = Picture.Scene.Material.Glass.Light(direction: Vector([0, 0, 1]), gloss: 10, rim: 0)
+        #expect(Tests.close(light.reflection(for: Vector([0, 0, 1])), 1))
+        #expect(Tests.close(light.reflection(for: Vector([0, 0, -3])), 1))
+        #expect(light.reflection(for: Vector([0.6, 0, 0.8])) < 1)
+        #expect(Tests.close(light.reflection(for: Vector([0.6, 0, 0.8])), 0.107_374_182_4))
+        #expect(light.reflection(for: Vector([1, 0, 0])) == 0)
+        #expect(light.reflection(for: .zero) == 0)
+        let side = Picture.Scene.Material.Glass.Light(direction: Vector([1, 0, 1]), gloss: 40, rim: 0)
+        let half = Vector<3, Double>([0.382_683_432_365_089_8, 0, 0.923_879_532_511_286_7])
+        #expect(Tests.close(side.reflection(for: half), 1))
+        #expect(side.reflection(for: Vector([0, 0, 1])) < side.reflection(for: half))
+    }
+
+    @Test
+    func `A light's rim grows as the surface turns edge-on to the eye, and the share stays within 0 and 1`() {
+        let rim = Picture.Scene.Material.Glass.Light(direction: Vector([0, 1, 0]), gloss: 1000, rim: 0.5)
+        #expect(Tests.close(rim.reflection(for: Vector([0, 0, 1])), 0))
+        #expect(Tests.close(rim.reflection(for: Vector([0.8, 0, 0.6])), 0.5 * 0.4 * 0.4 * 0.4))
+        #expect(Tests.close(rim.reflection(for: Vector([-1, 0, 0])), 0.5))
+        let both = Picture.Scene.Material.Glass.Light(direction: Vector([0, 0, 1]), gloss: 0, rim: 1)
+        #expect(both.reflection(for: Vector([0.8, 0, 0.6])) == 1)
+    }
+
+    @Test
+    func `Lit glass adds its light's colour by the share it reflects, and unlit glass is its tint alone`() {
+        let behind = Tests.pixel(0.25, 0.5, 0.75, 1)
+        let normal = Vector<3, Double>([0.6, 0, 0.8])
+        let plain = Picture.Scene.Material.Glass(bend: 20)
+        #expect(plain.light == nil)
+        #expect(plain.pixel(over: behind, facing: normal) == behind)
+        let light = Picture.Scene.Material.Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, rim: 0)
+        let lit = Picture.Scene.Material.Glass(bend: 20, light: light)
+        let share = Float(light.reflection(for: normal))
+        #expect(lit.pixel(over: behind, facing: normal) == Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: behind, operator: .lighter, coverage: share))
+        #expect(lit.pixel(over: behind, facing: Vector([1, 0, 0])) == behind)
+    }
+
+    @Test
     func `A scene holds its models in order with their meshes and materials`() throws {
         let torus = Mesh<Point<3, Double>>.torus(major: 2, minor: 0.5, segments: 8, sides: 4)
         let glass = Picture.Scene.Model(torus, material: .glass(.init(bend: 12)))

@@ -73,6 +73,11 @@ extension Picture.Renderer.CPU.Step {
         case .displacement(let displacement):
             let reach = 2.0.squareRoot() * abs(displacement.amplitude) * Picture.Renderer.CPU.stretch(transform)
             self = .map(conjugated(displacement.source(of:)), reach: reach.isFinite ? reach : nil)
+
+        case .swirl(let swirl):
+            guard swirl.angle != 0, swirl.radius > 0 else { return nil }
+            let reach = 2 * swirl.radius * Picture.Renderer.CPU.stretch(transform)
+            self = .map(conjugated(swirl.source(of:)), reach: reach.isFinite ? reach : nil)
         }
     }
 

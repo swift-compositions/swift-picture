@@ -91,6 +91,32 @@ extension `Picture Tests`.`An effect reads the sheet at a point it names` {
     }
 
     @Test
+    func `A swirl turns a point back about its centre by its angle times the square of the radius left`() {
+        let swirl = Picture.Effect.Swirl(center: Tests.at(10, -4), radius: 8, angle: Double.pi)
+        #expect(Tests.close(swirl.turn(at: 0), Double.pi))
+        #expect(Tests.close(swirl.turn(at: 4), Double.pi / 4))
+        #expect(swirl.turn(at: 8) == 0)
+        #expect(swirl.turn(at: 20) == 0)
+        #expect(Tests.close(swirl.source(of: Self.polar(4, 90, around: Tests.at(10, -4))), Self.polar(4, 45, around: Tests.at(10, -4))))
+        #expect(Tests.close(swirl.source(of: Self.polar(2, 0, around: Tests.at(10, -4))), Self.polar(2, -0.5625 * 180, around: Tests.at(10, -4))))
+        #expect(swirl.source(of: Tests.at(10, -4)) == Tests.at(10, -4))
+        #expect(swirl.source(of: Tests.at(30, 7)) == Tests.at(30, 7))
+        #expect(Picture.Effect.Swirl(center: .zero, radius: 0, angle: 3).source(of: Tests.at(0.5, 0)) == Tests.at(0.5, 0))
+    }
+
+    @Test
+    func `A swirl keeps every point's distance from its centre`() {
+        let swirl = Picture.Effect.Swirl(center: Tests.at(3, -2), radius: 12, angle: -2.5)
+        [(10.0, 1.0), (-4.0, 7.5), (3.0, -9.0), (3.5, -2.25), (20.0, 20.0)].forEach { x, y in
+            let point = Tests.at(x, y)
+            let source = swirl.source(of: point)
+            let before = ((point[0] - 3) * (point[0] - 3) + (point[1] + 2) * (point[1] + 2)).squareRoot()
+            let after = ((source[0] - 3) * (source[0] - 3) + (source[1] + 2) * (source[1] + 2)).squareRoot()
+            #expect(Tests.close(before, after))
+        }
+    }
+
+    @Test
     func `A kaleidoscope reads the mirror image in its first wedge`() {
         let four = Picture.Effect.Kaleidoscope(center: .zero, segments: 4)
         #expect(four.rotation == .zero)

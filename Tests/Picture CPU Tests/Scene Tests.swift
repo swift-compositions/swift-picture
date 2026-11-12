@@ -135,6 +135,31 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
     }
 
     @Test
+    func `Lit glass adds the light it reflects at its normal in eye space`() throws {
+        let gradient = Picture.Paint.linear(
+            .init(from: Tests.at(0, 0), to: Tests.at(40, 0), .init([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.blue)]))
+        )
+        let background = Picture.Element.shape(.init(Tests.rectangle(-20, -20, 80, 80), fill: .init(gradient)))
+        let tilt = 0.6
+        let pane = try Mesh(
+            vertices: [Vertex([-1, -1, -5]), Vertex([1, -1, -5 + 2 * tilt]), Vertex([1, 1, -5 + 2 * tilt]), Vertex([-1, 1, -5])],
+            faces: [Polygon(0, 1, 2, 3)]
+        )
+        let light = Picture.Scene.Material.Glass.Light(direction: Vector([-1, 0.5, 1]), color: .white, gloss: 3, rim: 0.4)
+        let glass = Picture.Scene.Material.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25), light: light)
+        let raster = try Tests.drawn([background, .scene(try Self.flat([.init(pane, material: .glass(glass))]))], on: Tests.canvas(40, 40))
+        let length = (1 + tilt * tilt).squareRoot()
+        let normal = Vector<3, Double>([-tilt / length, 0, 1 / length])
+        #expect(light.reflection(for: normal) > 0.1)
+        let offset = glass.offset(for: normal)
+        for (x, y): (UInt, UInt) in [(15, 15), (18, 22), (20, 18)] {
+            let read = gradient.pixel(at: Tests.at(Double(x) + 0.5 + offset[0], Double(y) + 0.5 + offset[1]))
+            #expect(Tests.close(Tests.at(raster, x, y), glass.pixel(over: read, facing: normal), within: 1e-4))
+            #expect(Tests.at(raster, x, y) != glass.pixel(over: read))
+        }
+    }
+
+    @Test
     func `A scene moves with its group and keeps to its clip`() throws {
         let scene = try Self.flat([.init(Self.square(0, 0, -5), material: .flat(Tests.red))])
         let moved = try Tests.drawn([.group(.init([.scene(scene)], transform: .translation(Vector([5, 3]))))], on: Tests.canvas(50, 50, Self.backdrop))

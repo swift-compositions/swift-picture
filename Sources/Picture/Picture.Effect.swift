@@ -18,5 +18,8 @@ extension Picture {
 
         /// Every point read from a place a smooth noise field pushes it to.
         case displacement(Displacement)
+
+        /// Everything near a centre turned about it, most at the centre.
+        case swirl(Swirl)
     }
 }

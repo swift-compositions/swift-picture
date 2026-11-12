@@ -101,7 +101,7 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
     }
 
     @Test
-    func `Pixelation, kaleidoscope and displacement read the sheet at the point their source names`() throws {
+    func `Pixelation, kaleidoscope, displacement and swirl read the sheet at the point their source names`() throws {
         let sheet = try Self.sheet()
         let pixelation = Picture.Effect.Pixelation(origin: Tests.at(1, -2), width: 3, height: 5)
         Self.expect(try Self.drawn([.pixelation(pixelation)])) { Self.read(sheet, pixelation.source(of: $0)) }
@@ -109,6 +109,9 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
         Self.expect(try Self.drawn([.kaleidoscope(kaleidoscope)])) { Self.read(sheet, kaleidoscope.source(of: $0)) }
         let displacement = Picture.Effect.Displacement(seed: .init(7, 11), frequency: 0.1, amplitude: 9, phase: 0.4)
         Self.expect(try Self.drawn([.displacement(displacement)])) { Self.read(sheet, displacement.source(of: $0)) }
+        let swirl = Picture.Effect.Swirl(center: Tests.at(12, 8), radius: 30, angle: 2.2)
+        Self.expect(try Self.drawn([.swirl(swirl)])) { Self.read(sheet, swirl.source(of: $0)) }
+        #expect(try Self.drawn([.swirl(.init(center: Tests.at(3, 3), radius: 10, angle: 0))]) == Self.drawn([]))
         #expect(try Self.drawn([.pixelation(.init(width: 0, height: 3))]) == Self.drawn([]))
         #expect(try Self.drawn([.kaleidoscope(.init(center: Tests.at(3, 3), segments: 0))]) == Self.drawn([]))
     }

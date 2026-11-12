@@ -297,7 +297,7 @@ extension Picture.Renderer.CPU.Canvas {
                     x: Double(x) + (Double(column % samples) + 0.5) / Double(samples) + across,
                     y: Double(y) + (Double(row % samples) + 0.5) / Double(samples) + down
                 )
-                return surface.glass.pixel(over: Self.sample(before, origin, point.x, point.y, edge: .extend))
+                return surface.glass.pixel(over: Self.sample(before, origin, point.x, point.y, edge: .extend), facing: normal)
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }
