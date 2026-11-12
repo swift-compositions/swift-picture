@@ -55,22 +55,29 @@ extension Picture.Renderer.CPU.Canvas {
     mutating func draw(_ sprites: Picture.Sprites, _ state: Picture.Renderer.CPU.State) {
         guard let inverse = state.inverse else { return }
         let tiles = Picture.Renderer.CPU.Tiles(sprites, state.transform, over: state.reach(in: box))
-        for (position, list) in zip(tiles.lists.indices, tiles.lists) where !list.isEmpty {
-            let near = Picture.Sprites(list, profile: sprites.profile)
-            let tile = tiles.tile(position)
-            var y = tile.top
-            while y < tile.bottom {
-                var x = tile.left
-                while x < tile.right {
-                    let light = near.light(at: Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
-                    if light != .transparent {
-                        let index = box.index(x, y)
-                        let old = pixels[index]
-                        pixels[index] = Picture.Renderer.CPU.limited(old, light.composited(over: old, operator: .lighter), state.share(x, y))
+        let box = self.box
+        pixels.withUnsafeMutableBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            let shared = unsafe Picture.Renderer.CPU.Workers.Pixels(base: base)
+            state.workers.run(tiles.lists.count) { position in
+                let list = tiles.lists[position]
+                guard !list.isEmpty else { return }
+                let near = Picture.Sprites(list, profile: sprites.profile)
+                let tile = tiles.tile(position)
+                var y = tile.top
+                while y < tile.bottom {
+                    var x = tile.left
+                    while x < tile.right {
+                        let light = near.light(at: Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
+                        if light != .transparent {
+                            let index = box.index(x, y)
+                            let old = unsafe shared[index]
+                            unsafe shared[index] = Picture.Renderer.CPU.limited(old, light.composited(over: old, operator: .lighter), state.share(x, y))
+                        }
+                        x += 1
                     }
-                    x += 1
+                    y += 1
                 }
-                y += 1
             }
         }
     }

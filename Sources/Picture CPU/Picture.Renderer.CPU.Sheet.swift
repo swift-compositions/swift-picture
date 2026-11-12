@@ -60,9 +60,9 @@ extension Picture.Renderer.CPU.Sheet {
             stage -= 1
         }
         var sheet = Picture.Renderer.CPU.Canvas(boxes[0], repeating: .transparent)
-        try sheet.draw(layer.content, Picture.Renderer.CPU.State(transform: state.transform, mask: nil))
+        try sheet.draw(layer.content, Picture.Renderer.CPU.State(transform: state.transform, mask: nil, workers: state.workers))
         for (step, box) in zip(steps, boxes.dropFirst()) {
-            sheet = step.applied(to: sheet, over: box)
+            sheet = step.applied(to: sheet, over: box, state.workers)
         }
         return sheet
     }

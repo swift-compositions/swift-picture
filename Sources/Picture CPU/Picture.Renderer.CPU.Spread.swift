@@ -14,7 +14,7 @@ extension Picture.Renderer.CPU.Spread {
     static let threshold: Double = 2
 
     /// The passes of the cascade.
-    static let passes: Int = 5
+    static let passes: Cardinal = 5
 
     /// The spread of a Gaussian of a deviation in pixels, or nil for a deviation that is negative or not finite.
     init?(deviation: Double) {
@@ -27,7 +27,7 @@ extension Picture.Renderer.CPU.Spread {
             return nil
         }
         do throws(Raster<SIMD4<Float>>.Kernel<Float>.Error) {
-            self = .boxes(try .gaussian(deviation: Float(deviation), count: Cardinal(UInt(Self.passes))))
+            self = .boxes(try .gaussian(deviation: Float(deviation), count: Self.passes))
         } catch {
             return nil
         }
@@ -51,25 +51,79 @@ extension Picture.Renderer.CPU.Spread {
         Picture.Pixel(color: .init(red: lanes[0], green: lanes[1], blue: lanes[2]), alpha: lanes[3])
     }
 
-    /// A raster spread across by one spread and down by another, transparent beyond its edge.
-    static func applied(_ across: Self, _ down: Self, to raster: Raster<Picture.Pixel>) -> Raster<Picture.Pixel> {
-        func mix(_ from: Picture.Pixel, _ to: Picture.Pixel, _ parameter: Float) -> Picture.Pixel {
-            from.interpolated(to: to, at: parameter)
+    /// A raster spread across by one spread and down by another, transparent beyond its edge. Across, the
+    /// workers take bands of whole rows; down, strips of whole columns, so each line is spread as it would be alone.
+    static func applied(
+        _ across: Self,
+        _ down: Self,
+        to raster: Raster<Picture.Pixel>,
+        _ workers: Picture.Renderer.CPU.Workers
+    ) -> Raster<Picture.Pixel> {
+        let spread = split(raster, down: false, workers) { across.spread($0, down: false) }
+        return split(spread, down: true, workers) { down.spread($0, down: true) }
+    }
+
+    /// A raster spread along one axis.
+    func spread(_ raster: Raster<Picture.Pixel>, down: Bool) -> Raster<Picture.Pixel> {
+        switch self {
+        case .exact(let kernel):
+            return raster.convolved(
+                horizontal: down ? .identity : kernel,
+                vertical: down ? kernel : .identity,
+                edge: .constant(.transparent)
+            ) { from, to, parameter in
+                from.interpolated(to: to, at: parameter)
+            }
+
+        case .boxes(let cascade):
+            return raster.map(Self.lanes)
+                .smoothed(horizontal: down ? .identity : cascade, vertical: down ? cascade : .identity, edge: .constant(.zero))
+                .map(Self.pixel)
         }
-        switch (across, down) {
-        case (.exact(let horizontal), .exact(let vertical)):
-            return raster.convolved(horizontal: horizontal, vertical: vertical, edge: .constant(.transparent), mixing: mix)
+    }
 
-        case (.boxes(let horizontal), .boxes(let vertical)):
-            return raster.map(lanes).smoothed(horizontal: horizontal, vertical: vertical, edge: .constant(.zero)).map(pixel)
-
-        case (.exact(let horizontal), .boxes(let vertical)):
-            let spread = raster.convolved(horizontal: horizontal, vertical: .identity, edge: .constant(.transparent), mixing: mix)
-            return spread.map(lanes).smoothed(horizontal: .identity, vertical: vertical, edge: .constant(.zero)).map(pixel)
-
-        case (.boxes(let horizontal), .exact(let vertical)):
-            let spread = raster.map(lanes).smoothed(horizontal: horizontal, vertical: .identity, edge: .constant(.zero)).map(pixel)
-            return spread.convolved(horizontal: .identity, vertical: vertical, edge: .constant(.transparent), mixing: mix)
+    /// A raster with `apply` made of each band of rows, or with `down` each strip of columns, the workers
+    /// taking the bands, put back together in place.
+    static func split(
+        _ raster: Raster<Picture.Pixel>,
+        down: Bool,
+        _ workers: Picture.Renderer.CPU.Workers,
+        _ apply: (Raster<Picture.Pixel>) -> Raster<Picture.Pixel>
+    ) -> Raster<Picture.Pixel> {
+        let width = Int(bitPattern: raster.width)
+        let height = Int(bitPattern: raster.height)
+        guard workers.count > 1, width * height >= 2 * Picture.Renderer.CPU.Workers.worth else { return apply(raster) }
+        let size = down ? Picture.Renderer.CPU.Workers.rows(across: height) : Picture.Renderer.CPU.Workers.rows(across: width)
+        let total = down ? width : height
+        var canvas = Picture.Renderer.CPU.Canvas(raster)
+        let source = raster
+        let box = canvas.box
+        canvas.pixels.withUnsafeMutableBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            let shared = unsafe Picture.Renderer.CPU.Workers.Pixels(base: base)
+            workers.run((total + size - 1) / size) { part in
+                let start = part * size
+                let count = Swift.min(size, total - start)
+                let region = Raster<Picture.Pixel>.Region(
+                    x: Ordinal(UInt(down ? start : 0)),
+                    y: Ordinal(UInt(down ? 0 : start)),
+                    width: Cardinal(UInt(down ? count : width)),
+                    height: Cardinal(UInt(down ? height : count))
+                )
+                let piece: Raster<Picture.Pixel>
+                do throws(Raster<Picture.Pixel>.Error) {
+                    piece = apply(try source.cropped(to: region))
+                } catch {
+                    preconditionFailure("A band lies inside its raster")
+                }
+                let columns = down ? count : width
+                for (index, pixel) in zip(piece.pixels.indices, piece.pixels) {
+                    let x = (down ? start : 0) + index % columns
+                    let y = (down ? 0 : start) + index / columns
+                    unsafe shared[box.index(x, y)] = pixel
+                }
+            }
         }
+        return canvas.raster
     }
 }

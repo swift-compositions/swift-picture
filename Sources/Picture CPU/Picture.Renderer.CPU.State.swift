@@ -5,6 +5,7 @@ extension Picture.Renderer.CPU {
     struct State {
         var transform: Picture.Transform
         var mask: Mask?
+        var workers: Workers = .one
     }
 }
 

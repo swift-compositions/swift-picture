@@ -17,6 +17,7 @@ let package = Package(
         .package(url: "https://github.com/swift-atoms/swift-byte.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-direction.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-geometry.git", branch: "main", traits: ["Affine"]),
+        .package(url: "https://github.com/swift-compositions/swift-kernel.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-matrix.git", branch: "main", traits: ["Projection"]),
         .package(url: "https://github.com/swift-atoms/swift-mesh.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-noise.git", branch: "main"),
@@ -61,6 +62,7 @@ let package = Package(
             name: "Picture CPU",
             dependencies: [
                 .target(name: "Picture"),
+                .product(name: "Kernel Thread", package: "swift-kernel"),
                 .product(name: "Numeric", package: "swift-numeric"),
             ]
         ),

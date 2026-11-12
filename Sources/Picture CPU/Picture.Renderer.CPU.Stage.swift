@@ -264,9 +264,11 @@ extension Picture.Renderer.CPU.Canvas {
         guard area.area > 0 else { return }
         let upper = scene.camera.projection.depth.range.upperBound
         let opaque = Picture.Renderer.CPU.Stage.tiles(stage.opaque, over: area)
-        for (tile, numbers) in opaque where !numbers.isEmpty {
+        unsafe tiles(opaque.count, state.workers) { shared, box, part in
+            let (tile, numbers) = opaque[part]
+            guard !numbers.isEmpty else { return }
             let hits = Picture.Renderer.CPU.Stage.hits(stage.opaque, numbers, in: tile, samples: samples)
-            visit(tile, samples) { _, _, row, column, old in
+            unsafe Self.visit(shared, box, tile, samples) { _, _, row, column, old in
                 let hit = hits[row * tile.width * samples + column]
                 guard hit.triangle >= 0, hit.depth <= upper else { return old }
                 return stage.colors[hit.triangle].composited(over: old)
@@ -278,10 +280,13 @@ extension Picture.Renderer.CPU.Canvas {
         let before = raster
         let origin = box
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
-        for ((tile, numbers), (_, covers)) in zip(glass, opaque) where !numbers.isEmpty {
+        unsafe tiles(glass.count, state.workers) { shared, box, part in
+            let (tile, numbers) = glass[part]
+            let covers = opaque[part].triangles
+            guard !numbers.isEmpty else { return }
             let hits = Picture.Renderer.CPU.Stage.hits(stage.glass, numbers, in: tile, samples: samples)
             let nearest = Picture.Renderer.CPU.Stage.hits(stage.opaque, covers, in: tile, samples: samples)
-            visit(tile, samples) { x, y, row, column, old in
+            unsafe Self.visit(shared, box, tile, samples) { x, y, row, column, old in
                 let position = row * tile.width * samples + column
                 let hit = hits[position]
                 let cover = nearest[position]
@@ -307,7 +312,9 @@ extension Picture.Renderer.CPU.Canvas {
     /// For each pixel of a tile, the mean over its `samples` × `samples` points of what `value` gives for the
     /// pixel as it is (row and column count sample points from the tile's corner), put in place by `finish`.
     /// A pixel all of whose points give it back unchanged is left alone.
-    mutating func visit(
+    static func visit(
+        _ pixels: Picture.Renderer.CPU.Workers.Pixels,
+        _ box: Picture.Renderer.CPU.Box,
         _ tile: Picture.Renderer.CPU.Box,
         _ samples: Int,
         _ value: (_ x: Int, _ y: Int, _ row: Int, _ column: Int, _ old: Picture.Pixel) -> Picture.Pixel,
@@ -318,7 +325,7 @@ extension Picture.Renderer.CPU.Canvas {
             var x = tile.left
             while x < tile.right {
                 let index = box.index(x, y)
-                let old = pixels[index]
+                let old = unsafe pixels[index]
                 var mean = old
                 var changed = false
                 var count = 0
@@ -334,10 +341,27 @@ extension Picture.Renderer.CPU.Canvas {
                     }
                     row += 1
                 }
-                if changed { pixels[index] = finish(x, y, old, mean) }
+                if changed { unsafe pixels[index] = finish(x, y, old, mean) }
                 x += 1
             }
             y += 1
+        }
+    }
+}
+
+extension Picture.Renderer.CPU.Canvas {
+    /// Calls `body` for each of some tiles of the canvas on the workers, with the canvas's pixels and box;
+    /// each call writes only the pixels of its own tile.
+    mutating func tiles(
+        _ count: Int,
+        _ workers: Picture.Renderer.CPU.Workers,
+        _ body: (_ pixels: Picture.Renderer.CPU.Workers.Pixels, _ box: Picture.Renderer.CPU.Box, _ part: Int) -> Void
+    ) {
+        let box = self.box
+        pixels.withUnsafeMutableBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            let shared = unsafe Picture.Renderer.CPU.Workers.Pixels(base: base)
+            workers.run(count) { part in unsafe body(shared, box, part) }
         }
     }
 }

@@ -79,16 +79,20 @@ extension `Picture CPU Tests`.`Timing` {
         )
     }
 
-    static func time(_ picture: Picture) throws -> Duration {
-        var best = Duration.seconds(1000)
-        for _ in 0..<3 {
-            var raster = Tests.canvas(1920, 1080, .transparent)
-            let clock = ContinuousClock()
-            let start = clock.now
-            try Tests.renderer.render(picture, into: &raster)
-            best = min(best, clock.now - start)
+    /// The best of three times for a picture, on one thread and on every logical processor.
+    static func time(_ picture: Picture) throws -> String {
+        func best(_ renderer: Picture.Renderer) throws -> Duration {
+            var best = Duration.seconds(1000)
+            for _ in 0..<3 {
+                var raster = Tests.canvas(1920, 1080, .transparent)
+                let clock = ContinuousClock()
+                let start = clock.now
+                try renderer.render(picture, into: &raster)
+                best = min(best, clock.now - start)
+            }
+            return best
         }
-        return best
+        return "one thread \(try best(.cpu(threads: 1))), all threads \(try best(.cpu))"
     }
 
     #if !DEBUG

@@ -31,20 +31,43 @@ extension Picture.Renderer.CPU.Canvas {
         }
     }
 
-    /// A canvas over a box whose pixels are a function of their centres in raster space.
-    init(_ box: Picture.Renderer.CPU.Box, _ pixel: (_ x: Double, _ y: Double) -> Picture.Pixel) {
-        var pixels: [Picture.Pixel] = []
-        pixels.reserveCapacity(box.area)
-        var y = box.top
-        while y < box.bottom {
-            var x = box.left
-            while x < box.right {
-                pixels.append(pixel(Double(x) + 0.5, Double(y) + 0.5))
-                x += 1
+    /// A canvas over a box whose pixels are a function of their centres in raster space, band by band on the workers.
+    init(_ box: Picture.Renderer.CPU.Box, _ workers: Picture.Renderer.CPU.Workers, _ pixel: (_ x: Double, _ y: Double) -> Picture.Pixel) {
+        self.init(box, repeating: .transparent)
+        update(box, workers) { x, y, _ in pixel(Double(x) + 0.5, Double(y) + 0.5) }
+    }
+
+    /// Gives each pixel of an area of the canvas the value `pixel` makes of its position and its pixel as it was.
+    /// The area is cut into bands of rows and the workers take the bands; each pixel is computed the same way
+    /// whichever thread takes it.
+    mutating func update(
+        _ area: Picture.Renderer.CPU.Box,
+        _ workers: Picture.Renderer.CPU.Workers,
+        _ pixel: (_ x: Int, _ y: Int, _ old: Picture.Pixel) -> Picture.Pixel
+    ) {
+        let area = area.intersection(box)
+        guard area.area > 0 else { return }
+        let box = self.box
+        let band = Picture.Renderer.CPU.Workers.rows(across: area.width)
+        let bands = (area.height + band - 1) / band
+        pixels.withUnsafeMutableBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            let shared = unsafe Picture.Renderer.CPU.Workers.Pixels(base: base)
+            workers.run(bands) { part in
+                var y = area.top + part * band
+                let end = Swift.min(y + band, area.bottom)
+                while y < end {
+                    var x = area.left
+                    var index = box.index(x, y)
+                    while x < area.right {
+                        unsafe shared[index] = pixel(x, y, unsafe shared[index])
+                        x += 1
+                        index += 1
+                    }
+                    y += 1
+                }
             }
-            y += 1
         }
-        self.init(box: box, pixels: pixels)
     }
 
     /// Copies another canvas's pixels where the two boxes overlap.
@@ -150,26 +173,17 @@ extension Picture.Renderer.CPU.Canvas {
         let coverage = try Self.coverage(of: path, rule: rule, in: area)
         var solid: Picture.Pixel?
         if case .solid = paint { solid = paint.pixel(at: .zero) }
-        var y = area.top
-        while y < area.bottom {
-            var x = area.left
-            while x < area.right {
-                let share = coverage[area.index(x, y)]
-                if share > 0 {
-                    let source = solid ?? paint.pixel(at: Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
-                    let index = box.index(x, y)
-                    let old = pixels[index]
-                    pixels[index] = Picture.Renderer.CPU.limited(old, source.composited(over: old, coverage: share), state.share(x, y))
-                }
-                x += 1
-            }
-            y += 1
+        update(area, state.workers) { x, y, old in
+            let share = coverage[area.index(x, y)]
+            guard share > 0 else { return old }
+            let source = solid ?? paint.pixel(at: Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
+            return Picture.Renderer.CPU.limited(old, source.composited(over: old, coverage: share), state.share(x, y))
         }
     }
 
     /// Draws a group's content under its transform, limited to its clip.
     mutating func draw(_ group: Picture.Group, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
-        var inner = Picture.Renderer.CPU.State(transform: state.transform.multiplied(by: group.transform), mask: state.mask)
+        var inner = Picture.Renderer.CPU.State(transform: state.transform.multiplied(by: group.transform), mask: state.mask, workers: state.workers)
         if let clip = group.clip {
             let path = clip.path.transformed(by: inner.transform)
             let area = Self.bounds(of: path).intersection(state.reach(in: box))
@@ -196,16 +210,8 @@ extension Picture.Renderer.CPU.Canvas {
         guard target.area > 0 else { return }
         let sheet = try Picture.Renderer.CPU.Sheet(layer, state, target).drawn()
         let visit = Picture.Renderer.CPU.Sheet.keeps(layer) ? target.intersection(sheet.box) : target
-        var y = visit.top
-        while y < visit.bottom {
-            var x = visit.left
-            while x < visit.right {
-                let index = box.index(x, y)
-                let old = pixels[index]
-                pixels[index] = Picture.Renderer.CPU.limited(old, layer.composited(sheet[x, y], over: old), state.share(x, y))
-                x += 1
-            }
-            y += 1
+        update(visit, state.workers) { x, y, old in
+            Picture.Renderer.CPU.limited(old, layer.composited(sheet[x, y], over: old), state.share(x, y))
         }
     }
 }

@@ -139,7 +139,7 @@ extension Picture.Renderer.CPU.Step {
     }
 
     /// The step's result over a box, read from a sheet.
-    func applied(to sheet: Picture.Renderer.CPU.Canvas, over box: Picture.Renderer.CPU.Box) -> Picture.Renderer.CPU.Canvas {
+    func applied(to sheet: Picture.Renderer.CPU.Canvas, over box: Picture.Renderer.CPU.Box, _ workers: Picture.Renderer.CPU.Workers) -> Picture.Renderer.CPU.Canvas {
         guard box.area > 0 else { return Picture.Renderer.CPU.Canvas(box, repeating: .transparent) }
         let raster = sheet.raster
         func read(_ x: Double, _ y: Double) -> Picture.Pixel {
@@ -150,13 +150,13 @@ extension Picture.Renderer.CPU.Step {
             let padded = box.expanded(across.reach, down.reach)
             var source = Picture.Renderer.CPU.Canvas(padded, repeating: .transparent)
             source.copy(sheet)
-            let blurred = Picture.Renderer.CPU.Spread.applied(across, down, to: source.raster)
+            let blurred = Picture.Renderer.CPU.Spread.applied(across, down, to: source.raster, workers)
             var result = Picture.Renderer.CPU.Canvas(box, repeating: .transparent)
             result.copy(Picture.Renderer.CPU.Canvas(box: padded, pixels: blurred.pixels))
             return result
 
         case .zoom(let source):
-            return Picture.Renderer.CPU.Canvas(box) { x, y in
+            return Picture.Renderer.CPU.Canvas(box, workers) { x, y in
                 let end = source(x, y, 1)
                 let across = end.x - x
                 let down = end.y - y
@@ -174,7 +174,7 @@ extension Picture.Renderer.CPU.Step {
             }
 
         case .chromatic(let chromatic, let red, let green, let blue):
-            return Picture.Renderer.CPU.Canvas(box) { x, y in
+            return Picture.Renderer.CPU.Canvas(box, workers) { x, y in
                 chromatic.pixel(
                     red: read(x - red.x, y - red.y),
                     green: read(x - green.x, y - green.y),
@@ -183,7 +183,7 @@ extension Picture.Renderer.CPU.Step {
             }
 
         case .map(let source, _):
-            return Picture.Renderer.CPU.Canvas(box) { x, y in
+            return Picture.Renderer.CPU.Canvas(box, workers) { x, y in
                 let point = source(x, y)
                 return read(point.x, point.y)
             }
