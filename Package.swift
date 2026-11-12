@@ -60,7 +60,8 @@ let package = Package(
         .target(
             name: "Picture CPU",
             dependencies: [
-                .target(name: "Picture")
+                .target(name: "Picture"),
+                .product(name: "Numeric", package: "swift-numeric"),
             ]
         ),
         .target(

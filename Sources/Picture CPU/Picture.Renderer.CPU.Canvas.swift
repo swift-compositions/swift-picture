@@ -67,10 +67,16 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// The canvas read at a point of raster space between pixel centres, transparent beyond its box.
-    static func sample(_ raster: Raster<Picture.Pixel>, _ box: Picture.Renderer.CPU.Box, _ x: Double, _ y: Double) -> Picture.Pixel {
+    static func sample(
+        _ raster: Raster<Picture.Pixel>,
+        _ box: Picture.Renderer.CPU.Box,
+        _ x: Double,
+        _ y: Double,
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
+    ) -> Picture.Pixel {
         guard x.isFinite, y.isFinite, box.area > 0 else { return .transparent }
         let point = Point<2, Double>(x: x - Double(box.left), y: y - Double(box.top))
-        return raster.sample(at: point, .bilinear, edge: .constant(.transparent)) { from, to, parameter in
+        return raster.sample(at: point, .bilinear, edge: edge) { from, to, parameter in
             from.interpolated(to: to, at: Float(parameter))
         }
     }
@@ -102,8 +108,8 @@ extension Picture.Renderer.CPU.Canvas {
         for element in picture.elements {
             switch element {
             case .shape(let shape): try draw(shape, state)
-            case .sprites(let sprites): try draw(sprites, state)
-            case .scene(let scene): try draw(scene, state)
+            case .sprites(let sprites): draw(sprites, state)
+            case .scene(let scene): draw(scene, state)
             case .group(let group): try draw(group, state)
             case .layer(let layer): try draw(layer, state)
             }
@@ -201,16 +207,6 @@ extension Picture.Renderer.CPU.Canvas {
             }
             y += 1
         }
-    }
-
-    /// Sprites are not drawn yet.
-    mutating func draw(_ sprites: Picture.Sprites, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
-        throw .unsupported
-    }
-
-    /// Scenes are not drawn yet.
-    mutating func draw(_ scene: Picture.Scene, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
-        throw .unsupported
     }
 }
 

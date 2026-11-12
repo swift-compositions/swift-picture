@@ -43,9 +43,11 @@ extension Picture.Renderer.CPU.Sheet {
     /// transparent, which for the first is the box around the content.
     func drawn() throws(Picture.Renderer.Error) -> Picture.Renderer.CPU.Canvas {
         guard let steps = try Self.steps(layer, state.transform) else { return Picture.Renderer.CPU.Canvas(.empty, repeating: .transparent) }
-        var supports: [Picture.Renderer.CPU.Box?] = [Picture.Renderer.CPU.Canvas.bounds(of: layer.content, state.transform)]
+        var support = Picture.Renderer.CPU.Canvas.bounds(of: layer.content, state.transform)
+        var supports = [support]
         for step in steps {
-            supports.append(step.support(supports[supports.count - 1]))
+            support = step.support(support)
+            supports.append(support)
         }
         var boxes = [Picture.Renderer.CPU.Box](repeating: .empty, count: supports.count)
         var needed = target

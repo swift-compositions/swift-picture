@@ -56,6 +56,30 @@ extension `Picture CPU Tests`.`Timing` {
         return Picture(elements)
     }
 
+
+    /// 20 000 soft sprites of radius 2 to 20 spread over the frame by a fixed rule.
+    static var swarm: Picture.Sprites {
+        let sprites = (0..<20_000).map { (index: Int) -> Picture.Sprites.Sprite in
+            let x = Double((index * 7919) % 1920)
+            let y = Double((index * 104_729) % 1080)
+            let color = Picture.Color(red: 1, green: Float(index % 7) / 6, blue: 0.4, alpha: 0.3)
+            return Picture.Sprites.Sprite(center: Tests.at(x, y), radius: Double(2 + index % 19), color: color)
+        }
+        return Picture.Sprites(sprites, profile: .soft)
+    }
+
+    /// A torus of 96 × 48 quads, turned toward the camera, filling most of a full-HD viewport.
+    static func torus(_ material: Picture.Scene.Material) throws -> Picture.Scene {
+        let projection = try Projection<Double>.perspective(fieldOfView: .init(0.9), aspect: 1920.0 / 1080, near: 0.5, far: 50, depth: .symmetric)
+        let turn = Matrix<4, 4, Double>(rows: [[1, 0, 0, 0], [0, 0.6, -0.8, 0], [0, 0.8, 0.6, -6], [0, 0, 0, 1]])
+        let mesh = Mesh<Point<3, Double>>.torus(major: 2, minor: 0.8, segments: 96, sides: 48)
+        return Picture.Scene(
+            camera: .init(projection: projection),
+            viewport: .init(llx: 0, lly: 0, urx: 1920, ury: 1080),
+            models: [.init(mesh, transform: turn, material: material)]
+        )
+    }
+
     static func time(_ picture: Picture) throws -> Duration {
         var best = Duration.seconds(1000)
         for _ in 0..<3 {
@@ -95,6 +119,17 @@ extension `Picture CPU Tests`.`Timing` {
                 print("Timing: flat frame under \(name) \(try Self.time([.layer(.init(Self.flat, effects: [effect]))]))")
             }
             print("Timing: flat frame with a glow of 8 \(try Self.time(Self.flat.glow(deviation: 8)))")
+        }
+
+        @Test
+        func `Sprites and scenes`() throws {
+            print("Timing: 20000 soft sprites \(try Self.time([.sprites(Self.swarm)]))")
+            let color = Picture.Color(red: 0.9, green: 0.5, blue: 0.3)
+            print("Timing: flat torus \(try Self.time([.scene(try Self.torus(.flat(color)))]))")
+            print("Timing: wireframe torus \(try Self.time([.scene(try Self.torus(.wireframe(color, width: 1.5)))]))")
+            print("Timing: points torus \(try Self.time([.scene(try Self.torus(.points(color, radius: 2)))]))")
+            let glass = Picture.Scene.Material.glass(.init(bend: 40, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1)))
+            print("Timing: glass torus over the flat frame \(try Self.time(Self.flat.appending([.scene(try Self.torus(glass))])))")
         }
     #endif
 }

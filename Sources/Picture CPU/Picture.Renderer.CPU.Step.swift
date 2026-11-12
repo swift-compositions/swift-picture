@@ -72,8 +72,6 @@ extension Picture.Renderer.CPU.Step {
             self = .map(conjugated(kaleidoscope.source(of:)), reach: nil)
 
         case .displacement(let displacement):
-            // Each of the offset's two coordinates is at most the amplitude in size, so the offset is at most
-            // √2 times it long, and the transform's linear part stretches it by at most `stretch`.
             let reach = 2.0.squareRoot() * abs(displacement.amplitude) * Picture.Renderer.CPU.stretch(transform)
             self = .map(conjugated(displacement.source(of:)), reach: reach.isFinite ? reach : nil)
         }
