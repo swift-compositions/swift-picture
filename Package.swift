@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v27), .iOS(.v27), .tvOS(.v27), .watchOS(.v27), .visionOS(.v27)],
     products: [
         .library(name: "Picture", targets: ["Picture"]),
+        .library(name: "Picture CPU", targets: ["Picture CPU"]),
         .library(name: "Picture PNG Integration", targets: ["Picture PNG Integration"]),
     ],
     traits: [
@@ -28,7 +29,7 @@ let package = Package(
         .package(url: "https://github.com/swift-compositions/swift-witnesses.git", branch: "main"),
         .package(url: "https://github.com/swift-iec/swift-iec-61966.git", branch: "main"),
         .package(url: "https://github.com/swift-iso/swift-iso-14496-22.git", branch: "main"),
-        .package(url: "https://github.com/swift-molecules/swift-raster.git", branch: "main"),
+        .package(url: "https://github.com/swift-molecules/swift-raster.git", branch: "main", traits: ["Geometry"]),
         .package(url: "https://github.com/swift-w3c/swift-w3c-css.git", branch: "main"),
         .package(url: "https://github.com/swift-w3c/swift-w3c-png.git", branch: "main"),
     ],
@@ -57,6 +58,12 @@ let package = Package(
             ]
         ),
         .target(
+            name: "Picture CPU",
+            dependencies: [
+                .target(name: "Picture")
+            ]
+        ),
+        .target(
             name: "Picture PNG Integration",
             dependencies: [
                 .target(name: "Picture"),
@@ -69,6 +76,13 @@ let package = Package(
             name: "Picture Tests",
             dependencies: [
                 .target(name: "Picture")
+            ]
+        ),
+        .testTarget(
+            name: "Picture CPU Tests",
+            dependencies: [
+                .target(name: "Picture CPU"),
+                .product(name: "Numeric", package: "swift-numeric"),
             ]
         ),
         .testTarget(

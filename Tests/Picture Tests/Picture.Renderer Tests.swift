@@ -59,31 +59,11 @@ extension `Picture Tests`.`A renderer is a value that draws a picture into a ras
     }
 
     @Test
-    func `Until a renderer is installed, the live and the test renderer fail with absent and draw nothing`() throws {
+    func `The absent renderer draws nothing and fails with absent`() throws {
         var raster = Canvas(width: 2, height: 1, repeating: Tests.pixel(0, 0, 1, 1))
-        #expect(throws: Picture.Renderer.Error.absent) { try Picture.Renderer.liveValue.render(Self.picture, into: &raster) }
-        #expect(throws: Picture.Renderer.Error.absent) { try Picture.Renderer.testValue.render(Self.picture, into: &raster) }
-        #expect(throws: Picture.Renderer.Error.absent) { try Picture.Renderer.previewValue.render(Self.picture, into: &raster) }
+        #expect(throws: Picture.Renderer.Error.absent) { try Picture.Renderer.absent.render(Self.picture, into: &raster) }
         #expect(throws: Picture.Renderer.Error.absent) { try Picture.Renderer.absent.render(Picture.empty, into: &raster) }
-        #expect(throws: Picture.Renderer.Error.absent) { try Witness.Context[Picture.Renderer.self].render(Self.picture, into: &raster) }
-        Witness.Context.withTest { _ in
-        } operation: {
-            _ = #expect(throws: Picture.Renderer.Error.absent) { try Witness.Context[Picture.Renderer.self].render(Self.picture, into: &raster) }
-        }
         #expect(raster.pixels == [Tests.pixel(0, 0, 1, 1), Tests.pixel(0, 0, 1, 1)])
-    }
-
-    @Test
-    func `A renderer set with withWitnesses is the one drawn with inside the scope, and only there`() throws {
-        var raster = Self.blank()
-        try withWitnesses {
-            $0[Picture.Renderer.self] = Self.counting
-        } operation: { () throws(Picture.Renderer.Error) in
-            try Witness.Context[Picture.Renderer.self].render(Self.picture, into: &raster)
-        }
-        #expect(raster.pixels.map(\.alpha) == [1, 1, 0, 0, 0, 0])
-        #expect(throws: Picture.Renderer.Error.absent) { try Witness.Context[Picture.Renderer.self].render(Self.picture, into: &raster) }
-        #expect(raster.pixels.map(\.alpha) == [1, 1, 0, 0, 0, 0])
     }
 
     @Test

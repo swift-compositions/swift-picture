@@ -29,7 +29,3 @@ extension Picture.Renderer: Renderer::Renderer.`Protocol` {
         try self.render(input, &context)
     }
 }
-
-extension Picture.Renderer: Witness.Key {
-    public static var liveValue: Self { .absent }
-}
