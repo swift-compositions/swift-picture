@@ -51,7 +51,7 @@ extension Picture.Renderer.CPU.Tiles {
 }
 
 extension Picture.Renderer.CPU.Canvas {
-    /// Adds the sprites' light to what is behind with `lighter`, read at each pixel's centre.
+    /// Adds the sprites' light to what is behind, read at each pixel's centre, by `Picture.Sprites.composited(_:over:)`.
     mutating func draw(_ sprites: Picture.Sprites, _ state: Picture.Renderer.CPU.State) {
         guard let inverse = state.inverse else { return }
         let tiles = Picture.Renderer.CPU.Tiles(sprites, state.transform, over: state.reach(in: box))
@@ -72,7 +72,7 @@ extension Picture.Renderer.CPU.Canvas {
                         if light != .transparent {
                             let index = box.index(x, y)
                             let old = unsafe shared[index]
-                            unsafe shared[index] = Picture.Renderer.CPU.limited(old, light.composited(over: old, operator: .lighter), state.share(x, y))
+                            unsafe shared[index] = Picture.Renderer.CPU.limited(old, Picture.Sprites.composited(light, over: old), state.share(x, y))
                         }
                         x += 1
                     }

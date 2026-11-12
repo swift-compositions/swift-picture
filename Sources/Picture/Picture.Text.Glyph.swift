@@ -1,4 +1,6 @@
+import Direction
 import Matrix
+public import Threefry
 import Vector
 
 extension Picture.Text {
@@ -25,5 +27,39 @@ extension Picture.Text.Glyph {
     /// The outline at the glyph's place in the text.
     public var path: Picture.Plane.Path {
         outline.transformed(by: .translation(Vector([origin[0], origin[1]])))
+    }
+}
+
+extension Picture.Text.Glyph {
+    /// The glyph sampled to points: of a lattice of square cells `spacing` wide over the text's plane, one
+    /// corner of one cell at the text's origin, the point of every cell whose point lies inside the glyph's
+    /// path. A cell's point is its centre, or with a seed a place in the cell that the seed and the cell's
+    /// column and row decide. The points come row by row from the top, each row from the left.
+    public func points(spacing: Double, seed: Threefry.Key? = nil) -> [Picture.Plane.Point<2>] {
+        guard spacing > 0, spacing.isFinite else { return [] }
+        let path = path
+        guard let box = path.boundingBox else { return [] }
+        let low = (column: (box.llx.underlying / spacing).rounded(.down), row: (box.lly.underlying / spacing).rounded(.down))
+        let high = (column: (box.urx.underlying / spacing).rounded(.down), row: (box.ury.underlying / spacing).rounded(.down))
+        guard abs(low.column) < 0x1p31, abs(low.row) < 0x1p31, abs(high.column) < 0x1p31, abs(high.row) < 0x1p31 else { return [] }
+        guard low.column <= high.column, low.row <= high.row else { return [] }
+        var points: [Picture.Plane.Point<2>] = []
+        var row = Int(low.row)
+        while row <= Int(high.row) {
+            var column = Int(low.column)
+            while column <= Int(high.column) {
+                var place = (across: 0.5, down: 0.5)
+                if let seed {
+                    let cell = Threefry.Block(UInt64(bitPattern: Int64(column)), UInt64(bitPattern: Int64(row)))
+                    let drawn = Threefry.block(key: seed, counter: cell)
+                    place = (Double(drawn.first >> 11) * 0x1p-53, Double(drawn.second >> 11) * 0x1p-53)
+                }
+                let point = Picture.Plane.Point<2>([(Double(column) + place.across) * spacing, (Double(row) + place.down) * spacing])
+                if path.contains(point, rule: Winding.Rule.nonzero) { points.append(point) }
+                column += 1
+            }
+            row += 1
+        }
+        return points
     }
 }

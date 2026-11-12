@@ -220,3 +220,45 @@ extension `Picture Tests`.`An effect reads the sheet at a point it names` {
         }
     }
 }
+
+extension `Picture Tests`.`An effect reads the sheet at a point it names` {
+    @Test
+    func `A grain's share lies within -1 and 1, is one all over a cell, and follows from the seed and the cell alone`() {
+        let grain = Picture.Effect.Grain(seed: Threefry.Key(3, 9), amount: 0.2, size: 4)
+        var shares: Set<Double> = []
+        var total = 0.0
+        (0..<10_000).forEach { (cell: Int) in
+            let corner = Tests.at(Double(cell % 100 - 50) * 4, Double(cell / 100 - 50) * 4)
+            let share = grain.share(at: corner)
+            #expect(share >= -1 && share < 1)
+            #expect(grain.share(at: Tests.at(corner[0] + 3.9, corner[1] + 2.5)) == share)
+            shares.insert(share)
+            total += share
+        }
+        #expect(shares.count > 9_900)
+        #expect(abs(total / 10_000) < 0.02)
+        let point = Tests.at(13.5, -7.25)
+        #expect(Picture.Effect.Grain(seed: Threefry.Key(3, 9), amount: 0.7, size: 4).share(at: point) == grain.share(at: point))
+        #expect(Picture.Effect.Grain(seed: Threefry.Key(3, 10), amount: 0.2, size: 4).share(at: point) != grain.share(at: point))
+        #expect(Picture.Effect.Grain(seed: Threefry.Key(3, 9), amount: 0.2, size: 0).share(at: point) == 0)
+    }
+
+    @Test
+    func `A grain moves red, green and blue alike by its amount times the share times alpha, within none and alpha`() {
+        let grain = Picture.Effect.Grain(seed: Threefry.Key(1, 2), amount: 0.1)
+        var seen = (lighter: false, darker: false)
+        (0..<200).forEach { (step: Int) in
+            let point = Tests.at(Double(step) + 0.5, Double(step % 7) + 0.5)
+            let change = Float(0.1 * grain.share(at: point)) * 0.5
+            seen = (seen.lighter || change > 0, seen.darker || change < 0)
+            let moved = grain.pixel(Tests.pixel(0.2, 0.25, 0.3, 0.5), at: point)
+            #expect(Tests.close(moved, Tests.pixel(0.2 + change, 0.25 + change, 0.3 + change, 0.5)))
+            #expect(grain.pixel(.transparent, at: point) == .transparent)
+            let dark = grain.pixel(Tests.pixel(0, 0.001, 0, 1), at: point)
+            #expect(dark.color.red >= 0 && dark.color.green >= 0 && dark.alpha == 1)
+            let bright = grain.pixel(Tests.pixel(1, 0.999, 1, 1), at: point)
+            #expect(bright.color.red <= 1 && bright.color.green <= 1)
+        }
+        #expect(seen.lighter && seen.darker)
+    }
+}

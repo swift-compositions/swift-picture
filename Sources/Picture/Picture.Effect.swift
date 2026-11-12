@@ -21,5 +21,8 @@ extension Picture {
 
         /// Everything near a centre turned about it, most at the centre.
         case swirl(Swirl)
+
+        /// Every cell of a fine grid made lighter or darker by a seeded amount.
+        case grain(Grain)
     }
 }

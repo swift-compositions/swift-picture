@@ -26,6 +26,7 @@ extension `Picture CPU Tests`.`A frame drawn on several threads is the frame dra
             .chromatic(.init(red: .init([6, 0]), blue: .init([-6, 0]))),
             .pixelation(.init(width: 24, height: 24)),
             .kaleidoscope(.init(center: Tests.at(960, 540), segments: 6)),
+            .grain(.init(seed: .init(4, 2), amount: 0.3, size: 3)),
         ]
         var elements: [Picture.Element] = [small(flat)]
         for (index, effect) in effects.enumerated() {

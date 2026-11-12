@@ -1,6 +1,7 @@
 public import Byte
 public import ISO_14496_22
 import Matrix
+public import Threefry
 import Vector
 
 extension Picture {
@@ -139,6 +140,11 @@ extension Picture.Text {
     /// Every glyph's outline at its place, as one path.
     public var path: Picture.Plane.Path {
         Picture.Plane.Path(subpaths: glyphs.flatMap(\.path.subpaths))
+    }
+
+    /// The text sampled to points: every glyph's `points(spacing:seed:)`, glyph after glyph, all on one lattice.
+    public func points(spacing: Double, seed: Threefry.Key? = nil) -> [Picture.Plane.Point<2>] {
+        glyphs.flatMap { $0.points(spacing: spacing, seed: seed) }
     }
 
     /// The whole text as one shape with a fill.

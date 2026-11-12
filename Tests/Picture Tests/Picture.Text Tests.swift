@@ -265,3 +265,57 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
         }
     }
 }
+
+extension `Picture Tests`.`A text is glyph outlines at places` {
+    @Test
+    func `A glyph sampled to points gives the centre of every lattice cell whose centre lies inside it`() throws {
+        let text = try Picture.Text("x", font: Self.font(), size: 100)
+        let points = text.glyphs[0].points(spacing: 10)
+        let expected = (0..<28).map { (cell: Int) in Tests.at(Double(cell % 4) * 10 + 5, Double(cell / 4) * 10 - 65) }
+        #expect(points == expected)
+        #expect(text.glyphs[0].points(spacing: 0).isEmpty)
+        #expect(text.glyphs[0].points(spacing: .nan).isEmpty)
+        #expect(try Picture.Text(" ", font: Self.font(), size: 100).points(spacing: 5).isEmpty)
+    }
+
+    @Test
+    func `The points of a text are its glyphs' points in order, on one lattice of the text's plane`() throws {
+        let text = try Picture.Text("Ax\nV", font: Self.font(), size: 100)
+        let points = text.points(spacing: 4)
+        #expect(points == text.glyphs.flatMap { $0.points(spacing: 4) })
+        let path = text.path
+        for point in points {
+            let across: Double = (point[0] - 2).remainder(dividingBy: 4)
+            let down: Double = (point[1] - 2).remainder(dividingBy: 4)
+            #expect(across == 0 && down == 0)
+            #expect(path.contains(point, rule: .nonzero))
+        }
+        // The triangle of "A" is half of a box 50 by 70, the box of "x" 40 by 70 and "V" the triangle again.
+        let cells: Double = (1750 + 2800 + 1750) / 16
+        let count = Double(points.count)
+        #expect(abs(count - cells) < 0.06 * cells)
+    }
+
+    @Test
+    func `With a seed each cell's point is a place in the cell that the seed decides, kept when it lies inside`() throws {
+        let text = try Picture.Text("AV", font: Self.font(), size: 100)
+        let seed = Threefry.Key(5, 8)
+        let points = text.points(spacing: 5, seed: seed)
+        #expect(points == text.points(spacing: 5, seed: seed))
+        #expect(points != text.points(spacing: 5, seed: Threefry.Key(5, 9)))
+        let path = text.path
+        var cells: Set<[Double]> = []
+        var offCentre = false
+        for point in points {
+            #expect(path.contains(point, rule: .nonzero))
+            cells.insert([(point[0] / 5).rounded(.down), (point[1] / 5).rounded(.down)])
+            let across: Double = (point[0] - 2.5).remainder(dividingBy: 5)
+            if across != 0 { offCentre = true }
+        }
+        #expect(cells.count == points.count)
+        #expect(offCentre)
+        let expected: Double = 3500 / 25
+        let count = Double(points.count)
+        #expect(abs(count - expected) < 0.15 * expected)
+    }
+}

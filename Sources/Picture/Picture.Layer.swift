@@ -27,7 +27,12 @@ extension Picture {
 
 extension Picture.Layer {
     /// One pixel of the finished sheet put onto one pixel of what is behind.
+    ///
+    /// Under `lighter` the colours add without a limit, but alpha, which says how much of what is behind a
+    /// pixel hides, is held at 1: light added to an opaque pixel leaves it opaque.
     public func composited(_ sheet: Picture.Pixel, over backdrop: Picture.Pixel) -> Picture.Pixel {
-        sheet.composited(over: backdrop, operator: `operator`, blend: blend, coverage: opacity)
+        let pixel = sheet.composited(over: backdrop, operator: `operator`, blend: blend, coverage: opacity)
+        guard `operator` == .lighter, pixel.alpha > 1 else { return pixel }
+        return Picture.Pixel(color: pixel.color, alpha: 1)
     }
 }

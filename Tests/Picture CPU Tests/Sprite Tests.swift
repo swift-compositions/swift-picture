@@ -30,9 +30,19 @@ extension `Picture CPU Tests`.`A renderer adds the sprites' light to what is beh
             let raster = try Tests.drawn([.sprites(sprites)], on: Tests.canvas(100, 70, backdrop))
             for (x, y) in Tests.positions(100, 70) {
                 let light = sprites.light(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5))
-                #expect(Tests.at(raster, x, y) == light.composited(over: backdrop, operator: .lighter))
+                #expect(Tests.at(raster, x, y) == Picture.Sprites.composited(light, over: backdrop))
             }
         }
+    }
+
+    @Test
+    func `Sprites on an opaque raster leave it opaque however much light they add`() throws {
+        let sprites = Self.swarm(300, profile: .hard)
+        let raster = try Tests.drawn([.sprites(sprites)], on: Tests.canvas(100, 70, Tests.pixel(0.1, 0.2, 0.3, 1)))
+        #expect(raster.pixels.allSatisfy { $0.alpha == 1 })
+        #expect(raster.pixels.contains { $0.color.red > 1 || $0.color.green > 1 || $0.color.blue > 1 })
+        let sheet = try Tests.drawn([.layer(.init([.sprites(sprites)]))], on: Tests.canvas(100, 70, Tests.pixel(1, 1, 1, 1)))
+        #expect(sheet.pixels.allSatisfy { $0.alpha == 1 && $0.color.red >= 0 && $0.color.green >= 0 && $0.color.blue >= 0 })
     }
 
     @Test
@@ -43,7 +53,7 @@ extension `Picture CPU Tests`.`A renderer adds the sprites' light to what is beh
         let inverse = try turn.inverted()
         for (x, y) in Tests.positions(100, 70) where x.isMultiple(of: 3) && y.isMultiple(of: 7) {
             let moved = inverse.applied(to: Vector([Double(x) + 0.5, Double(y) + 0.5]))
-            #expect(Tests.close(Tests.at(raster, x, y), sprites.light(at: Tests.at(moved[0], moved[1]))))
+            #expect(Tests.close(Tests.at(raster, x, y), Picture.Sprites.composited(sprites.light(at: Tests.at(moved[0], moved[1])), over: .transparent)))
         }
         let reversed = Picture.Sprites(sprites.sprites.reversed(), profile: .soft)
         let other = try Tests.drawn([.group(.init([.sprites(reversed)], transform: turn))], on: Tests.canvas(100, 70))

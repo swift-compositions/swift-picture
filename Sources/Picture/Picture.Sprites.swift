@@ -25,4 +25,12 @@ extension Picture.Sprites {
         }
         return total
     }
+
+    /// The sprites' light at a point added to one pixel of what is behind: the colours add without a limit,
+    /// and alpha, which says how much of what is behind a pixel hides, is held at 1.
+    public static func composited(_ light: Picture.Pixel, over backdrop: Picture.Pixel) -> Picture.Pixel {
+        let pixel = light.composited(over: backdrop, operator: .lighter)
+        guard pixel.alpha > 1 else { return pixel }
+        return Picture.Pixel(color: pixel.color, alpha: 1)
+    }
 }

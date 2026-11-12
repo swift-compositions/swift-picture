@@ -117,6 +117,26 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
     }
 
     @Test
+    func `Grain changes every pixel of the sheet by the grain at the pixel's centre in the layer's space`() throws {
+        let sheet = try Self.sheet()
+        let grain = Picture.Effect.Grain(seed: .init(7, 11), amount: 0.4, size: 3)
+        let drawn = try Self.drawn([.grain(grain)])
+        Self.expect(drawn) { grain.pixel(Self.read(sheet, $0), at: $0) }
+        #expect(drawn != (try Self.drawn([])))
+        #expect(try Self.drawn([.grain(.init(seed: .init(7, 11), amount: 0, size: 3))]) == Self.drawn([]))
+        #expect(try Self.drawn([.grain(.init(seed: .init(7, 11), amount: 0.4, size: 0))]) == Self.drawn([]))
+        let doubled = Picture.Transform(rows: [[2, 0, 1], [0, 2, -3]])
+        let layer = Picture.Layer(Self.content, effects: [.grain(grain)])
+        let scaled = try Tests.drawn([.group(.init([.layer(layer)], transform: doubled))], on: Tests.canvas(Self.width, Self.height))
+        let plain = try Tests.drawn([.group(.init(Self.content, transform: doubled))], on: Tests.canvas(Self.width, Self.height))
+        for (x, y) in Tests.positions(Self.width, Self.height) {
+            let centre = Self.centre(x, y)
+            let source = Tests.at((centre[0] - 1) / 2, (centre[1] + 3) / 2)
+            #expect(Tests.close(Tests.at(scaled, x, y), grain.pixel(Tests.at(plain, x, y), at: source)), "at \(x), \(y)")
+        }
+    }
+
+    @Test
     func `Chromatic takes each channel from its own offset and the largest alpha`() throws {
         let sheet = try Self.sheet()
         let chromatic = Picture.Effect.Chromatic(red: .init([6.5, -1]), green: .init([0, 0.25]), blue: .init([-3, 9]))
@@ -227,7 +247,7 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
         Self.expect(glow) { point in
             let x = UInt(point[0])
             let y = UInt(point[1])
-            return Self.read(blurred, point).composited(over: Tests.at(plain, x, y), operator: .lighter, coverage: 0.5)
+            return Picture.Layer([], opacity: 0.5, operator: .lighter).composited(Self.read(blurred, point), over: Tests.at(plain, x, y))
         }
         let pane = Picture.Clip(Tests.rectangle(4, 2, 10, 8))
         let backdrop = try Tests.drawn(Self.content.backdrop([.blur(.init(deviation: 2))], clip: pane), on: Tests.canvas(Self.width, Self.height))

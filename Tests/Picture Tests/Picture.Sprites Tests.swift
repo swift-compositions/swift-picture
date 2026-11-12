@@ -62,4 +62,12 @@ extension `Picture Tests`.`Sprites add their light` {
         let negative = Picture.Sprites([.init(center: Tests.at(0, 0), radius: -3, color: Self.blue)], profile: .hard)
         #expect(negative.light(at: Tests.at(0, 0)) == .transparent)
     }
+
+    @Test
+    func `Light put onto what is behind adds its colour without a limit and holds alpha at one`() {
+        typealias Sprites = Picture.Sprites
+        #expect(Sprites.composited(Tests.pixel(0.5, 0, 0.25, 0.5), over: Tests.pixel(0, 0.25, 0, 0.25)) == Tests.pixel(0.5, 0.25, 0.25, 0.75))
+        #expect(Sprites.composited(Tests.pixel(3, 0, 0.5, 3), over: Tests.pixel(0.5, 0.5, 0.5, 1)) == Tests.pixel(3.5, 0.5, 1, 1))
+        #expect(Sprites.composited(.transparent, over: Tests.pixel(0.5, 0.5, 0.5, 1)) == Tests.pixel(0.5, 0.5, 0.5, 1))
+    }
 }

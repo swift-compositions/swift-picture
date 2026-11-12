@@ -141,10 +141,22 @@ extension `Picture Tests`.`A layer is composited as one` {
     }
 
     @Test
+    func `Light added with lighter adds its colour without a limit and holds alpha at one`() {
+        let lighter = Picture.Layer([], operator: .lighter)
+        let sheet = Tests.pixel(0.5, 0.25, 0, 0.5)
+        #expect(lighter.composited(sheet, over: Tests.pixel(0.125, 0, 0.25, 0.25)) == Tests.pixel(0.625, 0.25, 0.25, 0.75))
+        #expect(lighter.composited(sheet, over: Tests.pixel(0.75, 1, 0.25, 1)) == Tests.pixel(1.25, 1.25, 0.25, 1))
+        #expect(lighter.composited(Tests.pixel(2, 2, 2, 1), over: Tests.pixel(0, 0, 0, 0.75)) == Tests.pixel(2, 2, 2, 1))
+        // Put onto an opaque pixel afterwards, a sheet lit like that hides it and no more.
+        let lit = lighter.composited(Tests.pixel(0.5, 0.5, 0.5, 1), over: Tests.pixel(0.5, 0.5, 0.5, 1))
+        #expect(Picture.Layer([]).composited(lit, over: Tests.pixel(1, 1, 1, 1)) == Tests.pixel(1, 1, 1, 1))
+    }
+
+    @Test
     func `The operator and the blend mode are the layer's`() {
         let sheet = Tests.pixel(0.5, 0.25, 0, 0.5)
         let backdrop = Tests.pixel(0.25, 0.25, 0.25, 1)
-        #expect(Picture.Layer([], operator: .lighter).composited(sheet, over: backdrop) == Tests.pixel(0.75, 0.5, 0.25, 1.5))
+        #expect(Picture.Layer([], operator: .lighter).composited(sheet, over: backdrop) == Tests.pixel(0.75, 0.5, 0.25, 1))
         #expect(Picture.Layer([], operator: .copy).composited(sheet, over: backdrop) == sheet)
         let multiplied = Picture.Layer([], blend: .multiply).composited(Tests.pixel(0.5, 0.5, 0.5, 1), over: Tests.pixel(0.5, 1, 0, 1))
         #expect(multiplied == Tests.pixel(0.25, 0.5, 0, 1))

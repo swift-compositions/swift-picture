@@ -23,6 +23,9 @@ extension Picture.Renderer.CPU {
 
         /// As `map`, with the map made afresh for each band of rows, so that it may keep a cache along the band.
         case field(() -> (_ x: Double, _ y: Double) -> (x: Double, y: Double), reach: Double?)
+
+        /// The sheet's own pixel at each point, changed by a function of the point.
+        case tone((_ x: Double, _ y: Double, _ pixel: Picture.Pixel) -> Picture.Pixel)
     }
 }
 
@@ -133,6 +136,10 @@ extension Picture.Renderer.CPU.Step {
             guard swirl.angle != 0, swirl.radius > 0 else { return nil }
             let reach = 2 * swirl.radius * Picture.Renderer.CPU.stretch(transform)
             self = .map(conjugated(swirl.source(of:)), reach: reach.isFinite ? reach : nil)
+
+        case .grain(let grain):
+            guard grain.amount != 0, grain.size > 0 else { return nil }
+            self = .tone { x, y, pixel in grain.pixel(pixel, at: Picture.Renderer.CPU.point(inverse, x, y)) }
         }
     }
 
@@ -167,6 +174,9 @@ extension Picture.Renderer.CPU.Step {
             guard let reach else { return Self.around(box, make()) }
             let pixels = Int(Swift.min(reach.rounded(.up), Picture.Renderer.CPU.Box.reach)) + 1
             return box.expanded(pixels, pixels)
+
+        case .tone:
+            return box
         }
     }
 
@@ -214,8 +224,11 @@ extension Picture.Renderer.CPU.Step {
     /// The box outside which the step's result is transparent, given the box outside which its sheet is,
     /// or nil when the step can read from anywhere.
     func support(_ box: Picture.Renderer.CPU.Box?) -> Picture.Renderer.CPU.Box? {
-        guard case .blur(let across, let down) = self else { return nil }
-        return box?.expanded(across.reach, down.reach)
+        switch self {
+        case .blur(let across, let down): return box?.expanded(across.reach, down.reach)
+        case .tone: return box
+        case .zoom, .chromatic, .map, .blend, .field: return nil
+        }
     }
 
     /// The step's result over a box, read from a sheet.
@@ -293,6 +306,9 @@ extension Picture.Renderer.CPU.Step {
                     }
                 }
             )
+
+        case .tone(let change):
+            return Picture.Renderer.CPU.Canvas(box, workers) { x, y in change(x, y, read(x, y)) }
         }
     }
 }
