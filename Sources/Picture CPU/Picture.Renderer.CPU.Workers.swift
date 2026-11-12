@@ -1,8 +1,9 @@
+import Picture
+import Synchronization
+
 #if Threads
     import Kernel_Thread
 #endif
-import Picture
-import Synchronization
 
 extension Picture.Renderer.CPU {
     /// The threads that draw a frame. Work is cut into parts that do not overlap, such as bands of rows or

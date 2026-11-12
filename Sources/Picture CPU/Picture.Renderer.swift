@@ -1,10 +1,12 @@
+public import Picture
+
 #if Threads
     import Kernel_Thread
 #endif
-public import Picture
 
 extension Picture.Renderer {
-    /// The renderer in pure Swift on as many threads as the machine has logical processors: it draws into a
+    /// The renderer in pure Swift on as many threads as the machine has logical processors, with the
+    /// `Threads` trait, and on one without it: it draws into a
     /// copy of the raster's pixels and puts the copy in place only when the whole picture is drawn.
     public static var cpu: Self {
         cpu(threads: Cardinal(UInt(processors())))

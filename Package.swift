@@ -12,7 +12,6 @@ let package = Package(
     traits: [
         .trait(name: "PNG", description: "PNG integration"),
         .trait(name: "Threads", description: "Picture CPU draws a frame on several threads"),
-        .default(enabledTraits: ["Threads"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swift-atoms/swift-angle.git", branch: "main"),
