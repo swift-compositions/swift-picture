@@ -14,15 +14,6 @@ extension Picture.Renderer.CPU {
 }
 
 extension Picture.Renderer.CPU.Stage {
-    /// A corner of a face of a model, before projection: where it is, how far in front of the near plane,
-    /// its normal and its fourth clip coordinate.
-    struct Corner {
-        var point: Point<3, Double>
-        var distance: Double
-        var normal: Vector<3, Double>
-        var divisor: Double
-    }
-
     /// The scene's models as triangles in raster space under a transform from the scene's space, with
     /// points drawn as discs fine enough for a raster sampled `samples` times along each side of a pixel.
     init(_ scene: Picture.Scene, _ transform: Picture.Transform, samples: Int) {
@@ -243,13 +234,12 @@ extension Picture.Renderer.CPU.Stage {
         samples: Int
     ) -> [Picture.Renderer.CPU.Hit] {
         let scale = Double(samples)
-        let fine = numbers.map { number in
+        let fine = numbers.map { (number: Int) -> InlineArray<3, Point<3, Double>> in
             let triangle = triangles[number]
             func moved(_ corner: Point<3, Double>) -> Point<3, Double> {
                 Point<3, Double>([(corner[0] - Double(tile.left)) * scale, (corner[1] - Double(tile.top)) * scale, corner[2]])
             }
-            let corners: InlineArray<3, Point<3, Double>> = [moved(triangle[0]), moved(triangle[1]), moved(triangle[2])]
-            return corners
+            return [moved(triangle[0]), moved(triangle[1]), moved(triangle[2])]
         }
         let region = Raster<Picture.Renderer.CPU.Hit>.Region(
             x: .zero,
@@ -276,7 +266,7 @@ extension Picture.Renderer.CPU.Canvas {
         let opaque = Picture.Renderer.CPU.Stage.tiles(stage.opaque, over: area)
         for (tile, numbers) in opaque where !numbers.isEmpty {
             let hits = Picture.Renderer.CPU.Stage.hits(stage.opaque, numbers, in: tile, samples: samples)
-            visit(tile, samples) { x, y, row, column, old in
+            visit(tile, samples) { _, _, row, column, old in
                 let hit = hits[row * tile.width * samples + column]
                 guard hit.triangle >= 0, hit.depth <= upper else { return old }
                 return stage.colors[hit.triangle].composited(over: old)

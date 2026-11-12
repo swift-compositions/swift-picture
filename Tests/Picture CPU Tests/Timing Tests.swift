@@ -56,7 +56,6 @@ extension `Picture CPU Tests`.`Timing` {
         return Picture(elements)
     }
 
-
     /// 20 000 soft sprites of radius 2 to 20 spread over the frame by a fixed rule.
     static var swarm: Picture.Sprites {
         let sprites = (0..<20_000).map { (index: Int) -> Picture.Sprites.Sprite in
