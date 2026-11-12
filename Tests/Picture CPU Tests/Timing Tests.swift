@@ -79,5 +79,22 @@ extension `Picture CPU Tests`.`Timing` {
             print("Timing: clipped bars \(try Self.time([all[41]]))")
             print("Timing: layer \(try Self.time([all[42]]))")
         }
+
+        @Test
+        func `The flat frame under each effect`() throws {
+            let effects: [(String, Picture.Effect)] = [
+                ("blur 8", .blur(.init(deviation: 8))),
+                ("blur 32", .blur(.init(deviation: 32))),
+                ("zoom 0.2", .zoom(.init(center: Tests.at(960, 540), amount: 0.2))),
+                ("chromatic", .chromatic(.init(red: .init([6, 0]), blue: .init([-6, 0])))),
+                ("pixelation", .pixelation(.init(width: 24, height: 24))),
+                ("kaleidoscope", .kaleidoscope(.init(center: Tests.at(960, 540), segments: 6))),
+                ("displacement", .displacement(.init(seed: .init(1, 2), frequency: 0.01, amplitude: 20))),
+            ]
+            for (name, effect) in effects {
+                print("Timing: flat frame under \(name) \(try Self.time([.layer(.init(Self.flat, effects: [effect]))]))")
+            }
+            print("Timing: flat frame with a glow of 8 \(try Self.time(Self.flat.glow(deviation: 8)))")
+        }
     #endif
 }

@@ -25,13 +25,43 @@ extension Picture.Renderer.CPU.Sheet {
         }
     }
 
-    /// The sheet with the content drawn on it, over the target's pixels at most.
+    /// The steps of the layer's effects, in order, leaving out those that change nothing; nil when the
+    /// layer's transform squashes the plane, so that nothing is drawn on the sheet.
+    static func steps(_ layer: Picture.Layer, _ transform: Picture.Transform) throws(Picture.Renderer.Error) -> [Picture.Renderer.CPU.Step]? {
+        guard let inverse = Picture.Renderer.CPU.State(transform: transform, mask: nil).inverse else { return nil }
+        var steps: [Picture.Renderer.CPU.Step] = []
+        for effect in layer.effects {
+            if let step = try Picture.Renderer.CPU.Step(effect, transform, inverse) { steps.append(step) }
+        }
+        return steps
+    }
+
+    /// The sheet with the content drawn on it and the effects applied, over the target's pixels at most.
+    ///
+    /// The boxes are worked out backwards: the last covers the target, and each step before it covers what
+    /// the step after it reads. Each is cut to the box outside which that stage of the sheet is known to be
+    /// transparent, which for the first is the box around the content.
     func drawn() throws(Picture.Renderer.Error) -> Picture.Renderer.CPU.Canvas {
-        guard layer.effects.isEmpty else { throw .unsupported }
-        let box = target.intersection(Picture.Renderer.CPU.Canvas.bounds(of: layer.content, state.transform) ?? target)
-        guard box.area <= Picture.Renderer.CPU.limit else { throw .unsupported }
-        var sheet = Picture.Renderer.CPU.Canvas(box, repeating: .transparent)
+        guard let steps = try Self.steps(layer, state.transform) else { return Picture.Renderer.CPU.Canvas(.empty, repeating: .transparent) }
+        var supports: [Picture.Renderer.CPU.Box?] = [Picture.Renderer.CPU.Canvas.bounds(of: layer.content, state.transform)]
+        for step in steps {
+            supports.append(step.support(supports[supports.count - 1]))
+        }
+        var boxes = [Picture.Renderer.CPU.Box](repeating: .empty, count: supports.count)
+        var needed = target
+        var stage = steps.count
+        while stage >= 0 {
+            let box = supports[stage].map { needed.intersection($0) } ?? needed
+            guard box.area <= Picture.Renderer.CPU.limit else { throw .unsupported }
+            boxes[stage] = box
+            if stage > 0 { needed = steps[stage - 1].reads(box) }
+            stage -= 1
+        }
+        var sheet = Picture.Renderer.CPU.Canvas(boxes[0], repeating: .transparent)
         try sheet.draw(layer.content, Picture.Renderer.CPU.State(transform: state.transform, mask: nil))
+        for (step, box) in zip(steps, boxes.dropFirst()) {
+            sheet = step.applied(to: sheet, over: box)
+        }
         return sheet
     }
 }

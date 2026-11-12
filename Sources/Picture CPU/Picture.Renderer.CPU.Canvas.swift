@@ -270,8 +270,16 @@ extension Picture.Renderer.CPU.Canvas {
             return content.map { $0.intersection(around) } ?? around
 
         case .layer(let layer):
-            guard layer.effects.isEmpty else { return nil }
-            return bounds(of: layer.content, transform)
+            let steps: [Picture.Renderer.CPU.Step]?
+            do throws(Picture.Renderer.Error) {
+                steps = try Picture.Renderer.CPU.Sheet.steps(layer, transform)
+            } catch {
+                return nil
+            }
+            guard let steps else { return .empty }
+            var box = bounds(of: layer.content, transform)
+            for step in steps { box = step.support(box) }
+            return box
         }
     }
 }
