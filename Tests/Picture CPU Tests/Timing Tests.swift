@@ -118,6 +118,13 @@ extension `Picture CPU Tests`.`Timing` {
                 print("Timing: flat frame under \(name) \(try Self.time([.layer(.init(Self.flat, effects: [effect]))]))")
             }
             print("Timing: flat frame with a glow of 8 \(try Self.time(Self.flat.glow(deviation: 8)))")
+            let shadow = Picture.Layer(
+                [Tests.fill(Tests.rectangle(320, 194, 1280, 750), .init(red: 0.17, green: 0.13, blue: 0.09, alpha: 0.42))],
+                effects: [.blur(.init(deviation: 30))]
+            )
+            print("Timing: a window's shadow, 1280 x 750 under a blur of 30 \(try Self.time([.layer(shadow)]))")
+            let card = Picture.Clip(Tests.rectangle(660, 340, 600, 400))
+            print("Timing: flat frame with a frosted card, 600 x 400 under a blur of 32 \(try Self.time(Self.flat.backdrop([.blur(.init(deviation: 32))], clip: card)))")
         }
 
         @Test

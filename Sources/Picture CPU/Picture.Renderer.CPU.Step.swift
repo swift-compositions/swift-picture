@@ -5,7 +5,7 @@ extension Picture.Renderer.CPU {
     /// map conjugated by the transform from the layer's space, so `T ∘ f ∘ T⁻¹`.
     enum Step {
         /// A separable Gaussian along the raster's axes.
-        case blur(Raster<Picture.Pixel>.Kernel<Float>, Raster<Picture.Pixel>.Kernel<Float>)
+        case blur(Spread, Spread)
 
         /// A mean along the stretch toward the zoom's centre: the point read at a fraction of the way.
         case zoom((_ x: Double, _ y: Double, _ fraction: Double) -> (x: Double, y: Double))
@@ -46,11 +46,10 @@ extension Picture.Renderer.CPU.Step {
             guard abs(skew) <= 1e-12 * (a * a + b * b + c * c + d * d) else { throw .unsupported }
             let across = blur.deviation * (a * a + b * b).squareRoot()
             let down = blur.deviation * (c * c + d * d).squareRoot()
-            do throws(Raster<Picture.Pixel>.Kernel<Float>.Error) {
-                self = .blur(try .gaussian(deviation: Float(across)), try .gaussian(deviation: Float(down)))
-            } catch {
+            guard let horizontal = Picture.Renderer.CPU.Spread(deviation: across), let vertical = Picture.Renderer.CPU.Spread(deviation: down) else {
                 throw .unsupported
             }
+            self = .blur(horizontal, vertical)
 
         case .zoom(let zoom):
             guard zoom.amount != 0 else { return nil }
@@ -82,7 +81,7 @@ extension Picture.Renderer.CPU.Step {
         guard box.area > 0 else { return .empty }
         switch self {
         case .blur(let across, let down):
-            return box.expanded(Int(clamping: across.radius), Int(clamping: down.radius))
+            return box.expanded(across.reach, down.reach)
 
         case .chromatic(_, let red, let green, let blue):
             var total = Picture.Renderer.CPU.Box.empty
@@ -131,7 +130,7 @@ extension Picture.Renderer.CPU.Step {
     /// or nil when the step can read from anywhere.
     func support(_ box: Picture.Renderer.CPU.Box?) -> Picture.Renderer.CPU.Box? {
         guard case .blur(let across, let down) = self else { return nil }
-        return box?.expanded(Int(clamping: across.radius), Int(clamping: down.radius))
+        return box?.expanded(across.reach, down.reach)
     }
 
     /// The step's result over a box, read from a sheet.
@@ -143,12 +142,10 @@ extension Picture.Renderer.CPU.Step {
         }
         switch self {
         case .blur(let across, let down):
-            let padded = box.expanded(Int(clamping: across.radius), Int(clamping: down.radius))
+            let padded = box.expanded(across.reach, down.reach)
             var source = Picture.Renderer.CPU.Canvas(padded, repeating: .transparent)
             source.copy(sheet)
-            let blurred = source.raster.convolved(horizontal: across, vertical: down, edge: .constant(.transparent)) { from, to, parameter in
-                from.interpolated(to: to, at: parameter)
-            }
+            let blurred = Picture.Renderer.CPU.Spread.applied(across, down, to: source.raster)
             var result = Picture.Renderer.CPU.Canvas(box, repeating: .transparent)
             result.copy(Picture.Renderer.CPU.Canvas(box: padded, pixels: blurred.pixels))
             return result

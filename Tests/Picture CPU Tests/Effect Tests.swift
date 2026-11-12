@@ -64,14 +64,40 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
         }
     }
 
+    /// The sheet convolved with the Gaussian kernel of a deviation on both axes.
+    static func convolved(_ sheet: Tests.Canvas, _ deviation: Float) throws -> Tests.Canvas {
+        let kernel = try Tests.Canvas.Kernel<Float>.gaussian(deviation: deviation)
+        return sheet.convolved(horizontal: kernel, vertical: kernel, edge: .constant(.transparent)) { $0.interpolated(to: $1, at: $2) }
+    }
+
+    /// The sheet smoothed by the cascade of five boxes of a deviation on both axes.
+    static func smoothed(_ sheet: Tests.Canvas, _ deviation: Float) throws -> Tests.Canvas {
+        let cascade = try Raster<SIMD4<Float>>.Cascade<Float>.gaussian(deviation: deviation, count: 5)
+        let lanes = sheet.map { SIMD4($0.color.red, $0.color.green, $0.color.blue, $0.alpha) }
+        return lanes.smoothed(horizontal: cascade, vertical: cascade, edge: .constant(.zero)).map { lanes in
+            Tests.Pixel(color: .init(red: lanes[0], green: lanes[1], blue: lanes[2]), alpha: lanes[3])
+        }
+    }
+
     @Test
-    func `A blur is the sheet convolved with the Gaussian, the raster's edge never showing`() throws {
-        let sheet = try Self.sheet()
-        let kernel = try Tests.Canvas.Kernel<Float>.gaussian(deviation: 2.5)
-        let blurred = sheet.convolved(horizontal: kernel, vertical: kernel, edge: .constant(.transparent)) { $0.interpolated(to: $1, at: $2) }
-        Self.expect(try Self.drawn([.blur(.init(deviation: 2.5))])) { Self.read(blurred, $0) }
+    func `A blur below a deviation of 2 is the sheet convolved with the Gaussian, the raster's edge never showing`() throws {
+        let blurred = try Self.convolved(try Self.sheet(), 1.5)
+        Self.expect(try Self.drawn([.blur(.init(deviation: 1.5))])) { Self.read(blurred, $0) }
         #expect(try Self.drawn([.blur(.init(deviation: 0))]) == Self.drawn([]))
         #expect(try Self.drawn([.blur(.init(deviation: -1))]) == Self.drawn([]))
+    }
+
+    @Test
+    func `From a deviation of 2 a blur is a cascade of five boxes, within 0.064 of the Gaussian times the brightest channel`() throws {
+        let sheet = try Self.sheet()
+        let brightest = sheet.pixels.reduce(Float(0)) { Swift.max($0, $1.color.red, $1.color.green, $1.color.blue, $1.alpha) }
+        for deviation: Float in [2, 2.5, 7] {
+            let smoothed = try Self.smoothed(sheet, deviation)
+            let drawn = try Self.drawn([.blur(.init(deviation: Double(deviation)))])
+            Self.expect(drawn) { Self.read(smoothed, $0) }
+            let exact = try Self.convolved(sheet, deviation)
+            Self.expect(drawn, within: 0.064 * brightest) { Self.read(exact, $0) }
+        }
     }
 
     @Test
@@ -159,9 +185,7 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
 
     @Test
     func `A glow adds the blurred picture's light, and a backdrop pane replaces what is inside its clip by itself changed`() throws {
-        let sheet = try Self.sheet()
-        let kernel = try Tests.Canvas.Kernel<Float>.gaussian(deviation: 2)
-        let blurred = sheet.convolved(horizontal: kernel, vertical: kernel, edge: .constant(.transparent)) { $0.interpolated(to: $1, at: $2) }
+        let blurred = try Self.smoothed(try Self.sheet(), 2)
         let plain = try Tests.drawn(Self.content, on: Tests.canvas(Self.width, Self.height))
         let glow = try Tests.drawn(Self.content.glow(deviation: 2, strength: 0.5), on: Tests.canvas(Self.width, Self.height))
         Self.expect(glow) { point in
