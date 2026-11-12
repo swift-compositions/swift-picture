@@ -35,7 +35,18 @@ extension Picture.Scene.Camera {
     /// A direction of a model in eye space, at unit length: the upper-left 3 × 3 of view times model
     /// applied to it. It is the zero vector when that has no length.
     public func direction(_ vector: Vector<3, Double>, in model: Matrix<4, 4, Double> = .identity) -> Vector<3, Double> {
-        let moved = view.multiplied(by: model).applied(to: Vector([vector[0], vector[1], vector[2], 0]))
+        Self.direction(vector, through: eye(of: model))
+    }
+
+    /// View times model: what takes a model's space into eye space.
+    public func eye(of model: Matrix<4, 4, Double>) -> Matrix<4, 4, Double> {
+        view.multiplied(by: model)
+    }
+
+    /// A direction at unit length after the upper-left 3 × 3 of a matrix into eye space, `eye(of:)` of a
+    /// model, so that `direction(_:in:)` is this with the product made once per model instead of per call.
+    public static func direction(_ vector: Vector<3, Double>, through eye: Matrix<4, 4, Double>) -> Vector<3, Double> {
+        let moved = eye.applied(to: Vector([vector[0], vector[1], vector[2], 0]))
         let length = (moved[0] * moved[0] + moved[1] * moved[1] + moved[2] * moved[2]).squareRoot()
         guard length > 0, length.isFinite else { return .zero }
         return Vector([moved[0] / length, moved[1] / length, moved[2] / length])

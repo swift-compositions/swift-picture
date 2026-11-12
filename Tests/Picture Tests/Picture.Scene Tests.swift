@@ -178,3 +178,29 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
         #expect(Picture([.scene(scene)]) == Picture([.scene(scene)]))
     }
 }
+
+extension `Picture Tests`.`A scene places points of a model in the picture` {
+    @Test
+    func `A direction through a model's eye matrix, and a glass's shading, are the per-call forms bit for bit`() throws {
+        var camera = try Self.flat().camera
+        camera.view = Matrix(rows: [[0, -1, 0, 7], [1, 0.3, 0, 7], [0, 0, 1, 7], [0, 0, 0, 1]])
+        let model = Matrix<4, 4, Double>(rows: [[1.5, 0, 0.2, 1], [0, 1, 0, 2], [0.1, 0, 0.9, 3], [0, 0, 0, 1]])
+        let eye = camera.eye(of: model)
+        #expect(eye == camera.view.multiplied(by: model))
+        let normals: [Vector<3, Double>] = [Vector([0.3, -0.2, 0.9]), Vector([1, 2, 3]), .zero, Vector([-0.5, 0.5, -0.7])]
+        for normal in normals {
+            #expect(Picture.Scene.Camera.direction(normal, through: eye) == camera.direction(normal, in: model))
+        }
+        let light = Picture.Scene.Material.Glass.Light(direction: Vector([0.3, 0.5, 1]), color: .init(red: 1, green: 0.9, blue: 0.7), gloss: 30, rim: 0.6)
+        let glasses = [
+            Picture.Scene.Material.Glass(bend: 20, tint: .init(red: 1, green: 0.4, blue: 0.2, alpha: 0.3), light: light),
+            Picture.Scene.Material.Glass(bend: 20, tint: .init(red: 0.2, green: 0.4, blue: 1, alpha: 0.6)),
+        ]
+        let behind = Picture.Pixel(color: .init(red: 0.2, green: 0.3, blue: 0.1), alpha: 0.8)
+        for glass in glasses {
+            for normal in normals {
+                #expect(glass.shading.pixel(over: behind, facing: normal) == glass.pixel(over: behind, facing: normal))
+            }
+        }
+    }
+}

@@ -31,7 +31,7 @@ extension Picture.Renderer.CPU.Sheet {
         guard let inverse = Picture.Renderer.CPU.State(transform: transform, mask: nil).inverse else { return nil }
         var steps: [Picture.Renderer.CPU.Step] = []
         for effect in layer.effects {
-            if let step = try Picture.Renderer.CPU.Step(effect, transform, inverse) { steps.append(step) }
+            steps += try Picture.Renderer.CPU.Step.steps(effect, transform, inverse)
         }
         return steps
     }

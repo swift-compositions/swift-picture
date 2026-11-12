@@ -130,6 +130,39 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
     }
 
     @Test
+    func `A zoom in two passes stays within 0.02 of the mean over its whole stretch`() throws {
+        let rings = Picture.Paint.radial(
+            .init(
+                center: Tests.at(4, 3),
+                radius: 9,
+                .init([
+                    .init(offset: 0, color: Tests.red), .init(offset: 0.3, color: Tests.blue),
+                    .init(offset: 0.6, color: Tests.translucent), .init(offset: 1, color: Tests.red),
+                ])
+            )
+        )
+        let field: Picture = [.shape(.init(Tests.rectangle(-200, -200, 400, 400), fill: .init(rings)))]
+        let zoom = Picture.Effect.Zoom(center: Tests.at(30, -5), amount: 0.6)
+        let drawn = try Tests.drawn([.layer(.init(field, effects: [.zoom(zoom)]))], on: Tests.canvas(Self.width, Self.height))
+        var worst: Float = 0
+        for (x, y) in Tests.positions(Self.width, Self.height) {
+            let point = Self.centre(x, y)
+            var mean = Tests.Pixel.transparent
+            var step = 0
+            while step < 2000 {
+                let pixel = rings.pixel(at: zoom.source(of: point, at: (Double(step) + 0.5) / 2000))
+                mean = step == 0 ? pixel : mean.interpolated(to: pixel, at: 1 / Float(step + 1))
+                step += 1
+            }
+            let got = Tests.at(drawn, x, y)
+            let channels = [got.color.red - mean.color.red, got.color.green - mean.color.green, got.color.blue - mean.color.blue, got.alpha - mean.alpha]
+            worst = channels.reduce(worst) { Swift.max($0, abs($1)) }
+        }
+        print("A zoom in two passes: largest difference to the dense mean \(worst)")
+        #expect(worst <= 0.02)
+    }
+
+    @Test
     func `Zoom is the mean of the sheet along the stretch toward the centre`() throws {
         let gradient = Picture.Paint.linear(
             .init(from: Tests.at(-200, -100), to: Tests.at(200, 100), .init([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.translucent)]))

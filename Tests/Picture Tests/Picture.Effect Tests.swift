@@ -205,3 +205,18 @@ extension `Picture Tests`.`An effect reads the sheet at a point it names` {
         #expect(field.offset(at: Tests.at(4.5, -6)) != .zero)
     }
 }
+
+extension `Picture Tests`.`An effect reads the sheet at a point it names` {
+    @Test
+    func `A displacement read through caches gives the offsets it gives without, bit for bit`() {
+        let field = Picture.Effect.Displacement(seed: Threefry.Key(7, 11), frequency: 0.05, amplitude: 12, phase: 0.3)
+        var caches = Picture.Effect.Displacement.Caches()
+        var step = 0
+        while step < 300 {
+            let point = Tests.at(Double(step) * 0.77 - 40, Double(step % 23) * 3.1)
+            #expect(field.offset(at: point, caches: &caches) == field.offset(at: point))
+            #expect(field.source(of: point, caches: &caches) == field.source(of: point))
+            step += 1
+        }
+    }
+}

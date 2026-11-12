@@ -94,6 +94,11 @@ extension Picture.Renderer.CPU.Box {
         return Self(left: left - across, top: top - down, right: right + across, bottom: bottom + down)
     }
 
+    /// The box moved by a number of pixels across and down.
+    func moved(_ across: Int, _ down: Int) -> Self {
+        Self(left: left + across, top: top + down, right: right + across, bottom: bottom + down)
+    }
+
     /// The pixel's position in a row-by-row list of the box's pixels.
     func index(_ x: Int, _ y: Int) -> Int {
         (y - top) * width + (x - left)

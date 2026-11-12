@@ -37,6 +37,24 @@ extension Picture.Renderer.CPU.Canvas {
         update(box, workers) { x, y, _ in pixel(Double(x) + 0.5, Double(y) + 0.5) }
     }
 
+    /// A canvas over a box whose pixels are a function of their centres, made afresh for each band of rows by
+    /// `make`, so that the function may keep what it learns along a band, such as a cache.
+    init(
+        _ box: Picture.Renderer.CPU.Box,
+        _ workers: Picture.Renderer.CPU.Workers,
+        making make: () -> (_ x: Double, _ y: Double) -> Picture.Pixel
+    ) {
+        self.init(box, repeating: .transparent)
+        update(
+            box,
+            workers,
+            making: {
+                let pixel = make()
+                return { x, y, _ in pixel(Double(x) + 0.5, Double(y) + 0.5) }
+            }
+        )
+    }
+
     /// Gives each pixel of an area of the canvas the value `pixel` makes of its position and its pixel as it was.
     /// The area is cut into bands of rows and the workers take the bands; each pixel is computed the same way
     /// whichever thread takes it.
@@ -44,6 +62,17 @@ extension Picture.Renderer.CPU.Canvas {
         _ area: Picture.Renderer.CPU.Box,
         _ workers: Picture.Renderer.CPU.Workers,
         _ pixel: (_ x: Int, _ y: Int, _ old: Picture.Pixel) -> Picture.Pixel
+    ) {
+        withoutActuallyEscaping(pixel) { pixel in
+            update(area, workers, making: { pixel })
+        }
+    }
+
+    /// `update(_:_:_:)` with the function made afresh for each band by `make`.
+    mutating func update(
+        _ area: Picture.Renderer.CPU.Box,
+        _ workers: Picture.Renderer.CPU.Workers,
+        making make: () -> (_ x: Int, _ y: Int, _ old: Picture.Pixel) -> Picture.Pixel
     ) {
         let area = area.intersection(box)
         guard area.area > 0 else { return }
@@ -54,6 +83,7 @@ extension Picture.Renderer.CPU.Canvas {
             guard let base = buffer.baseAddress else { return }
             let shared = unsafe Picture.Renderer.CPU.Workers.Pixels(base: base)
             workers.run(bands) { part in
+                let pixel = make()
                 var y = area.top + part * band
                 let end = Swift.min(y + band, area.bottom)
                 while y < end {

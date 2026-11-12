@@ -280,6 +280,8 @@ extension Picture.Renderer.CPU.Canvas {
         let before = raster
         let origin = box
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
+        let eyes = scene.models.map { scene.camera.eye(of: $0.transform) }
+        let shadings = stage.surfaces.map { $0.glass.shading }
         unsafe tiles(glass.count, state.workers) { shared, box, part in
             let (tile, numbers) = glass[part]
             let covers = opaque[part].triangles
@@ -293,8 +295,7 @@ extension Picture.Renderer.CPU.Canvas {
                 let hidden = cover.triangle >= 0 && cover.depth <= upper && cover.depth <= hit.depth
                 guard hit.triangle >= 0, hit.depth <= upper, !hidden else { return old }
                 let surface = stage.surfaces[hit.triangle]
-                let model = scene.models[surface.model]
-                let normal = scene.camera.direction(surface.normal(hit.weights), in: model.transform)
+                let normal = Picture.Scene.Camera.direction(surface.normal(hit.weights), through: eyes[surface.model])
                 let offset = surface.glass.offset(for: normal)
                 let across = state.transform[0, 0] * offset[0] + state.transform[0, 1] * offset[1]
                 let down = state.transform[1, 0] * offset[0] + state.transform[1, 1] * offset[1]
@@ -302,7 +303,7 @@ extension Picture.Renderer.CPU.Canvas {
                     x: Double(x) + (Double(column % samples) + 0.5) / Double(samples) + across,
                     y: Double(y) + (Double(row % samples) + 0.5) / Double(samples) + down
                 )
-                return surface.glass.pixel(over: Self.sample(before, origin, point.x, point.y, edge: .extend), facing: normal)
+                return shadings[hit.triangle].pixel(over: Self.sample(before, origin, point.x, point.y, edge: .extend), facing: normal)
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }
