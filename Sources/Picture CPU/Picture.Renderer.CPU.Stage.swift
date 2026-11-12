@@ -9,6 +9,10 @@ extension Picture.Renderer.CPU {
         var colors: [Picture.Pixel] = []
         var glass: [InlineArray<3, Point<3, Double>>] = []
         var surfaces: [Surface] = []
+
+        /// The triangles of glass with a body that face away from the eye, where light leaves it, and their surfaces.
+        var far: [InlineArray<3, Point<3, Double>>] = []
+        var exits: [Surface] = []
         var bounds: Box = .empty
     }
 }
@@ -19,12 +23,21 @@ extension Picture.Renderer.CPU.Stage {
     init(_ scene: Picture.Scene, _ transform: Picture.Transform, samples: Int) {
         self.init()
         let lower = scene.camera.projection.depth.range.lowerBound
+        let lens = Picture.Renderer.CPU.Lens(scene, transform)
         for (number, model) in zip(scene.models.indices, scene.models) {
             let mesh = model.mesh
             let normals: [Vector<3, Double>] = mesh.normals(per: .vertex)
+            let eye = scene.camera.eye(of: model.transform)
             let corners = zip(mesh.vertices, normals).map { point, normal in
                 let clip = scene.camera.clip(point, in: model.transform)
-                return Corner(point: point, distance: clip[2] - lower * clip[3], normal: normal, divisor: clip[3])
+                let place = eye.applied(to: Vector([point[0], point[1], point[2], 1]))
+                return Corner(
+                    point: point,
+                    distance: clip[2] - lower * clip[3],
+                    normal: normal,
+                    divisor: clip[3],
+                    place: Vector([place[0], place[1], place[2]])
+                )
             }
             func project(_ corner: Corner) -> Point<3, Double>? {
                 guard let position = scene.position(of: corner.point, in: model) else { return nil }
@@ -47,15 +60,26 @@ extension Picture.Renderer.CPU.Stage {
                     let polygon = Self.clipped(face.vertices.map { corners[Int(bitPattern: $0)] })
                     for triangle in Self.fan(polygon) {
                         guard let a = project(triangle.0), let b = project(triangle.1), let c = project(triangle.2) else { continue }
-                        self.glass.append([a, b, c])
-                        surfaces.append(
-                            Picture.Renderer.CPU.Surface(
-                                model: number,
-                                glass: glass,
-                                normals: [triangle.0.normal, triangle.1.normal, triangle.2.normal],
-                                divisors: [triangle.0.divisor, triangle.1.divisor, triangle.2.divisor]
-                            )
+                        let places: InlineArray<3, Vector<3, Double>> = [triangle.0.place, triangle.1.place, triangle.2.place]
+                        let facing: InlineArray<3, Vector<3, Double>> = [
+                            Picture.Scene.Camera.direction(triangle.0.normal, through: eye),
+                            Picture.Scene.Camera.direction(triangle.1.normal, through: eye),
+                            Picture.Scene.Camera.direction(triangle.2.normal, through: eye),
+                        ]
+                        let surface = Picture.Renderer.CPU.Surface(
+                            model: number,
+                            glass: glass,
+                            normals: [triangle.0.normal, triangle.1.normal, triangle.2.normal],
+                            divisors: [triangle.0.divisor, triangle.1.divisor, triangle.2.divisor],
+                            places: places,
+                            front: lens.faces(places, facing)
                         )
+                        self.glass.append([a, b, c])
+                        surfaces.append(surface)
+                        if glass.refraction != nil, !surface.front {
+                            far.append([a, b, c])
+                            exits.append(surface)
+                        }
                         widen([a, b, c])
                     }
                 }
@@ -121,7 +145,8 @@ extension Picture.Renderer.CPU.Stage {
             point: Point<3, Double>([along(a.point[0], b.point[0]), along(a.point[1], b.point[1]), along(a.point[2], b.point[2])]),
             distance: along(a.distance, b.distance),
             normal: Vector([along(a.normal[0], b.normal[0]), along(a.normal[1], b.normal[1]), along(a.normal[2], b.normal[2])]),
-            divisor: along(a.divisor, b.divisor)
+            divisor: along(a.divisor, b.divisor),
+            place: Vector([along(a.place[0], b.place[0]), along(a.place[1], b.place[1]), along(a.place[2], b.place[2])])
         )
     }
 
@@ -282,6 +307,8 @@ extension Picture.Renderer.CPU.Canvas {
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
         let eyes = scene.models.map { scene.camera.eye(of: $0.transform) }
         let shadings = stage.surfaces.map { $0.glass.shading }
+        let lens = Picture.Renderer.CPU.Lens(scene, state.transform)
+        let far = Picture.Renderer.CPU.Far(stage, eyes: eyes, over: area)
         unsafe tiles(glass.count, state.workers) { shared, box, part in
             let (tile, numbers) = glass[part]
             let covers = opaque[part].triangles
@@ -296,6 +323,35 @@ extension Picture.Renderer.CPU.Canvas {
                 guard hit.triangle >= 0, hit.depth <= upper, !hidden else { return old }
                 let surface = stage.surfaces[hit.triangle]
                 let normal = Picture.Scene.Camera.direction(surface.normal(hit.weights), through: eyes[surface.model])
+                let shading = shadings[hit.triangle]
+                if let refraction = surface.glass.refraction {
+                    let passage = Picture.Renderer.CPU.Passage(
+                        from: surface.place(hit.weights),
+                        normal: normal,
+                        at: .init(
+                            x: Double(x) + (Double(column % samples) + 0.5) / Double(samples),
+                            y: Double(y) + (Double(row % samples) + 0.5) / Double(samples)
+                        ),
+                        through: refraction,
+                        lens: lens,
+                        far: far
+                    )
+                    let reads = passage.reads
+                    let behind: InlineArray<3, Picture.Pixel> = [
+                        Self.sample(before, origin, reads[0].x, reads[0].y, edge: .extend),
+                        Self.sample(before, origin, reads[1].x, reads[1].y, edge: .extend),
+                        Self.sample(before, origin, reads[2].x, reads[2].y, edge: .extend),
+                    ]
+                    return shading.pixel(
+                        over: behind,
+                        through: passage.length,
+                        leaving: passage.leaving,
+                        beyond: passage.beyond,
+                        mirroring: passage.mirrored,
+                        by: passage.share,
+                        facing: normal
+                    )
+                }
                 let offset = surface.glass.offset(for: normal)
                 let across = state.transform[0, 0] * offset[0] + state.transform[0, 1] * offset[1]
                 let down = state.transform[1, 0] * offset[0] + state.transform[1, 1] * offset[1]
@@ -303,7 +359,7 @@ extension Picture.Renderer.CPU.Canvas {
                     x: Double(x) + (Double(column % samples) + 0.5) / Double(samples) + across,
                     y: Double(y) + (Double(row % samples) + 0.5) / Double(samples) + down
                 )
-                return shadings[hit.triangle].pixel(over: Self.sample(before, origin, point.x, point.y, edge: .extend), facing: normal)
+                return shading.pixel(over: Self.sample(before, origin, point.x, point.y, edge: .extend), facing: normal)
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }

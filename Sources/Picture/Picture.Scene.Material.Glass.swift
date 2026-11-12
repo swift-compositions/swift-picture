@@ -9,10 +9,16 @@ extension Picture.Scene.Material {
         /// A light the glass reflects, or none.
         public var light: Light?
 
-        public init(bend: Double, tint: Picture.Color = .clear, light: Light? = nil) {
+        /// The glass's body, or none: then the glass is a skin that reads the picture behind at `offset(for:)`
+        /// under a coat of `tint`. With a body `bend` is not used, and the tint is taken on along the way
+        /// through it: its alpha is the share after one unit of the scene.
+        public var refraction: Refraction?
+
+        public init(bend: Double, tint: Picture.Color = .clear, light: Light? = nil, refraction: Refraction? = nil) {
             self.bend = bend
             self.tint = tint
             self.light = light
+            self.refraction = refraction
         }
     }
 }
@@ -35,8 +41,27 @@ extension Picture.Scene.Material.Glass {
         shading.pixel(over: behind, facing: normal)
     }
 
+    /// The pixel of glass with a body: `shading`'s, which says what each part does.
+    public func pixel(
+        over behind: InlineArray<3, Picture.Pixel>,
+        through length: Double,
+        leaving: Vector<3, Double>,
+        beyond: Double,
+        mirroring mirrored: Vector<3, Double>,
+        by share: Double,
+        facing normal: Vector<3, Double>
+    ) -> Picture.Pixel {
+        shading.pixel(over: behind, through: length, leaving: leaving, beyond: beyond, mirroring: mirrored, by: share, facing: normal)
+    }
+
     /// The glass with its colours taken into working pixels once, for drawing many points of it.
     public var shading: Shading {
-        Shading(tint: tint.pixel, light: light, shine: light?.color.pixel ?? .transparent)
+        Shading(
+            tint: tint.pixel,
+            light: light,
+            shine: light?.color.pixel ?? .transparent,
+            above: refraction?.surroundings?.above.pixel,
+            below: refraction?.surroundings?.below.pixel
+        )
     }
 }

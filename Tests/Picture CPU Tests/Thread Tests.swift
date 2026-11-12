@@ -38,6 +38,9 @@ extension `Picture CPU Tests`.`A frame drawn on several threads is the frame dra
         let glass = Picture.Scene.Material.glass(.init(bend: 40, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1)))
         elements.append(small([.scene(try torus(.flat(.init(red: 0.9, green: 0.5, blue: 0.3))))]))
         elements.append(small([.scene(try torus(glass))]))
+        let around = Picture.Scene.Material.Glass.Surroundings(above: .white, below: .init(gray: 0.2), width: 1.2)
+        let body = Picture.Scene.Material.Glass.Refraction(index: 1.5, distance: 2, dispersion: 0.05, surroundings: around)
+        elements.append(small([.scene(try torus(.glass(.init(bend: 0, tint: .init(red: 1, green: 0.4, blue: 0.5, alpha: 0.3), refraction: body))))]))
         elements.append(small([.scene(try torus(.wireframe(.init(red: 0.2, green: 0.5, blue: 0.9), width: 1.5)))]))
         return Picture(elements)
     }
