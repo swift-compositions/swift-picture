@@ -52,6 +52,11 @@ extension `Picture CPU Tests` {
         return raster
     }
 
+    /// Every pixel position of a raster of a size, in row order.
+    static func positions(_ width: UInt, _ height: UInt) -> [(x: UInt, y: UInt)] {
+        (0..<height).flatMap { y in (0..<width).map { x in (x: x, y: y) } }
+    }
+
     static func at(_ raster: Canvas, _ x: UInt, _ y: UInt) -> Pixel {
         raster[x: Ordinal(x), y: Ordinal(y)]
     }

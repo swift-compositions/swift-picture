@@ -11,9 +11,7 @@ extension Picture.Renderer.CPU {
 }
 
 extension Picture.Renderer.CPU.Sheet {
-    typealias CPU = Picture.Renderer.CPU
-
-    init(_ layer: Picture.Layer, _ state: CPU.State, _ target: CPU.Box) {
+    init(_ layer: Picture.Layer, _ state: Picture.Renderer.CPU.State, _ target: Picture.Renderer.CPU.Box) {
         self.init(layer: layer, state: state, target: target)
     }
 
@@ -28,12 +26,12 @@ extension Picture.Renderer.CPU.Sheet {
     }
 
     /// The sheet with the content drawn on it, over the target's pixels at most.
-    func drawn() throws(Picture.Renderer.Error) -> CPU.Canvas {
+    func drawn() throws(Picture.Renderer.Error) -> Picture.Renderer.CPU.Canvas {
         guard layer.effects.isEmpty else { throw .unsupported }
-        let box = target.intersection(CPU.Canvas.bounds(of: layer.content, state.transform) ?? target)
-        guard box.area <= CPU.limit else { throw .unsupported }
-        var sheet = CPU.Canvas(box, repeating: .transparent)
-        try sheet.draw(layer.content, CPU.State(transform: state.transform, mask: nil))
+        let box = target.intersection(Picture.Renderer.CPU.Canvas.bounds(of: layer.content, state.transform) ?? target)
+        guard box.area <= Picture.Renderer.CPU.limit else { throw .unsupported }
+        var sheet = Picture.Renderer.CPU.Canvas(box, repeating: .transparent)
+        try sheet.draw(layer.content, Picture.Renderer.CPU.State(transform: state.transform, mask: nil))
         return sheet
     }
 }

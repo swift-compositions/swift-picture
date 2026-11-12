@@ -9,17 +9,15 @@ extension Picture.Renderer.CPU {
 }
 
 extension Picture.Renderer.CPU.Canvas {
-    typealias CPU = Picture.Renderer.CPU
-
     /// A canvas over a box, every pixel the same.
-    init(_ box: CPU.Box, repeating pixel: Picture.Pixel) {
+    init(_ box: Picture.Renderer.CPU.Box, repeating pixel: Picture.Pixel) {
         self.init(box: box, pixels: [Picture.Pixel](repeating: pixel, count: box.area))
     }
 
     /// A canvas holding a raster's pixels at the raster's own place.
     init(_ raster: Raster<Picture.Pixel>) {
         self.init(
-            box: CPU.Box(left: 0, top: 0, right: Int(clamping: raster.width), bottom: Int(clamping: raster.height)),
+            box: Picture.Renderer.CPU.Box(left: 0, top: 0, right: Int(clamping: raster.width), bottom: Int(clamping: raster.height)),
             pixels: raster.pixels
         )
     }
@@ -34,7 +32,7 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// A canvas over a box whose pixels are a function of their centres in raster space.
-    init(_ box: CPU.Box, _ pixel: (_ x: Double, _ y: Double) -> Picture.Pixel) {
+    init(_ box: Picture.Renderer.CPU.Box, _ pixel: (_ x: Double, _ y: Double) -> Picture.Pixel) {
         var pixels: [Picture.Pixel] = []
         pixels.reserveCapacity(box.area)
         var y = box.top
@@ -69,7 +67,7 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// The canvas read at a point of raster space between pixel centres, transparent beyond its box.
-    static func sample(_ raster: Raster<Picture.Pixel>, _ box: CPU.Box, _ x: Double, _ y: Double) -> Picture.Pixel {
+    static func sample(_ raster: Raster<Picture.Pixel>, _ box: Picture.Renderer.CPU.Box, _ x: Double, _ y: Double) -> Picture.Pixel {
         guard x.isFinite, y.isFinite, box.area > 0 else { return .transparent }
         let point = Point<2, Double>(x: x - Double(box.left), y: y - Double(box.top))
         return raster.sample(at: point, .bilinear, edge: .constant(.transparent)) { from, to, parameter in
@@ -81,26 +79,26 @@ extension Picture.Renderer.CPU.Canvas {
     static func coverage(
         of path: Picture.Plane.Path,
         rule: Winding.Rule,
-        in box: CPU.Box
+        in box: Picture.Renderer.CPU.Box
     ) throws(Picture.Renderer.Error) -> [Float] {
         let moved = path.transformed(by: .translation(Vector([-Double(box.left), -Double(box.top)])))
         do throws(Picture.Plane.Path.Error) {
-            return try Raster<Float>.coverage(of: moved, rule: rule, in: box.region, tolerance: .init(CPU.tolerance)).pixels
+            return try Raster<Float>.coverage(of: moved, rule: rule, in: box.region, tolerance: .init(Picture.Renderer.CPU.tolerance)).pixels
         } catch {
             throw .path(error)
         }
     }
 
     /// The box of whole pixels around a path of raster space, one pixel wider on every side.
-    static func bounds(of path: Picture.Plane.Path) -> CPU.Box {
+    static func bounds(of path: Picture.Plane.Path) -> Picture.Renderer.CPU.Box {
         guard let rectangle = path.boundingBox else { return .empty }
-        return CPU.Box(rectangle, .identity).expanded(1, 1)
+        return Picture.Renderer.CPU.Box(rectangle, .identity).expanded(1, 1)
     }
 }
 
 extension Picture.Renderer.CPU.Canvas {
     /// Draws a picture's elements in order.
-    mutating func draw(_ picture: Picture, _ state: CPU.State) throws(Picture.Renderer.Error) {
+    mutating func draw(_ picture: Picture, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
         for element in picture.elements {
             switch element {
             case .shape(let shape): try draw(shape, state)
@@ -113,11 +111,11 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// Draws the fill, then the stroke.
-    mutating func draw(_ shape: Picture.Shape, _ state: CPU.State) throws(Picture.Renderer.Error) {
+    mutating func draw(_ shape: Picture.Shape, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
         var outline: Picture.Plane.Path?
         if let stroke = shape.stroke {
-            let stretch = CPU.stretch(state.transform)
-            let tolerance = stretch > 0 && stretch.isFinite ? CPU.tolerance / stretch : CPU.tolerance
+            let stretch = Picture.Renderer.CPU.stretch(state.transform)
+            let tolerance = stretch > 0 && stretch.isFinite ? Picture.Renderer.CPU.tolerance / stretch : Picture.Renderer.CPU.tolerance
             do throws(Picture.Plane.Path.Error) {
                 outline = try stroke.outline(of: shape.path, tolerance: .init(tolerance))
             } catch {
@@ -139,7 +137,7 @@ extension Picture.Renderer.CPU.Canvas {
         _ rule: Winding.Rule,
         _ paint: Picture.Paint,
         _ inverse: Picture.Transform,
-        _ state: CPU.State
+        _ state: Picture.Renderer.CPU.State
     ) throws(Picture.Renderer.Error) {
         let area = Self.bounds(of: path).intersection(state.reach(in: box))
         guard area.area > 0 else { return }
@@ -152,10 +150,10 @@ extension Picture.Renderer.CPU.Canvas {
             while x < area.right {
                 let share = coverage[area.index(x, y)]
                 if share > 0 {
-                    let source = solid ?? paint.pixel(at: CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
+                    let source = solid ?? paint.pixel(at: Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
                     let index = box.index(x, y)
                     let old = pixels[index]
-                    pixels[index] = CPU.limited(old, source.composited(over: old, coverage: share), state.share(x, y))
+                    pixels[index] = Picture.Renderer.CPU.limited(old, source.composited(over: old, coverage: share), state.share(x, y))
                 }
                 x += 1
             }
@@ -164,8 +162,8 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// Draws a group's content under its transform, limited to its clip.
-    mutating func draw(_ group: Picture.Group, _ state: CPU.State) throws(Picture.Renderer.Error) {
-        var inner = CPU.State(transform: state.transform.multiplied(by: group.transform), mask: state.mask)
+    mutating func draw(_ group: Picture.Group, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
+        var inner = Picture.Renderer.CPU.State(transform: state.transform.multiplied(by: group.transform), mask: state.mask)
         if let clip = group.clip {
             let path = clip.path.transformed(by: inner.transform)
             let area = Self.bounds(of: path).intersection(state.reach(in: box))
@@ -181,24 +179,24 @@ extension Picture.Renderer.CPU.Canvas {
                     y += 1
                 }
             }
-            inner.mask = CPU.Mask(box: area, values: values)
+            inner.mask = Picture.Renderer.CPU.Mask(box: area, values: values)
         }
         try draw(group.content, inner)
     }
 
     /// Draws a layer on a sheet of its own, applies its effects and puts the sheet onto the canvas.
-    mutating func draw(_ layer: Picture.Layer, _ state: CPU.State) throws(Picture.Renderer.Error) {
+    mutating func draw(_ layer: Picture.Layer, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
         let target = state.reach(in: box)
         guard target.area > 0 else { return }
-        let sheet = try CPU.Sheet(layer, state, target).drawn()
-        let visit = CPU.Sheet.keeps(layer) ? target.intersection(sheet.box) : target
+        let sheet = try Picture.Renderer.CPU.Sheet(layer, state, target).drawn()
+        let visit = Picture.Renderer.CPU.Sheet.keeps(layer) ? target.intersection(sheet.box) : target
         var y = visit.top
         while y < visit.bottom {
             var x = visit.left
             while x < visit.right {
                 let index = box.index(x, y)
                 let old = pixels[index]
-                pixels[index] = CPU.limited(old, layer.composited(sheet[x, y], over: old), state.share(x, y))
+                pixels[index] = Picture.Renderer.CPU.limited(old, layer.composited(sheet[x, y], over: old), state.share(x, y))
                 x += 1
             }
             y += 1
@@ -206,12 +204,12 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// Sprites are not drawn yet.
-    mutating func draw(_ sprites: Picture.Sprites, _ state: CPU.State) throws(Picture.Renderer.Error) {
+    mutating func draw(_ sprites: Picture.Sprites, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
         throw .unsupported
     }
 
     /// Scenes are not drawn yet.
-    mutating func draw(_ scene: Picture.Scene, _ state: CPU.State) throws(Picture.Renderer.Error) {
+    mutating func draw(_ scene: Picture.Scene, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
         throw .unsupported
     }
 }
@@ -219,8 +217,8 @@ extension Picture.Renderer.CPU.Canvas {
 extension Picture.Renderer.CPU.Canvas {
     /// A box of raster space outside which a picture under a transform leaves its sheet transparent,
     /// or nil when no such box is known.
-    static func bounds(of picture: Picture, _ transform: Picture.Transform) -> CPU.Box? {
-        var total = CPU.Box.empty
+    static func bounds(of picture: Picture, _ transform: Picture.Transform) -> Picture.Renderer.CPU.Box? {
+        var total = Picture.Renderer.CPU.Box.empty
         for element in picture.elements {
             guard let box = bounds(of: element, transform) else { return nil }
             total = total.union(box)
@@ -229,7 +227,7 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// A box of raster space outside which one element under a transform draws nothing, or nil.
-    static func bounds(of element: Picture.Element, _ transform: Picture.Transform) -> CPU.Box? {
+    static func bounds(of element: Picture.Element, _ transform: Picture.Transform) -> Picture.Renderer.CPU.Box? {
         switch element {
         case .shape(let shape):
             guard let rectangle = shape.path.boundingBox else { return .empty }
@@ -246,10 +244,10 @@ extension Picture.Renderer.CPU.Canvas {
                 urx: .init(rectangle.urx.underlying + reach),
                 ury: .init(rectangle.ury.underlying + reach)
             )
-            return CPU.Box(grown, transform).expanded(1, 1)
+            return Picture.Renderer.CPU.Box(grown, transform).expanded(1, 1)
 
         case .sprites(let sprites):
-            var total = CPU.Box.empty
+            var total = Picture.Renderer.CPU.Box.empty
             for sprite in sprites.sprites where sprite.radius > 0 {
                 let square = Picture.Plane.Rectangle(
                     llx: .init(sprite.center[0] - sprite.radius),
@@ -257,7 +255,7 @@ extension Picture.Renderer.CPU.Canvas {
                     urx: .init(sprite.center[0] + sprite.radius),
                     ury: .init(sprite.center[1] + sprite.radius)
                 )
-                total = total.union(CPU.Box(square, transform).expanded(1, 1))
+                total = total.union(Picture.Renderer.CPU.Box(square, transform).expanded(1, 1))
             }
             return total
 

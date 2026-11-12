@@ -29,7 +29,7 @@ extension `Picture CPU Tests`.`Timing` {
         var elements: [Picture.Element] = [
             .shape(.init(Tests.rectangle(0, 0, 1920, 1080), fill: .init(.linear(.init(from: Tests.at(0, 0), to: Tests.at(400, 1080), sky)))))
         ]
-        for index in 0..<40 {
+        elements += (0..<40).map { index in
             let x = Double(index % 8) * 240 + 120
             let y = Double(index / 8) * 216 + 108
             let color = Picture.Color(red: Float(index % 3) / 2, green: 0.6, blue: Float(index % 5) / 4, alpha: 0.7)
@@ -37,7 +37,7 @@ extension `Picture CPU Tests`.`Timing` {
                 index.isMultiple(of: 2)
                 ? .solid(color)
                 : .radial(.init(center: Tests.at(x, y), radius: 100, .init([.init(offset: 0, color: .white), .init(offset: 1, color: color)])))
-            elements.append(.shape(.init(disc(x, y, 60 + Double(index % 4) * 30), fill: .init(paint))))
+            return Picture.Element.shape(.init(disc(x, y, 60 + Double(index % 4) * 30), fill: .init(paint)))
         }
         let bars: Picture = Picture(
             (0..<20).map { index in

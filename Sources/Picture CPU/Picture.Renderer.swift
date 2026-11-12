@@ -11,7 +11,3 @@ extension Picture.Renderer {
         })
     }
 }
-
-extension Picture.Renderer: Witness.Key {
-    public static var liveValue: Self { .cpu }
-}

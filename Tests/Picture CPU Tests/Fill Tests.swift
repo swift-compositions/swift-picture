@@ -44,16 +44,12 @@ extension `Picture CPU Tests`.`A renderer puts a fill's paint over what is behin
             let shape = Picture.Element.shape(.init(Tests.rectangle(0, 0, 4, 2), fill: .init(paint)))
             let plain = try Tests.drawn([shape], on: Tests.canvas(4, 2))
             let scaled = try Tests.drawn([.group(.init([shape], transform: scale))], on: Tests.canvas(9, 4))
-            for y: UInt in 0..<2 {
-                for x: UInt in 0..<4 {
-                    #expect(Tests.at(plain, x, y) == paint.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5)))
-                }
+            for (x, y) in Tests.positions(4, 2) {
+                #expect(Tests.at(plain, x, y) == paint.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5)))
             }
-            for y: UInt in 0..<4 {
-                for x: UInt in 1..<9 {
-                    let inner = Tests.at((Double(x) + 0.5 - 1) / 2, (Double(y) + 0.5) / 2)
-                    #expect(Tests.close(Tests.at(scaled, x, y), paint.pixel(at: inner)))
-                }
+            for (x, y) in Tests.positions(9, 4) where x >= 1 {
+                let inner = Tests.at((Double(x) + 0.5 - 1) / 2, (Double(y) + 0.5) / 2)
+                #expect(Tests.close(Tests.at(scaled, x, y), paint.pixel(at: inner)))
             }
         }
     }
@@ -65,10 +61,8 @@ extension `Picture CPU Tests`.`A renderer puts a fill's paint over what is behin
             placement: .init(rows: [[2, 0, 0], [0, 2, 0]])
         )
         let raster = try Tests.drawn([.shape(.init(Tests.rectangle(0, 0, 4, 2), fill: .init(.image(image))))], on: Tests.canvas(4, 2))
-        for y: UInt in 0..<2 {
-            for x: UInt in 0..<4 {
-                #expect(Tests.at(raster, x, y) == image.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5)))
-            }
+        for (x, y) in Tests.positions(4, 2) {
+            #expect(Tests.at(raster, x, y) == image.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5)))
         }
     }
 
