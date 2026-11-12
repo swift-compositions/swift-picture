@@ -69,4 +69,13 @@ extension `Picture CPU Tests`.`A frame drawn on several threads is the frame dra
         }
         #expect(try Self.drawn(picture, threads: 0) == one)
     }
+
+    @Test
+    func `A fill larger than one part of work reaches every row and column of it`() throws {
+        let colour = Picture.Color(red: 0.3, green: 0.6, blue: 0.9)
+        for threads: Cardinal in [1, 4] {
+            let drawn = try Self.drawn([Tests.fill(Tests.rectangle(0, 0, 272, 154), colour)], threads: threads)
+            #expect(drawn.pixels.allSatisfy { $0 == colour.pixel }, "\(threads) threads")
+        }
+    }
 }
