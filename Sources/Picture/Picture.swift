@@ -49,6 +49,34 @@ extension Picture {
     }
 }
 
+extension Picture {
+    /// The mean of pictures, each drawn on a sheet of its own: one layer that holds, for each picture, a
+    /// layer with one part in their number as opacity and `lighter` as operator, so the sheets add up to
+    /// their mean, colour and alpha alike. No pictures give the empty picture, and one picture gives itself.
+    public static func mean(of pictures: [Self]) -> Self {
+        guard pictures.count > 1 else { return pictures.first ?? .empty }
+        let share = 1 / Float(pictures.count)
+        return [.layer(Layer(Self(pictures.map { .layer(Layer($0, opacity: share, operator: .lighter)) })))]
+    }
+
+    /// A picture that changes while a shutter is open, as the shutter records it: the mean of the picture at
+    /// the midpoints of `samples` equal parts of the exposure, which runs from fraction 0 to fraction 1.
+    /// What moves is smeared along its way, and what stands still is drawn as it is. No samples give the
+    /// empty picture, and one gives the picture at fraction one half.
+    public static func exposure<Failure: Swift.Error>(
+        samples: Cardinal,
+        _ picture: (_ fraction: Double) throws(Failure) -> Self
+    ) throws(Failure) -> Self {
+        let count = Int(clamping: samples)
+        var pictures: [Self] = []
+        pictures.reserveCapacity(count)
+        for sample in 0..<count {
+            pictures.append(try picture((Double(sample) + 0.5) / Double(count)))
+        }
+        return mean(of: pictures)
+    }
+}
+
 extension Picture: ExpressibleByArrayLiteral {
     public init(arrayLiteral elements: Element...) {
         self.init(elements)
