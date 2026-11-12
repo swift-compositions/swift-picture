@@ -27,7 +27,7 @@ extension Picture.Renderer.CPU.Spread {
             return nil
         }
         do throws(Raster<SIMD4<Float>>.Kernel<Float>.Error) {
-            self = .boxes(try .gaussian(deviation: Float(deviation), count: Self.passes))
+            self = .boxes(try .gaussian(deviation: Float(deviation), count: Cardinal(UInt(Self.passes))))
         } catch {
             return nil
         }
