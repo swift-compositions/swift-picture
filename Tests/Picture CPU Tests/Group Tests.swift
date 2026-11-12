@@ -71,6 +71,17 @@ extension `Picture CPU Tests`.`A renderer draws a group's content moved, straigh
     }
 
     @Test
+    func `Nested clips multiply on every row they share`() throws {
+        let backdrop = Tests.blue.pixel
+        let inner = Picture.Group([Tests.fill(Tests.rectangle(0, 0, 3, 3), Tests.red)], clip: .init(Tests.rectangle(0, 0, 3, 3)))
+        let outer = Picture.Group([.group(inner)], clip: .init(Tests.rectangle(0, 0, 0.5, 3)))
+        let raster = try Tests.drawn([.group(outer)], on: Tests.canvas(3, 3, backdrop))
+        for (x, y) in Tests.positions(3, 3) {
+            #expect(Tests.at(raster, x, y) == (x == 0 ? backdrop.interpolated(to: Tests.red.pixel, at: 0.5) : backdrop), "at \(x), \(y)")
+        }
+    }
+
+    @Test
     func `A transform that squashes the plane draws nothing`() throws {
         let backdrop = Tests.canvas(4, 4, Tests.blue.pixel)
         let squashed = Picture.Transform(rows: [[1, 2, 0], [2, 4, 0]])
