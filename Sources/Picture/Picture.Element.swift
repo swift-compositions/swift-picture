@@ -1,5 +1,7 @@
 public import Direction
+public import Matrix
 public import Raster
+import Vector
 
 extension Picture {
     /// One thing a picture draws.
@@ -71,19 +73,53 @@ extension Picture.Element {
 }
 
 extension Picture.Element {
-    /// The part of a picture inside a rectangle kept as an image, standing where that part stood: the rectangle
-    /// filled with `Picture.Image(_:in:scale:samples:sampling:edge:)` of it. The renderer draws the part once, at
+    /// The part of a picture inside a rectangle kept as an image, standing where that part stood: an area filled
+    /// with `Picture.Image(_:in:scale:samples:sampling:edge:)` of it. The renderer draws the part once, at
     /// `scale` pixels to a unit, and paints it back as an image, so it can be shown again, moved and repeated for
     /// the price of an image, and a part that does not change from frame to frame is drawn once for all of them.
+    /// The area is the rectangle by default; a wider one shows the image's `edge` beyond the rectangle, so an
+    /// edge of `.mirror` fills it with the part mirrored, `.wrap` with the part repeated and `.extend` with its
+    /// border pixels drawn out.
     public static func image(
         _ picture: Picture,
         in rectangle: Picture.Plane.Rectangle,
         scale: Double,
         samples: Cardinal = 1,
         sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
-        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent),
+        filling area: Picture.Plane.Rectangle? = nil
     ) -> Self {
         let image = Picture.Image(picture, in: rectangle, scale: scale, samples: samples, sampling: sampling, edge: edge)
-        return .fill(Picture.area(rectangle), .image(image))
+        return .fill(Picture.area(area ?? rectangle), .image(image))
+    }
+
+    /// The part of a picture inside a rectangle kept as an image, as `image(_:in:scale:samples:sampling:edge:filling:)`
+    /// keeps it, and fitted onto four corners in perspective: the quadrilateral of the corners filled with the
+    /// image under the projective map that takes the rectangle's corners, (llx, lly), (urx, lly), (urx, ury) and
+    /// (llx, ury) in that order, onto them, `Matrix<3, 3, Double>(fitting:onto:)` of swift-matrix. So the part is
+    /// a card seen at a slant, straight lines kept straight and nearer parts larger, read perspective-correct at
+    /// every pixel. A rectangle with no area and corners three of which lie on one line fit no map and fail with
+    /// `Matrix.Error.singular`.
+    public static func image(
+        _ picture: Picture,
+        in rectangle: Picture.Plane.Rectangle,
+        scale: Double,
+        samples: Cardinal = 1,
+        sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent),
+        onto corners: InlineArray<4, Picture.Plane.Point<2>>
+    ) throws(Matrix<3, 3, Double>.Error) -> Self {
+        let (left, top) = (rectangle.llx.underlying, rectangle.lly.underlying)
+        let (right, bottom) = (rectangle.urx.underlying, rectangle.ury.underlying)
+        let sources: InlineArray<4, Vector<2, Double>> = [Vector([left, top]), Vector([right, top]), Vector([right, bottom]), Vector([left, bottom])]
+        let targets: InlineArray<4, Vector<2, Double>> = [
+            Vector([corners[0][0], corners[0][1]]), Vector([corners[1][0], corners[1][1]]),
+            Vector([corners[2][0], corners[2][1]]), Vector([corners[3][0], corners[3][1]]),
+        ]
+        let fit = try Matrix<3, 3, Double>(fitting: sources, onto: targets)
+        var image = Picture.Image(picture, in: rectangle, scale: scale, samples: samples, sampling: sampling, edge: edge)
+        image.placement = fit.multiplied(by: image.placement)
+        let quadrilateral = Picture.Plane.Path([Picture.Plane.Polygon(vertices: [corners[0], corners[1], corners[2], corners[3]])])
+        return .fill(quadrilateral, .image(image))
     }
 }

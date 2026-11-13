@@ -1,10 +1,15 @@
+public import Matrix
 public import Raster
 
 extension Picture {
     /// A raster of working pixels placed in a shape's space.
     public struct Image: Sendable, Hashable {
         public var raster: Raster<Picture.Pixel>
-        public var placement: Picture.Transform
+
+        /// Where the raster stands: a projective map of the plane from the raster's own space, one unit a
+        /// pixel, into the shape's. An affine placement, whose last row is (0, 0, 1), moves the image as a
+        /// group's transform moves its content; any other shows it in perspective, as a card seen at a slant.
+        public var placement: Matrix<3, 3, Double>
         public var sampling: Raster<Picture.Pixel>.Sampling
         public var edge: Raster<Picture.Pixel>.Edge
 
@@ -14,7 +19,7 @@ extension Picture {
 
         public init(
             _ raster: Raster<Picture.Pixel>,
-            placement: Picture.Transform = .identity,
+            placement: Matrix<3, 3, Double> = .identity,
             sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
             edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
         ) {
@@ -28,6 +33,16 @@ extension Picture {
 }
 
 extension Picture.Image {
+    /// An image under an affine placement: `init(_:placement:sampling:edge:)` of the placement's lift.
+    public init(
+        _ raster: Raster<Picture.Pixel>,
+        placement: Picture.Transform,
+        sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
+    ) {
+        self.init(raster, placement: Matrix<3, 3, Double>(placement), sampling: sampling, edge: edge)
+    }
+
     /// The image's pixel at a point of the shape's space. A renderer that reads many pixels of one image reads
     /// them from its `sampler`, which inverts the placement once.
     public func pixel(at point: Picture.Plane.Point<2>) -> Picture.Pixel {
@@ -54,7 +69,7 @@ extension Picture.Image {
         edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
     ) {
         let source = Source(picture, in: rectangle, scale: scale, samples: samples)
-        self.init(Raster(width: .zero, height: .zero, repeating: .transparent), placement: source.placement, sampling: sampling, edge: edge)
+        self.init(Raster(width: .zero, height: .zero, repeating: .transparent), placement: Matrix<3, 3, Double>(source.placement), sampling: sampling, edge: edge)
         self.source = source
     }
 

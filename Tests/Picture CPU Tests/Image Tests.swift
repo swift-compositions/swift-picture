@@ -48,7 +48,7 @@ extension `Picture CPU Tests`.`A picture kept as an image shows the picture wher
         let image = try Picture.Image(Self.picture, in: Self.part(2, 1, 5, 4), scale: 3, through: Tests.renderer)
         let enlarged: Picture = [.group(.init(Self.picture, transform: .init(rows: [[3, 0, -6], [0, 3, -3]])))]
         #expect(image.raster == (try Tests.drawn(enlarged, on: Tests.canvas(15, 12))))
-        #expect(image.placement == Picture.Transform(rows: [[1.0 / 3, 0, 2], [0, 1.0 / 3, 1]]))
+        #expect(image.placement == Matrix<3, 3, Double>(Picture.Transform(rows: [[1.0 / 3, 0, 2], [0, 1.0 / 3, 1]])))
     }
 
     @Test

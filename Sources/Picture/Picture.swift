@@ -40,7 +40,9 @@ extension Picture {
     /// `destinationOut`, so each pixel of the light keeps one minus the mask's alpha there before it is added:
     /// where the mask is opaque the picture is left as it is drawn, as a ring's glow that does not fill its
     /// middle, and where the mask fades the light comes back. The mask is in this picture's space.
+    /// A strength of 0 adds no light, and gives this picture itself.
     public func glow(deviation: Double, strength: Float = 1, sparing mask: Self = .empty) -> Self {
+        guard strength != 0 else { return self }
         let blurred = Layer(self, effects: [.blur(Effect.Blur(deviation: deviation))], opacity: strength, operator: .lighter)
         guard !mask.elements.isEmpty else { return appending([.layer(blurred)]) }
         let light: Self = [

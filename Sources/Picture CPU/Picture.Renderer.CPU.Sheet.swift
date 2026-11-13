@@ -25,6 +25,13 @@ extension Picture.Renderer.CPU.Sheet {
 
     /// Whether the layer's operator leaves the backdrop as it is where the sheet is transparent, so that
     /// only the sheet's own box needs visiting.
+    /// Whether a layer provably changes nothing behind it, so that it is not drawn at all: an opacity of 0 under
+    /// an operator that keeps the backdrop where the sheet is transparent, since the opacity scales the sheet's
+    /// alpha to 0 before it is put on and such an operator then gives the backdrop exactly.
+    static func idle(_ layer: Picture.Layer) -> Bool {
+        layer.opacity == 0 && keeps(layer)
+    }
+
     static func keeps(_ layer: Picture.Layer) -> Bool {
         guard layer.opacity.isFinite else { return false }
         switch layer.operator {

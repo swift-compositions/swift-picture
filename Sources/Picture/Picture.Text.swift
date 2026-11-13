@@ -28,7 +28,7 @@ extension Picture.Text {
     /// Sets a string in a parsed font.
     ///
     /// `tracking` is extra advance after every glyph, as a share of the size, so that it scales with the
-    /// text; `figures` sets the digits proportional or tabular.
+    /// text; `figures` sets the digits proportional, tabular or in cells with the characters among them.
     public init(
         _ string: String,
         font: ISO_14496_22.FontFile,
@@ -50,7 +50,7 @@ extension Picture.Text {
         let figure = (0x30...0x39).map { (scalar: UInt32) in font.advanceWidth(for: font.glyphIndex(for: scalar) ?? 0) }.max() ?? 0
         let upright = Picture.Transform(rows: [[scale, 0, 0], [0, -scale, 0]])
         var outlines: [UInt16: Picture.Plane.Path] = [:]
-        var centred: [UInt16: Picture.Plane.Path] = [:]
+        var centred: [Cell: Picture.Plane.Path] = [:]
         var runs: [Run] = []
         var text: [Unicode.Scalar] = []
         var bytes = string.utf8.makeIterator()
@@ -61,7 +61,7 @@ extension Picture.Text {
         for paragraph in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let scalars = Array(paragraph)
             let indices = scalars.map { font.glyphIndex(for: $0.value) ?? 0 }
-            let tabular = scalars.map { figures == .tabular && ("0"..."9").contains($0) }
+            let shares = scalars.map { figures.share(of: $0) }
             for index in indices where outlines[index] == nil {
                 do throws(ISO_14496_22.Outline.Error) {
                     outlines[index] = try font.outline(for: index).transformed(by: upright, to: Picture.Space.self)
@@ -69,15 +69,16 @@ extension Picture.Text {
                     throw .outline(error)
                 }
             }
-            for (index, digit) in zip(indices, tabular) where digit && centred[index] == nil {
-                let shift = (Double(figure) - Double(font.advanceWidth(for: index))) / 2 * scale
-                centred[index] = outlines[index]?.transformed(by: .translation(x: shift, y: 0))
+            for (index, share) in zip(indices, shares) {
+                guard let share, centred[Cell(index: index, share: share)] == nil else { continue }
+                let shift = (Double(figure) * share - Double(font.advanceWidth(for: index))) / 2 * scale
+                centred[Cell(index: index, share: share)] = outlines[index]?.transformed(by: .translation(x: shift, y: 0))
             }
-            let units = zip(indices, tabular).map { index, digit in digit ? figure : font.advanceWidth(for: index) }
+            let units = zip(indices, shares).map { index, share in share.map { Double(figure) * $0 } ?? Double(font.advanceWidth(for: index)) }
             var starts: [Double] = [0]
             for position in indices.indices {
-                var advance = Double(units[position])
-                if position + 1 < indices.count, !tabular[position], !tabular[position + 1] {
+                var advance = units[position]
+                if position + 1 < indices.count, shares[position] == nil, shares[position + 1] == nil {
                     do throws(ISO_14496_22.FontFile.ParsingError) {
                         advance += try font.kerning(left: indices[position], right: indices[position + 1]).underlying
                     } catch {
@@ -86,7 +87,7 @@ extension Picture.Text {
                 }
                 starts.append(starts[position] + advance * scale + tracked)
             }
-            let widths = units.map { Double($0) * scale }
+            let widths = units.map { $0 * scale }
             let blank = scalars.map { $0 == " " }
             var start = 0
             var opportunity: Int?
@@ -94,13 +95,13 @@ extension Picture.Text {
                 for position in indices.indices where !blank[position] {
                     if position > start, blank[position - 1] { opportunity = position }
                     if let cut = opportunity, starts[position] - starts[start] + widths[position] > measure {
-                        runs.append(Run(scalars: scalars, indices: indices, tabular: tabular, starts: starts, widths: widths, blank: blank, range: start..<cut))
+                        runs.append(Run(scalars: scalars, indices: indices, shares: shares, starts: starts, widths: widths, blank: blank, range: start..<cut))
                         start = cut
                         opportunity = nil
                     }
                 }
             }
-            runs.append(Run(scalars: scalars, indices: indices, tabular: tabular, starts: starts, widths: widths, blank: blank, range: start..<indices.count))
+            runs.append(Run(scalars: scalars, indices: indices, shares: shares, starts: starts, widths: widths, blank: blank, range: start..<indices.count))
         }
         let widest = runs.reduce(0) { Swift.max($0, $1.width) }
         let within = measure ?? widest
@@ -114,7 +115,7 @@ extension Picture.Text {
                     index: index,
                     origin: Picture.Plane.Point<2>([indent + run.starts[position] - run.starts[run.range.lowerBound], baseline]),
                     advance: run.widths[position],
-                    outline: (run.tabular[position] ? centred[index] : outlines[index]) ?? Picture.Plane.Path(subpaths: [])
+                    outline: (run.shares[position].map { centred[Cell(index: index, share: $0)] } ?? outlines[index]) ?? Picture.Plane.Path(subpaths: [])
                 )
             }
             return Line(glyphs: glyphs, baseline: baseline, width: run.width)

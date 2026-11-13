@@ -22,7 +22,7 @@ extension `Picture CPU Tests`.`An image that names its picture is drawn by the r
 
     static func moved(_ image: Picture.Image, _ onto: Picture.Transform) -> Picture.Image {
         var image = image
-        image.placement = onto.multiplied(by: image.placement)
+        image.placement = Matrix<3, 3, Double>(onto).multiplied(by: image.placement)
         return image
     }
 

@@ -29,29 +29,50 @@ extension Picture.Scene.Material {
 }
 
 extension Picture.Scene.Material.Shade {
-    /// The light a surface takes at a normal in eye space: Lambert's cosine to the lamp, held at 0 or more, plus
-    /// `rim` times one less the normal's z raised to `sharpness`. Either side of a surface takes light, so a
-    /// normal facing away from the eye is turned to face it first. A normal of no length takes none, and a lamp
-    /// direction of no length gives no cosine.
+    /// The light a surface takes at a normal in eye space: `cosine(facing:)` plus `rim(facing:)`. Read from 0 on
+    /// the dark side, 1 where the surface faces the lamp, and past 1 where the rim adds to it.
     public func light(facing normal: Vector<3, Double>) -> Double {
-        let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).squareRoot()
-        guard length > 0, length.isFinite else { return 0 }
-        let sign: Double = normal[2] < 0 ? -1 : 1
-        let n = (sign * normal[0] / length, sign * normal[1] / length, sign * normal[2] / length)
+        cosine(facing: normal) + rim(facing: normal)
+    }
+
+    /// The lamp's part of the light at a normal in eye space: Lambert's cosine to the lamp, held at 0 or more.
+    /// Either side of a surface takes light, so a normal facing away from the eye is turned to face it first. A
+    /// normal of no length and a lamp direction of no length give 0.
+    public func cosine(facing normal: Vector<3, Double>) -> Double {
+        guard let n = Self.facing(normal) else { return 0 }
         let reach = (toward[0] * toward[0] + toward[1] * toward[1] + toward[2] * toward[2]).squareRoot()
-        var cosine = 0.0
-        if reach > 0, reach.isFinite {
-            cosine = Swift.max((n.0 * toward[0] + n.1 * toward[1] + n.2 * toward[2]) / reach, 0)
-        }
+        guard reach > 0, reach.isFinite else { return 0 }
+        return Swift.max((n.0 * toward[0] + n.1 * toward[1] + n.2 * toward[2]) / reach, 0)
+    }
+
+    /// The rim's part of the light at a normal in eye space: `rim` times one less the normal's z raised to
+    /// `sharpness`, the normal turned to face the eye first; 0 for a normal of no length. A thing that is not a
+    /// mesh, such as a point or a sprite, is lit by the same law from a normal of its own, through `cosine(facing:)`,
+    /// this and the ramp read at their sum.
+    public func rim(facing normal: Vector<3, Double>) -> Double {
+        guard let n = Self.facing(normal) else { return 0 }
         let edge = 1 - Swift.min(Swift.max(n.2, 0), 1)
         let power = Swift.max(sharpness, 0)
         let falloff = edge > 0 ? Double.exp(power * Double.log(edge)) : (power == 0 ? 1 : 0)
-        return cosine + rim * falloff
+        return rim * falloff
     }
 
     /// The pixel a surface shows at a normal in eye space: the ramp's pixel at `light(facing:)`. A renderer that
     /// reads many takes the ramp's `ramp` once and reads it at the light.
     public func pixel(facing normal: Vector<3, Double>) -> Picture.Pixel {
-        ramp.pixel(at: Float(light(facing: normal)))
+        pixel(at: light(facing: normal))
+    }
+
+    /// The pixel of a light, however it was found: the ramp's pixel there.
+    public func pixel(at light: Double) -> Picture.Pixel {
+        ramp.pixel(at: Float(light))
+    }
+
+    /// A normal at unit length turned to face the eye, nil for one of no length.
+    static func facing(_ normal: Vector<3, Double>) -> (Double, Double, Double)? {
+        let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).squareRoot()
+        guard length > 0, length.isFinite else { return nil }
+        let sign: Double = normal[2] < 0 ? -1 : 1
+        return (sign * normal[0] / length, sign * normal[1] / length, sign * normal[2] / length)
     }
 }

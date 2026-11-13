@@ -33,3 +33,13 @@ extension `Picture Tests`.`A glow can spare what a mask covers` {
         )
     }
 }
+
+extension `Picture Tests`.`A glow can spare what a mask covers` {
+    @Test
+    func `A glow of strength 0 is the picture itself`() {
+        let picture: Picture = [.fill(Picture.Plane.Path(Picture.Plane.Circle(center: .init([2, 2]), radius: 2)), .solid(.white))]
+        #expect(picture.glow(deviation: 3, strength: 0) == picture)
+        #expect(picture.glow(deviation: 3, strength: 0, sparing: picture) == picture)
+        #expect(picture.glow(deviation: 3, strength: 0.5) != picture)
+    }
+}

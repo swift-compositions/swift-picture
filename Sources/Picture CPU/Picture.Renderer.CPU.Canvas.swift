@@ -261,6 +261,7 @@ extension Picture.Renderer.CPU.Canvas {
 
     /// Draws a layer on a sheet of its own, applies its effects and puts the sheet onto the canvas.
     mutating func draw(_ layer: Picture.Layer, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
+        guard !Picture.Renderer.CPU.Sheet.idle(layer) else { return }
         let target = state.reach(in: box)
         guard target.area > 0 else { return }
         let sheet = try Picture.Renderer.CPU.Sheet(layer, state, target, beneath: [self] + state.beneath).drawn()

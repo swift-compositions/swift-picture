@@ -34,7 +34,7 @@ extension `Picture Tests`.`A picture kept as an image is drawn once, at a scale,
     @Test
     func `The placement puts the raster's first corner at the rectangle's and a pixel at one part in scale`() throws {
         let image = try Picture.Image(.empty, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, through: Self.stub)
-        #expect(image.placement == Picture.Transform(rows: [[0.25, 0, 3], [0, 0.25, -2]]))
+        #expect(image.placement == Matrix<3, 3, Double>(Picture.Transform(rows: [[0.25, 0, 3], [0, 0.25, -2]])))
         #expect(image.sampling == .bilinear)
         #expect(image.edge == .constant(.transparent))
         #expect(Tests.close(image.pixel(at: Tests.at(4, -1.5)), Self.grey))
@@ -69,7 +69,7 @@ extension `Picture Tests`.`A picture kept as an image is drawn once, at a scale,
         let named = Picture.Image(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2, sampling: .nearest, edge: .extend)
         #expect(named.source == Picture.Image.Source(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2))
         #expect(named.raster.isEmpty)
-        #expect(named.placement == Picture.Transform(rows: [[0.25, 0, 3], [0, 0.25, -2]]))
+        #expect(named.placement == Matrix<3, 3, Double>(Picture.Transform(rows: [[0.25, 0, 3], [0, 0.25, -2]])))
         #expect(named.pixel(at: Tests.at(4, -1.5)) == .transparent)
         let drawn = try named.drawn(through: Self.stub)
         #expect(drawn == (try Picture.Image(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2, sampling: .nearest, edge: .extend, through: Self.stub)))
