@@ -25,6 +25,7 @@ extension Picture.Scene {
 
     /// Where the scene draws a point after a matrix into clip space, `Camera.map(of:)` of a model's transform,
     /// so that `position(of:in:)` is this with the product made once per model instead of per point.
+    @inlinable
     public func position(of point: Point::Point<3, Double>, through map: Matrix<4, 4, Double>) -> Position? {
         guard let normalized = Camera.normalized(point, through: map) else { return nil }
         let left = viewport.llx.underlying

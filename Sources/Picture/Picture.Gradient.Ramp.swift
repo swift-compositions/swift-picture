@@ -19,6 +19,7 @@ extension Picture.Gradient {
 
 extension Picture.Gradient.Ramp {
     /// The pixel at a parameter.
+    @inlinable
     public func pixel(at parameter: Float) -> Picture.Pixel {
         guard !pixels.isEmpty else { return .transparent }
         guard parameter > offsets[0] else { return pixels[0] }

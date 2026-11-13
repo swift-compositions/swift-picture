@@ -36,11 +36,13 @@ extension Picture.Scene.Camera {
 
     /// The clip coordinates of a point after a matrix into clip space, `map(of:)` of a model, so that
     /// `clip(_:in:)` is this with the product made once per model instead of per point.
+    @inlinable
     public static func clip(_ point: Point::Point<3, Double>, through map: Matrix<4, 4, Double>) -> Vector<4, Double> {
         map.applied(to: Vector([point[0], point[1], point[2], 1]))
     }
 
     /// The normalised coordinates of a point after a matrix into clip space, as `normalized(_:in:)` gives them.
+    @inlinable
     public static func normalized(_ point: Point::Point<3, Double>, through map: Matrix<4, 4, Double>) -> Point::Point<3, Double>? {
         let clip = clip(point, through: map)
         guard clip[3] > 0 else { return nil }
