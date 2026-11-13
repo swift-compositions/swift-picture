@@ -17,5 +17,8 @@ extension Picture.Text {
 
         /// The font says an em has no units.
         case units
+
+        /// The tracking is not a finite number.
+        case tracking
     }
 }

@@ -1,3 +1,4 @@
+public import Geometry
 public import Matrix
 public import Point
 
@@ -36,5 +37,41 @@ extension Picture.Scene {
             point: Picture.Plane.Point<2>([left + (normalized[0] + 1) / 2 * width, top + (1 - normalized[1]) / 2 * height]),
             depth: normalized[2]
         )
+    }
+}
+
+extension Picture.Scene {
+    /// A flat path lying in a model, as the scene draws it: the path's point (x, y) is the model's point
+    /// (x, y, 0), and the path, flattened to within `tolerance` in the model's units, has each vertex put at
+    /// its `position(of:in:)`. Straight lines stay straight through a perspective, so this is the path's
+    /// picture up to the flattening, magnified as much as the camera magnifies the model there. It is nil
+    /// when a vertex lies in the plane of the eye or behind it. Nothing hides it: depth is not kept, and a
+    /// caller that draws several such paths orders them from far to near.
+    public func projected(
+        _ path: Picture.Plane.Path,
+        in model: Matrix<4, 4, Double>,
+        tolerance: Picture.Plane.Length
+    ) throws(Picture.Plane.Path.Error) -> Picture.Plane.Path? {
+        let map = camera.map(of: model)
+        let flat = try path.flattened(tolerance: tolerance)
+        var subpaths: [Picture.Plane.Path.Subpath] = []
+        for subpath in flat.subpaths {
+            var vertices = [subpath.startPoint]
+            for segment in subpath.segments {
+                guard case .line(let line) = segment else { continue }
+                vertices.append(line.end)
+            }
+            var points: [Picture.Plane.Point<2>] = []
+            for vertex in vertices {
+                guard let position = position(of: Point::Point<3, Double>([vertex[0], vertex[1], 0]), through: map) else { return nil }
+                points.append(position.point)
+            }
+            let lines = zip(points, points.dropFirst()).map { from, to in
+                Picture.Plane.Path.Segment.line(.init(start: from, end: to))
+            }
+            guard let start = points.first else { continue }
+            subpaths.append(Picture.Plane.Path.Subpath(startPoint: start, segments: lines, isClosed: subpath.isClosed))
+        }
+        return Picture.Plane.Path(subpaths: subpaths)
     }
 }

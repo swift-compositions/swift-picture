@@ -31,6 +31,22 @@ extension Picture.Text.Glyph {
 }
 
 extension Picture.Text.Glyph {
+    /// The glyph moved by an affine map of the text's plane: its origin goes where the map takes it and its
+    /// outline is turned, scaled and sheared by the map's linear part, so that the glyph's `path` is its old
+    /// path under the map, up to rounding.
+    public func transformed(by map: Picture.Transform) -> Self {
+        let place = map.applied(to: Vector([origin[0], origin[1]]))
+        return Self(
+            scalar: scalar,
+            index: index,
+            origin: Picture.Plane.Point<2>([place[0], place[1]]),
+            advance: advance,
+            outline: outline.transformed(by: Picture.Transform(linear: map.linear))
+        )
+    }
+}
+
+extension Picture.Text.Glyph {
     /// The glyph sampled to points: of a lattice of square cells `spacing` wide over the text's plane, one
     /// corner of one cell at the text's origin, the point of every cell whose point lies inside the glyph's
     /// path. A cell's point is its centre, or with a seed a place in the cell that the seed and the cell's

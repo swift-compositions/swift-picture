@@ -83,6 +83,7 @@ let package = Package(
             dependencies: [
                 .target(name: "Picture"),
                 .product(name: "Color Standard", package: "swift-color-standard"),
+                .product(name: "Numeric", package: "swift-numeric"),
             ]
         ),
         .testTarget(

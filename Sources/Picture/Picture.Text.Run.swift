@@ -3,6 +3,7 @@ extension Picture.Text {
     struct Run {
         let scalars: [Unicode.Scalar]
         let indices: [UInt16]
+        let tabular: [Bool]
         let starts: [Double]
         let widths: [Double]
         let blank: [Bool]
