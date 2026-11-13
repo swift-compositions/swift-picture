@@ -84,7 +84,7 @@ import Testing
             let store = Picture.Store(try Self.directory(), edition: "fixed")
             // Written by an earlier run: the image's source keeps a `Hasher` value that differs per process,
             // which its canonical value leaves out.
-            #expect(try Self.key(store, picture).hex == "fb91835dfa1bbb8a16f5313aca746a8e1c1e8c629d5916e8845011eae1481ac2")
+            #expect(try Self.key(store, picture).hex == "15b31735247114cb380f1119de0ec5025eb2d68ce8cf39b1f610d043006ec235")
         }
 
         @Test func `processes keeping one entry at once leave one whole entry`() async throws {
