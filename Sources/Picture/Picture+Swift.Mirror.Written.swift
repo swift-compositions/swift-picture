@@ -45,7 +45,11 @@ extension Picture.Shape: Swift.Mirror.Written {
         guard Self.write(path, into: writer) else { return false }
         if let fill {
             writer.number(1)
-            guard fill.paint.write(into: writer), writer.write(fill.rule) else { return false }
+            guard fill.paint.write(into: writer) else { return false }
+            switch fill.rule {
+            case .nonzero: writer.number(0)
+            case .evenodd: writer.number(1)
+            }
         } else {
             writer.number(0)
         }
@@ -99,7 +103,11 @@ extension Picture.Paint: Swift.Mirror.Written {
         switch self {
         case .solid(let color):
             writer.number(0)
-            return writer.write(color)
+            writer.float(Double(color.red))
+            writer.float(Double(color.green))
+            writer.float(Double(color.blue))
+            writer.float(Double(color.alpha))
+            return true
         case .linear(let linear):
             writer.number(1)
             return writer.write(linear)

@@ -28,6 +28,7 @@ import Testing
         guard case .line(let line) = Self.path.subpaths[0].segments[0] else { Issue.record("a line"); return }
         #expect(Self.labels(line) == ["start", "end"])
         #expect(Self.labels(Self.corners[0]) == ["position"])
+        #expect(Self.labels(Picture.Color.white) == ["red", "green", "blue", "alpha"])
         let tile = Raster<Picture.Pixel>(width: 2, height: 2, repeating: .transparent)
         #expect(Self.labels(Picture.Image(tile)) == ["raster", "placement", "sampling", "edge", "source"])
         #expect(Self.labels(tile) == ["width", "height", "storage"])
