@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "Picture CPU", targets: ["Picture CPU"]),
         .library(name: "Picture PNG Integration", targets: ["Picture PNG Integration"]),
         .library(name: "Picture Store", targets: ["Picture Store"]),
+        .library(name: "Picture Test Support", targets: ["Picture Test Support"]),
     ],
     traits: [
         .trait(name: "PNG", description: "PNG integration"),
@@ -103,11 +104,20 @@ let package = Package(
                 ),
             ]
         ),
+        .target(
+            name: "Picture Test Support",
+            dependencies: [
+                .target(name: "Picture"),
+                .product(name: "Numeric", package: "swift-numeric"),
+            ],
+            path: "Tests/Support"
+        ),
         .testTarget(
             name: "Picture Tests",
             dependencies: [
                 .target(name: "Picture"),
                 .product(name: "Standard Library Extensions", package: "swift-standard-library-extensions"),
+                .target(name: "Picture Test Support"),
                 .product(name: "Color Standard", package: "swift-color-standard"),
                 .product(name: "Numeric", package: "swift-numeric"),
             ]
