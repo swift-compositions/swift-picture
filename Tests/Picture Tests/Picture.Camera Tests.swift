@@ -87,6 +87,21 @@ extension `Picture Tests`.`A flat camera sees a picture from a focus at a scale`
         #expect(Self.close(picture, since: Self.wide) == .layer(Picture.Layer([Self.wide(picture)], effects: [.zoom(smear)])))
         #expect(Self.close(picture, since: Self.close) == Self.close(picture))
     }
+
+    @Test(arguments: [0.25, 0.5, 1.0])
+    func `Through a shutter the picture is seen since the camera where the shutter opened`(shutter: Double) {
+        let picture: Picture = [.fill(Tests.square(10), .solid(.white))]
+        let opened = Self.wide.mixed(to: Self.close, at: 1 - shutter)
+        #expect(Self.close(picture, since: Self.wide, shutter: shutter) == Self.close(picture, since: opened))
+        #expect(Self.close(picture, since: Self.wide, shutter: 0) == Self.close(picture))
+        #expect(Self.close(picture, since: Self.wide, shutter: -1) == Self.close(picture))
+    }
+
+    @Test
+    func `A shutter open all the way is the picture since the earlier camera`() {
+        let picture: Picture = [.fill(Tests.square(10), .solid(.white))]
+        #expect(Self.close(picture, since: Self.wide, shutter: 1) == Self.close(picture, since: Self.wide))
+    }
 }
 
 extension Picture.Transform {

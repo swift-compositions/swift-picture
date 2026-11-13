@@ -19,3 +19,17 @@ extension Picture.Paint {
         }
     }
 }
+
+extension Picture.Paint {
+    /// The light of a glow of a colour around a centre: the colour, full at the centre, falling to nothing at
+    /// the radius by `Picture.Gradient.falloff(at:core:)`, and clear beyond. A radial gradient of
+    /// `Picture.Gradient.glow(_:core:stops:)`.
+    public static func glow(
+        _ color: Picture.Color,
+        center: Picture.Plane.Point<2>,
+        radius: Double,
+        core: Double = 0.25
+    ) -> Self {
+        .radial(Radial(center: center, radius: radius, .glow(color, core: core)))
+    }
+}

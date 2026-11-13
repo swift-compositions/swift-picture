@@ -49,6 +49,14 @@ extension Picture.Camera {
         return .layer(Picture.Layer([earlier(picture)], effects: [.zoom(smear)]))
     }
 
+    /// A picture as this camera sees it through a shutter that was open for the last `shutter` of the way
+    /// from an earlier camera: the picture `since:` the camera `earlier.mixed(to: self, at: 1 − shutter)`,
+    /// where the shutter opened. A shutter of 1 is open all the way, and one of 0 or less is the plain view.
+    public func callAsFunction(_ picture: Picture, since earlier: Self, shutter: Double) -> Picture.Element {
+        guard shutter > 0 else { return self(picture) }
+        return self(picture, since: earlier.mixed(to: self, at: 1 - shutter))
+    }
+
     /// The camera scaled by a factor about a point of the picture, which it still sees at the same place on the
     /// frame: its scale times the factor, its focus moved toward the point by one over the factor. A factor that
     /// is not positive gives this camera.

@@ -50,6 +50,81 @@ extension Picture {
 }
 
 extension Picture {
+    /// This picture with the light of its bright parts spread over it, as a lens and the eye spread a bright
+    /// light: the picture kept as an image of the rectangle, and on top, under `lighter` with `strength` as
+    /// opacity, the same image under `threshold` and blurred, kept again at `resolution` times its scale.
+    ///
+    /// The light is the mean of `octaves` blurs whose deviations halve from `deviation`, so a bright point
+    /// spreads with a sharp core and a long, faint tail rather than as one Gaussian, and since each blur keeps
+    /// the light it is given, the light added is `strength` times what the threshold keeps. The picture is
+    /// drawn once, into the first image, and the blurs are drawn at the second image's resolution, where they
+    /// cost a fourth of the pixels at the default half. Nothing above the threshold, no octaves or no strength
+    /// give the kept picture alone. Light that would spread past the rectangle is not drawn.
+    public func bloom(
+        in rectangle: Plane.Rectangle,
+        threshold: Effect.Threshold = Effect.Threshold(),
+        deviation: Double = 24,
+        octaves: Cardinal = 3,
+        strength: Float = 1,
+        scale: Double = 1,
+        resolution: Double = 0.5
+    ) -> Self {
+        let count = Int(clamping: octaves)
+        let passes = (0..<count).map { octave in
+            [Effect.threshold(threshold), .blur(Effect.Blur(deviation: deviation / Double(1 << Swift.min(octave, 62))))]
+        }
+        return lit(by: passes, in: rectangle, strength: strength, scale: scale, resolution: resolution)
+    }
+
+    /// This picture with the light of its bright parts streaming away from a point, as light through haze: the
+    /// picture kept as an image of the rectangle, and on top, under `lighter` with `strength` as opacity, the
+    /// mean of `streaks` passes of the same image under `threshold`, the k-th of n a `zoom` toward the point of
+    /// amount `length × k / n`, kept again at `resolution` times its scale. A bright part at a distance r from
+    /// the point leaves a streak reaching out to r / (1 − length), brightest near the part and fading as it goes
+    /// in n steps. The picture is drawn once; nothing above the threshold, no streaks, no length or no
+    /// strength give the kept picture alone.
+    public func rays(
+        from center: Plane.Point<2>,
+        in rectangle: Plane.Rectangle,
+        threshold: Effect.Threshold = Effect.Threshold(),
+        length: Double = 0.5,
+        streaks: Cardinal = 4,
+        strength: Float = 1,
+        scale: Double = 1,
+        resolution: Double = 0.5
+    ) -> Self {
+        let count = length == 0 ? 0 : Int(clamping: streaks)
+        let passes = (0..<count).map { streak in
+            [Effect.threshold(threshold), .zoom(Effect.Zoom(center: center, amount: length * Double(streak + 1) / Double(count)))]
+        }
+        return lit(by: passes, in: rectangle, strength: strength, scale: scale, resolution: resolution)
+    }
+
+    /// The picture kept in a rectangle, and on top the mean of that image under each list of effects, kept
+    /// again at a resolution and added with a strength.
+    func lit(by passes: [[Effect]], in rectangle: Plane.Rectangle, strength: Float, scale: Double, resolution: Double) -> Self {
+        let area = Self.area(rectangle)
+        let kept = Element.fill(area, .image(Image(self, in: rectangle, scale: scale)))
+        guard !passes.isEmpty, strength != 0 else { return [kept] }
+        let share = 1 / Float(passes.count)
+        let light = Self(passes.map { .layer(Layer([kept], effects: $0, opacity: share, operator: .lighter)) })
+        let spread = Element.fill(area, .image(Image(light, in: rectangle, scale: scale * resolution)))
+        return [kept, .layer(Layer([spread], opacity: strength, operator: .lighter))]
+    }
+
+    /// The path around a rectangle.
+    static func area(_ rectangle: Plane.Rectangle) -> Plane.Path {
+        let (left, top) = (rectangle.llx.underlying, rectangle.lly.underlying)
+        let (right, bottom) = (rectangle.urx.underlying, rectangle.ury.underlying)
+        let corners: [Plane.Point<2>] = [.init([left, top]), .init([right, top]), .init([right, bottom]), .init([left, bottom])]
+        let sides = zip(corners, corners.dropFirst() + corners.prefix(1)).map { start, end in
+            Plane.Path.Segment.line(.init(start: start, end: end))
+        }
+        return Plane.Path(subpaths: [.init(startPoint: corners[0], segments: sides, isClosed: true)])
+    }
+}
+
+extension Picture {
     /// The mean of pictures, each drawn on a sheet of its own: one layer that holds, for each picture, a
     /// layer with one part in their number as opacity and `lighter` as operator, so the sheets add up to
     /// their mean, colour and alpha alike. No pictures give the empty picture, and one picture gives itself.

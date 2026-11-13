@@ -42,3 +42,26 @@ extension Picture.Element {
         stroke(path, paint, pen: Picture.Plane.Path.Stroke(width: .init(width), join: join, cap: cap))
     }
 }
+
+extension Picture.Element {
+    /// A glow of a colour around a centre: the square around the circle of the radius, filled with
+    /// `Picture.Paint.glow(_:center:radius:core:)`, which is clear outside the circle. Over what is behind it
+    /// puts its colour as far as the falloff lets it; in a layer under `lighter` it adds its light.
+    public static func glow(
+        _ color: Picture.Color,
+        center: Picture.Plane.Point<2>,
+        radius: Double,
+        core: Double = 0.25
+    ) -> Self {
+        let (x, y) = (center[0], center[1])
+        let corners: [Picture.Plane.Point<2>] = [
+            .init([x - radius, y - radius]), .init([x + radius, y - radius]),
+            .init([x + radius, y + radius]), .init([x - radius, y + radius]),
+        ]
+        let sides = zip(corners, corners.dropFirst() + corners.prefix(1)).map { start, end in
+            Picture.Plane.Path.Segment.line(.init(start: start, end: end))
+        }
+        let square = Picture.Plane.Path(subpaths: [.init(startPoint: corners[0], segments: sides, isClosed: true)])
+        return .fill(square, .glow(color, center: center, radius: radius, core: core))
+    }
+}

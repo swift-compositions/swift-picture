@@ -47,8 +47,9 @@ extension Picture.Renderer.CPU.Store {
     /// from the store or drawn, the ones to draw side by side on the workers, and what is drawn is kept.
     /// A source is drawn exactly as `Picture.Image.Source.raster(through:)` draws it through this renderer,
     /// and a source inside a source is drawn the same way first. Each raster is kept as soon as it is drawn and
-    /// the store is asked again just before a source is drawn, so a source that another source of the same
-    /// picture also names is drawn once when the two are not drawn at the same moment.
+    /// the store is asked again just before a source is drawn. The sources are drawn in rounds: a source waits
+    /// until every other source of the picture that its own picture names, however deep, is drawn and kept, so
+    /// a source that another source also names is drawn once, and before the one that names it.
     func resolved(_ picture: Picture, _ workers: Picture.Renderer.CPU.Workers) throws(Picture.Renderer.Error) -> Picture {
         var places: [Key: Int] = [:]
         var keys: [Key] = []
@@ -66,12 +67,22 @@ extension Picture.Renderer.CPU.Store {
         }
         guard !keys.isEmpty else { return picture }
         var rasters = keys.map { raster(for: $0) }
-        let missing = keys.indices.filter { rasters[$0] == nil }
-        if !missing.isEmpty {
-            let renderer = Picture.Renderer.cpu(Picture.Renderer.CPU.Workers(count: Swift.max(1, workers.count / missing.count)), self)
-            let drawn = Mutex([Result<Raster<Picture.Pixel>, Picture.Renderer.Error>?](repeating: nil, count: missing.count))
-            workers.run(missing.count) { part in
-                let key = keys[missing[part]]
+        var missing = keys.indices.filter { rasters[$0] == nil }
+        let inside: [Int: Set<Key>] = Dictionary(
+            uniqueKeysWithValues: missing.map { place in
+                var named = Set<Key>()
+                Self.sources(of: keys[place].source.picture, into: &named)
+                return (place, named)
+            }
+        )
+        while !missing.isEmpty {
+            let waiting = Set(missing.map { keys[$0] })
+            var ready = missing.filter { inside[$0, default: []].isDisjoint(with: waiting) }
+            if ready.isEmpty { ready = missing }
+            let renderer = Picture.Renderer.cpu(Picture.Renderer.CPU.Workers(count: Swift.max(1, workers.count / ready.count)), self)
+            let drawn = Mutex([Result<Raster<Picture.Pixel>, Picture.Renderer.Error>?](repeating: nil, count: ready.count))
+            workers.run(ready.count) { part in
+                let key = keys[ready[part]]
                 let result: Result<Raster<Picture.Pixel>, Picture.Renderer.Error>
                 if let kept = raster(for: key) {
                     result = .success(kept)
@@ -86,10 +97,12 @@ extension Picture.Renderer.CPU.Store {
                 }
                 drawn.withLock { $0[part] = result }
             }
-            for (place, result) in zip(missing, drawn.withLock { $0 }) {
+            for (place, result) in zip(ready, drawn.withLock { $0 }) {
                 guard let result else { throw .unsupported }
                 rasters[place] = try result.get()
             }
+            let done = Set(ready)
+            missing.removeAll { done.contains($0) }
         }
         var next = 0
         return Picture.Renderer.CPU.mapped(picture) { image in
@@ -99,6 +112,20 @@ extension Picture.Renderer.CPU.Store {
             drawn.source = nil
             next += 1
             return drawn
+        }
+    }
+}
+
+extension Picture.Renderer.CPU.Store {
+    /// Adds the source of every image a picture paints with to a set, and the sources their pictures name, as
+    /// deep as they go.
+    static func sources(of picture: Picture, into named: inout Set<Key>) {
+        var found: [Picture.Image.Source] = []
+        Picture.Renderer.CPU.images(of: picture) { image in
+            if let source = image.source { found.append(source) }
+        }
+        for source in found where named.insert(Key(source)).inserted {
+            sources(of: source.picture, into: &named)
         }
     }
 }

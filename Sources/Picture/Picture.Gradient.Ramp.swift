@@ -18,24 +18,34 @@ extension Picture.Gradient {
 }
 
 extension Picture.Gradient.Ramp {
-    /// The pixel at a parameter.
+    /// Where a parameter falls among the stops: the stop it goes from, the stop it goes to and how far it is
+    /// between them, read as `pixel(at:)` reads them. Before the first offset, and for a parameter that is not
+    /// a number, it is the first stop alone; from the last offset on, the last stop alone; a stop alone has
+    /// itself as both ends and no way to go. Nil when there are no stops.
     @inlinable
-    public func pixel(at parameter: Float) -> Picture.Pixel {
-        guard !pixels.isEmpty else { return .transparent }
-        guard parameter > offsets[0] else { return pixels[0] }
+    public func place(of parameter: Float) -> (from: Int, to: Int, fraction: Float)? {
+        guard !pixels.isEmpty else { return nil }
+        guard parameter > offsets[0] else { return (0, 0, 0) }
         var previous = 0
         var floor = offsets[0]
         var stop = 1
         while stop < pixels.count {
             let offset = Swift.max(offsets[stop], floor)
             if parameter < offset {
-                let fraction = (parameter - floor) / (offset - floor)
-                return pixels[previous].interpolated(to: pixels[stop], at: fraction)
+                return (previous, stop, (parameter - floor) / (offset - floor))
             }
             previous = stop
             floor = offset
             stop += 1
         }
-        return pixels[previous]
+        return (previous, previous, 0)
+    }
+
+    /// The pixel at a parameter.
+    @inlinable
+    public func pixel(at parameter: Float) -> Picture.Pixel {
+        guard let place = place(of: parameter) else { return .transparent }
+        guard place.from != place.to else { return pixels[place.from] }
+        return pixels[place.from].interpolated(to: pixels[place.to], at: place.fraction)
     }
 }

@@ -46,6 +46,22 @@ extension Picture.Color {
     public var pixel: Picture.Pixel {
         Compositing.Premultiplied(linear)
     }
+
+    /// The colour written for a working pixel, the way back from `pixel`: red, green and blue divided by
+    /// alpha and put through `IEC_61966.SRGB.TransferFunction.encoded(_:)`, nothing clamped. A pixel with no
+    /// alpha, or one that is not a number, is `clear`.
+    public init(_ pixel: Picture.Pixel) {
+        guard pixel.alpha > 0 else {
+            self = .clear
+            return
+        }
+        self.init(
+            red: IEC_61966.SRGB.TransferFunction.encoded(pixel.color.red / pixel.alpha),
+            green: IEC_61966.SRGB.TransferFunction.encoded(pixel.color.green / pixel.alpha),
+            blue: IEC_61966.SRGB.TransferFunction.encoded(pixel.color.blue / pixel.alpha),
+            alpha: pixel.alpha
+        )
+    }
 }
 
 extension Picture.Color {

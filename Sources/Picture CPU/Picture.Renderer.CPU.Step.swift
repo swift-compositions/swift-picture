@@ -161,6 +161,9 @@ extension Picture.Renderer.CPU.Step {
                     return grain.pixel(pixel, share: shares[place])
                 }
             }
+
+        case .threshold(let threshold):
+            self = .tone { _ in { _, _, pixel in threshold.pixel(pixel) } }
         }
     }
 

@@ -1,6 +1,4 @@
-import Point
 public import Raster
-import Vector
 
 extension Picture {
     /// A raster of working pixels placed in a shape's space.
@@ -30,20 +28,10 @@ extension Picture {
 }
 
 extension Picture.Image {
-    /// The image's pixel at a point of the shape's space.
+    /// The image's pixel at a point of the shape's space. A renderer that reads many pixels of one image reads
+    /// them from its `sampler`, which inverts the placement once.
     public func pixel(at point: Picture.Plane.Point<2>) -> Picture.Pixel {
-        guard source == nil else { return .transparent }
-        let inverse: Picture.Transform
-        do throws(Matrix<2, 3, Double>.Error) { inverse = try placement.inverted() } catch { return .transparent }
-        if raster.isEmpty {
-            guard case .constant(let pixel) = edge else { return .transparent }
-            return pixel
-        }
-        let source = inverse.applied(to: Vector([point[0], point[1]]))
-        guard source[0].isFinite, source[1].isFinite else { return .transparent }
-        return raster.sample(at: Point::Point<2, Double>([source[0], source[1]]), sampling, edge: edge) { from, to, parameter in
-            from.interpolated(to: to, at: Float(parameter))
-        }
+        sampler.pixel(at: point)
     }
 }
 

@@ -209,8 +209,8 @@ extension Picture.Renderer.CPU.Canvas {
             case .radial(let radial): radial.gradient.ramp
             case .solid, .image: Picture.Gradient([]).ramp
             }
-        var image: Picture.Image?
-        if case .image(let painted) = paint { image = painted }
+        var image: Picture.Image.Sampler?
+        if case .image(let painted) = paint { image = painted.sampler }
         let picture = image
         update(area, state.workers) { x, y, old in
             let share = coverage[area.index(x, y)]

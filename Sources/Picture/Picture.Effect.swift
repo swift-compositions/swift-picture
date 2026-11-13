@@ -24,5 +24,8 @@ extension Picture {
 
         /// Every cell of a fine grid made lighter or darker by a seeded amount.
         case grain(Grain)
+
+        /// Only the light above a level kept, eased in: what of a sheet is bright enough to bloom.
+        case threshold(Threshold)
     }
 }
