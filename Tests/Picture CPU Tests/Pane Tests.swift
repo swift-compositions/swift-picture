@@ -146,4 +146,16 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
         #expect(Tests.at(dark, 40, 10).color.red < 1e-6)
         #expect(Tests.close(Tests.at(bright, 40, 30), Tests.at(dark, 40, 30), within: 1e-6))
     }
+
+    @Test
+    func `A pane takes a rectangle with continuous corners as any region`() throws {
+        let colour = Picture.Color(red: 0.2, green: 0.6, blue: 0.9)
+        let shape = Picture.Plane.Superellipse(.init(llx: 10, lly: 10, urx: 70, ury: 50), radius: 16, exponent: 5)
+        let pane = Picture.Glass.Pane(.superellipse(shape), glass: Picture.Glass(refraction: .init(index: 1.5, distance: 4)), thickness: 6, rim: 8)
+        let raster = try Tests.drawn([Tests.fill(Tests.rectangle(-100, -100, 300, 300), colour), .pane(pane)], on: Tests.canvas(80, 60))
+        #expect(Tests.close(Tests.at(raster, 40, 30), colour.pixel, within: 2e-4))
+        #expect(Tests.at(raster, 11, 11) == colour.pixel)
+        let corner = Picture.Plane.Region.superellipse(shape).distance(to: Tests.at(11, 11))
+        #expect(corner > 0)
+    }
 }
