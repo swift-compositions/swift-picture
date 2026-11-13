@@ -7,7 +7,7 @@ public import Standard_Library_Extensions
 extension Picture: Swift.Mirror.Written {
     public func write(into writer: Swift.Mirror.Writer) -> Bool {
         guard !writer.again(elements) else { return true }
-        writer.number(elements.count)
+        writer.number(UInt64(elements.count))
         for element in elements {
             guard element.write(into: writer) else { return false }
         }
@@ -64,12 +64,12 @@ extension Picture.Shape: Swift.Mirror.Written {
     /// A path: its subpaths, each its start, its segments and whether it is closed, a line segment by its ends.
     static func write(_ path: Picture.Plane.Path, into writer: Swift.Mirror.Writer) -> Bool {
         guard !writer.again(path.subpaths) else { return true }
-        writer.number(path.subpaths.count)
+        writer.number(UInt64(path.subpaths.count))
         for subpath in path.subpaths {
             point(subpath.startPoint, into: writer)
             writer.number(subpath.isClosed ? 1 : 0)
             guard !writer.again(subpath.segments) else { continue }
-            writer.number(subpath.segments.count)
+            writer.number(UInt64(subpath.segments.count))
             for segment in subpath.segments {
                 switch segment {
                 case .line(let line):
@@ -123,8 +123,8 @@ extension Picture.Paint: Swift.Mirror.Written {
 
 extension Picture.Image: Swift.Mirror.Written {
     public func write(into writer: Swift.Mirror.Writer) -> Bool {
-        writer.number(Int(clamping: raster.width))
-        writer.number(Int(clamping: raster.height))
+        writer.number(UInt64(raster.width.rawValue))
+        writer.number(UInt64(raster.height.rawValue))
         guard writer.write(raster.pixels), writer.write(placement), writer.write(sampling) else { return false }
         switch edge {
         case .extend: writer.number(0)
