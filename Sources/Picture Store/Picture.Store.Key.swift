@@ -3,7 +3,7 @@
     public import Picture
 
     extension Picture.Store {
-        /// What decides a drawn raster's pixels, as a SHA-256 digest.
+        /// What decides an entry, as a SHA-256 digest.
         public struct Key: Sendable, Hashable {
             public let digest: FIPS_180_4.Digest
 

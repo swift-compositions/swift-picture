@@ -41,6 +41,7 @@ let package = Package(
         .package(url: "https://github.com/swift-compositions/swift-file-system.git", branch: "main"),
         .package(url: "https://github.com/swift-standards/swift-fips-180-4.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-standard-library-extensions.git", branch: "main"),
+        .package(url: "https://github.com/swift-ietf/swift-rfc-1950.git", branch: "main"),
     ],
     targets: [
         .target(
@@ -66,6 +67,7 @@ let package = Package(
                 .product(name: "Vector", package: "swift-vector"),
                 .product(name: "W3C CSS Compositing", package: "swift-w3c-css"),
                 .product(name: "Witnesses", package: "swift-witnesses"),
+                .product(name: "Standard Library Extensions", package: "swift-standard-library-extensions"),
             ]
         ),
         .target(
@@ -93,6 +95,7 @@ let package = Package(
                 .product(name: "Byte", package: "swift-byte"),
                 .product(name: "File System", package: "swift-file-system", condition: .when(traits: ["Store"])),
                 .product(name: "FIPS 180-4", package: "swift-fips-180-4", condition: .when(traits: ["Store"])),
+                .product(name: "RFC 1950", package: "swift-rfc-1950", condition: .when(traits: ["Store"])),
                 .product(
                     name: "Standard Library Extensions",
                     package: "swift-standard-library-extensions",
@@ -104,6 +107,7 @@ let package = Package(
             name: "Picture Tests",
             dependencies: [
                 .target(name: "Picture"),
+                .product(name: "Standard Library Extensions", package: "swift-standard-library-extensions"),
                 .product(name: "Color Standard", package: "swift-color-standard"),
                 .product(name: "Numeric", package: "swift-numeric"),
             ]

@@ -24,104 +24,79 @@ import Testing
             File.Directory(try File.Path(validating: "/tmp/picture-store-tests-" + Swift.String(UInt64.random(in: 0...UInt64.max))))
         }
 
-        static func drawn(_ picture: Picture, through renderer: Picture.Renderer, ground: Picture.Pixel = .transparent) throws -> Raster<Picture.Pixel> {
-            var raster = Raster<Picture.Pixel>(width: 24, height: 16, repeating: ground)
-            try renderer.render(picture, into: &raster)
-            return raster
+        static func key(_ store: Picture.Store, _ picture: Picture = picture, form: Swift.String = "raw") throws -> Picture.Store.Key {
+            try #require(store.key(picture, width: 24, height: 16, over: .transparent, form: form))
         }
 
-        /// The one entry in a store's directory.
-        static func entry(_ store: Picture.Store, _ picture: Picture, ground: Picture.Pixel = .transparent) throws -> File {
-            let key = try #require(store.key(picture, width: 24, height: 16, over: ground))
-            return try #require(store.file(for: key))
-        }
+        static let payload: [Byte] = (0..<100_000).map { Byte(bitPattern: UInt8(truncatingIfNeeded: $0 &* 7)) }
 
-        @Test func `a warm store gives the pixels drawing gives, bit for bit, without drawing`() throws {
+        @Test func `kept bytes are read back as they were`() throws {
             let store = Picture.Store.cpu(try Self.directory())
-            let plain = try Self.drawn(Self.picture, through: .cpu(threads: 1))
-            let cold = try Self.drawn(Self.picture, through: .stored(in: store, through: .cpu(threads: 1)))
-            #expect(try Self.entry(store, Self.picture).read.bytes().count > 0)
-            let warm = try Self.drawn(Self.picture, through: .stored(in: store, through: .absent))
-            #expect(cold == plain)
-            #expect(warm == plain)
+            let key = try Self.key(store)
+            #expect(store.bytes(for: key) == nil)
+            try store.keep(Self.payload, for: key)
+            #expect(store.bytes(for: key) == Self.payload)
+            try store.keep([], for: key)
+            #expect(store.bytes(for: key) == [])
         }
 
-        @Test func `a changed picture, size, ground or edition is another key`() throws {
+        @Test func `a changed picture, size, ground, form or edition is another key`() throws {
             let store = Picture.Store(try Self.directory(), edition: "one")
             let other = Picture.Store(store.directory, edition: "two")
             let moved: Picture = [Self.square(2.5, 7.25, .black), Self.square(9.0001, 3, .white)]
             let keys = [
-                store.key(Self.picture, width: 24, height: 16, over: .transparent),
-                store.key(moved, width: 24, height: 16, over: .transparent),
-                store.key(Self.picture, width: 16, height: 24, over: .transparent),
-                store.key(Self.picture, width: 24, height: 16, over: Picture.Color.white.pixel),
-                other.key(Self.picture, width: 24, height: 16, over: .transparent),
+                store.key(Self.picture, width: 24, height: 16, over: .transparent, form: "raw"),
+                store.key(moved, width: 24, height: 16, over: .transparent, form: "raw"),
+                store.key(Self.picture, width: 16, height: 24, over: .transparent, form: "raw"),
+                store.key(Self.picture, width: 24, height: 16, over: Picture.Color.white.pixel, form: "raw"),
+                store.key(Self.picture, width: 24, height: 16, over: .transparent, form: "png"),
+                other.key(Self.picture, width: 24, height: 16, over: .transparent, form: "raw"),
             ]
             #expect(Set(keys.compactMap { $0 }).count == keys.count)
-            #expect(keys[0] == store.key(Self.picture, width: 24, height: 16, over: .transparent))
+            #expect(keys[0] == store.key(Self.picture, width: 24, height: 16, over: .transparent, form: "raw"))
         }
 
-        @Test func `a changed picture misses and is drawn`() throws {
+        @Test func `a truncated, damaged or misnamed entry is a miss`() throws {
             let store = Picture.Store.cpu(try Self.directory())
-            let renderer = Picture.Renderer.stored(in: store, through: .cpu(threads: 1))
-            _ = try Self.drawn(Self.picture, through: renderer)
-            let moved: Picture = [Self.square(3, 7.25, .black)]
-            #expect(try Self.drawn(moved, through: renderer) == Self.drawn(moved, through: .cpu(threads: 1)))
-            #expect(throws: Picture.Renderer.Error.self) {
-                try Self.drawn([Self.square(4, 7.25, .black)], through: .stored(in: store, through: .absent))
-            }
-        }
+            let key = try Self.key(store)
+            try store.keep(Self.payload, for: key)
+            let file = try #require(store.file(for: key))
+            let whole = try file.read.bytes()
 
-        @Test func `a truncated, damaged or misnamed entry is a miss, and is drawn and kept again`() throws {
-            let store = Picture.Store.cpu(try Self.directory())
-            let renderer = Picture.Renderer.stored(in: store, through: .cpu(threads: 1))
-            let plain = try Self.drawn(Self.picture, through: .cpu(threads: 1))
-            _ = try Self.drawn(Self.picture, through: renderer)
-            let entry = try Self.entry(store, Self.picture)
-            let whole = try entry.read.bytes()
-            let key = try #require(store.key(Self.picture, width: 24, height: 16, over: .transparent))
-
-            try entry.write.atomic(Array(whole.dropLast(5)).span)
-            #expect(store.raster(for: key) == nil)
-            #expect(try Self.drawn(Self.picture, through: renderer) == plain)
-            #expect(try entry.read.bytes() == whole)
+            try file.write.atomic(Array(whole.dropLast(5)).span)
+            #expect(store.bytes(for: key) == nil)
 
             var damaged = whole
-            damaged[Picture.Store.header + 100] = Byte(bitPattern: damaged[Picture.Store.header + 100].bitPattern ^ 1)
-            try entry.write.atomic(damaged.span)
-            #expect(store.raster(for: key) == nil)
-            #expect(try Self.drawn(Self.picture, through: renderer) == plain)
+            damaged[Picture.Store.header + 1000] = Byte(bitPattern: damaged[Picture.Store.header + 1000].bitPattern ^ 1)
+            try file.write.atomic(damaged.span)
+            #expect(store.bytes(for: key) == nil)
 
-            let other = try #require(store.key([Self.square(1, 1, .white)], width: 24, height: 16, over: .transparent))
+            let other = try Self.key(store, [Self.square(1, 1, .white)])
             try #require(store.file(for: other)).write.atomic(whole.span)
-            #expect(store.raster(for: other) == nil)
-            #expect(store.raster(for: key) == plain)
+            #expect(store.bytes(for: other) == nil)
         }
 
-        @Test func `a raster of more than one colour is drawn through and nothing is kept`() throws {
-            let directory = try Self.directory()
-            let store = Picture.Store.cpu(directory)
-            var raster = Raster<Picture.Pixel>(width: 24, height: 16, repeating: .transparent)
-            raster[x: 3, y: 3] = Picture.Color.white.pixel
-            var plain = raster
-            try Picture.Renderer.cpu(threads: 1).render(Self.picture, into: &plain)
-            try Picture.Renderer.stored(in: store, through: .cpu(threads: 1)).render(Self.picture, into: &raster)
-            #expect(raster == plain)
-            #expect(!directory.stat.exists)
+        @Test func `a picture with a kept image has the same key in every process`() throws {
+            let inner: Picture = [Self.square(1, 3, .white)]
+            let rectangle = Picture.Plane.Rectangle(llx: 0, lly: 0, urx: 8, ury: 8)
+            let image = Picture.Image(inner, in: rectangle, scale: 2)
+            let picture: Picture = [.fill(Picture.Plane.Path(subpaths: []), .image(image))]
+            let store = Picture.Store(try Self.directory(), edition: "fixed")
+            // Written by an earlier run: the image's source keeps a `Hasher` value that differs per process,
+            // which its canonical value leaves out.
+            #expect(try Self.key(store, picture).hex == "fb91835dfa1bbb8a16f5313aca746a8e1c1e8c629d5916e8845011eae1481ac2")
         }
 
-        @Test func `processes drawing into one directory at once leave one whole entry`() async throws {
+        @Test func `processes keeping one entry at once leave one whole entry`() async throws {
             let store = Picture.Store.cpu(try Self.directory())
-            let plain = try Self.drawn(Self.picture, through: .cpu(threads: 1))
-            let drawn = try await withThrowingTaskGroup(of: Raster<Picture.Pixel>.self) { group in
+            let key = try Self.key(store)
+            try await withThrowingTaskGroup(of: Void.self) { group in
                 for _ in 0..<8 {
-                    group.addTask { try Self.drawn(Self.picture, through: .cpu(threads: 1, storing: store.directory)) }
+                    group.addTask { try store.keep(Self.payload, for: key) }
                 }
-                return try await group.reduce(into: []) { $0.append($1) }
+                try await group.waitForAll()
             }
-            #expect(drawn.allSatisfy { $0 == plain })
-            let key = try #require(store.key(Self.picture, width: 24, height: 16, over: .transparent))
-            #expect(store.raster(for: key) == plain)
+            #expect(store.bytes(for: key) == Self.payload)
         }
     }
 #endif
