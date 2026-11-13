@@ -35,7 +35,7 @@ extension `Picture Tests`.`Short forms are the long forms they stand for` {
 
     @Test
     func `Six hexadecimal digits are three bytes over 255`() {
-        for level in 0...255 {
+        (0...255).forEach { level in
             let value = UInt32(level)
             let color = Picture.Color(hex: value << 16 | (255 - value) << 8 | value)
             let byte = Float(level) / 255

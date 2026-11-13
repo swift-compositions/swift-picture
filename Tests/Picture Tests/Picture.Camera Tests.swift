@@ -74,7 +74,7 @@ extension `Picture Tests`.`A flat camera sees a picture from a focus at a scale`
         let smear = try #require(Self.close.smear(since: Self.wide))
         #expect(Tests.close(smear.amount, 1 - 1.2 / 4.5, within: 1e-12))
         let picture = smear.center
-        let then = Self.wide.transform.inverse(of: picture)
+        let then = try Self.wide.transform.inverse(of: picture)
         #expect(Tests.close(Self.close.place(of: then), picture, within: 1e-6))
         #expect(Self.close.smear(since: Self.close) == nil)
         #expect(Self.close.smear(since: Picture.Camera(focus: Tests.at(0, 0), center: Self.middle, scale: 0)) == nil)
@@ -90,8 +90,8 @@ extension `Picture Tests`.`A flat camera sees a picture from a focus at a scale`
 }
 
 extension Picture.Transform {
-    fileprivate func inverse(of point: Picture.Plane.Point<2>) -> Picture.Plane.Point<2> {
-        let moved = ((try? inverted()) ?? .identity).applied(to: Vector([point[0], point[1]]))
+    fileprivate func inverse(of point: Picture.Plane.Point<2>) throws(Matrix<2, 3, Double>.Error) -> Picture.Plane.Point<2> {
+        let moved = try inverted().applied(to: Vector([point[0], point[1]]))
         return Picture.Plane.Point<2>([moved[0], moved[1]])
     }
 }
