@@ -209,6 +209,9 @@ extension Picture.Renderer.CPU.Canvas {
             case .radial(let radial): radial.gradient.ramp
             case .solid, .image: Picture.Gradient([]).ramp
             }
+        var image: Picture.Image?
+        if case .image(let painted) = paint { image = painted }
+        let picture = image
         update(area, state.workers) { x, y, old in
             let share = coverage[area.index(x, y)]
             guard share > 0 else { return old }
@@ -220,7 +223,7 @@ extension Picture.Renderer.CPU.Canvas {
                 switch paint {
                 case .linear(let linear): source = ramp.pixel(at: Float(linear.parameter(at: point)))
                 case .radial(let radial): source = ramp.pixel(at: Float(radial.parameter(at: point)))
-                case .solid, .image: source = paint.pixel(at: point)
+                case .solid, .image: source = picture?.pixel(at: point) ?? paint.pixel(at: point)
                 }
             }
             return Picture.Renderer.CPU.limited(old, source.composited(over: old, coverage: share), state.share(x, y))
