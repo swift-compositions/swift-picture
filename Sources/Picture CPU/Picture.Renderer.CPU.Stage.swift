@@ -216,8 +216,10 @@ extension Picture.Renderer.CPU {
 }
 
 extension Picture.Renderer.CPU.Stage {
-    /// For each tile of a box, in row order, the tile and the numbers of the triangles whose box reaches it,
-    /// in their original order, so that a tie in depth goes to the same triangle as over the whole box.
+    /// For each tile of a box, in row order, the tile and the numbers of the triangles that can reach it, in
+    /// their original order, so that a tie in depth goes to the same triangle as over the whole box. A
+    /// triangle is listed for the tiles its box reaches, but for those that one of its edges clears: a long
+    /// thin triangle is listed along its length, not over the whole of its box.
     static func tiles(
         _ triangles: [InlineArray<3, Point<3, Double>>],
         over box: Picture.Renderer.CPU.Box
@@ -237,7 +239,10 @@ extension Picture.Renderer.CPU.Stage {
             while row <= (reach.bottom - 1 - box.top) / side {
                 var column = (reach.left - box.left) / side
                 while column <= (reach.right - 1 - box.left) / side {
-                    lists[row * columns + column].append(number)
+                    let left = box.left + column * side
+                    let top = box.top + row * side
+                    let tile = Picture.Renderer.CPU.Box(left: left - 1, top: top - 1, right: left + side + 1, bottom: top + side + 1)
+                    if !clears(triangle, tile) { lists[row * columns + column].append(number) }
                     column += 1
                 }
                 row += 1
@@ -251,6 +256,48 @@ extension Picture.Renderer.CPU.Stage {
         }
     }
 
+    /// Whether a box of raster space lies wholly beyond one edge of a triangle, so that the triangle has no
+    /// point in it. Each corner of the box must lie beyond the edge by more than rounding can account for,
+    /// here or where the triangle is sampled; a triangle without area, or one too large to measure, clears nothing.
+    static func clears(_ triangle: InlineArray<3, Point<3, Double>>, _ box: Picture.Renderer.CPU.Box) -> Bool {
+        let turn = (triangle[1][0] - triangle[0][0]) * (triangle[2][1] - triangle[0][1]) - (triangle[1][1] - triangle[0][1]) * (triangle[2][0] - triangle[0][0])
+        guard turn > 0 || turn < 0 else { return false }
+        let sign: Double = turn > 0 ? 1 : -1
+        let across = (Double(box.left), Double(box.right))
+        let down = (Double(box.top), Double(box.bottom))
+        var edge = 0
+        while edge < 3 {
+            let start = triangle[edge]
+            let end = triangle[(edge + 1) % 3]
+            edge += 1
+            let run = (x: end[0] - start[0], y: end[1] - start[1])
+            /// Whether a point lies beyond the edge, on the side away from the triangle.
+            func beyond(_ x: Double, _ y: Double) -> Bool {
+                let slack = (abs(run.x) * (abs(y) + abs(start[1])) + abs(run.y) * (abs(x) + abs(start[0]))) * 0x1p-40
+                return sign * (run.x * (y - start[1]) - run.y * (x - start[0])) < -slack
+            }
+            if beyond(across.0, down.0), beyond(across.1, down.0), beyond(across.0, down.1), beyond(across.1, down.1) { return true }
+        }
+        return false
+    }
+
+    /// Some triangles moved to a tile's sample points, `samples` to a pixel along each side.
+    static func fine(
+        _ triangles: [InlineArray<3, Point<3, Double>>],
+        _ numbers: [Int],
+        in tile: Picture.Renderer.CPU.Box,
+        samples: Int
+    ) -> [InlineArray<3, Point<3, Double>>] {
+        let scale = Double(samples)
+        return numbers.map { (number: Int) -> InlineArray<3, Point<3, Double>> in
+            let triangle = triangles[number]
+            func moved(_ corner: Point<3, Double>) -> Point<3, Double> {
+                Point<3, Double>([(corner[0] - Double(tile.left)) * scale, (corner[1] - Double(tile.top)) * scale, corner[2]])
+            }
+            return [moved(triangle[0]), moved(triangle[1]), moved(triangle[2])]
+        }
+    }
+
     /// The nearest of some triangles at each sample point of a tile, `samples` × `samples` to a pixel, row by row.
     static func hits(
         _ triangles: [InlineArray<3, Point<3, Double>>],
@@ -258,22 +305,26 @@ extension Picture.Renderer.CPU.Stage {
         in tile: Picture.Renderer.CPU.Box,
         samples: Int
     ) -> [Picture.Renderer.CPU.Hit] {
-        let scale = Double(samples)
-        let fine = numbers.map { (number: Int) -> InlineArray<3, Point<3, Double>> in
-            let triangle = triangles[number]
-            func moved(_ corner: Point<3, Double>) -> Point<3, Double> {
-                Point<3, Double>([(corner[0] - Double(tile.left)) * scale, (corner[1] - Double(tile.top)) * scale, corner[2]])
-            }
-            return [moved(triangle[0]), moved(triangle[1]), moved(triangle[2])]
-        }
-        let region = Raster<Picture.Renderer.CPU.Hit>.Region(
-            x: .zero,
-            y: .zero,
-            width: Cardinal(UInt(tile.width * samples)),
-            height: Cardinal(UInt(tile.height * samples))
-        )
-        return Raster<Picture.Renderer.CPU.Hit>.fragments(of: fine, in: region, empty: .none) { triangle, weights, depth in
+        let fine = fine(triangles, numbers, in: tile, samples: samples)
+        let width = Cardinal(UInt(tile.width * samples))
+        let height = Cardinal(UInt(tile.height * samples))
+        return Raster<Picture.Renderer.CPU.Hit>.fragments(of: fine, width: width, height: height, empty: .none) { triangle, weights, depth in
             Picture.Renderer.CPU.Hit(triangle: numbers[Int(bitPattern: triangle)], weights: weights, depth: depth)
+        }.pixels
+    }
+
+    /// As `hits`, for a surface that needs no weights: which triangle is nearest at each sample point, and its depth.
+    static func nearest(
+        _ triangles: [InlineArray<3, Point<3, Double>>],
+        _ numbers: [Int],
+        in tile: Picture.Renderer.CPU.Box,
+        samples: Int
+    ) -> [Picture.Renderer.CPU.Hit.Nearest] {
+        let fine = fine(triangles, numbers, in: tile, samples: samples)
+        let width = Cardinal(UInt(tile.width * samples))
+        let height = Cardinal(UInt(tile.height * samples))
+        return Raster<Picture.Renderer.CPU.Hit.Nearest>.fragments(of: fine, width: width, height: height, empty: .none) { triangle, depth in
+            Picture.Renderer.CPU.Hit.Nearest(triangle: numbers[Int(bitPattern: triangle)], depth: depth)
         }.pixels
     }
 }
@@ -292,11 +343,12 @@ extension Picture.Renderer.CPU.Canvas {
         unsafe tiles(opaque.count, state.workers) { shared, box, part in
             let (tile, numbers) = opaque[part]
             guard !numbers.isEmpty else { return }
-            let hits = Picture.Renderer.CPU.Stage.hits(stage.opaque, numbers, in: tile, samples: samples)
-            unsafe Self.visit(shared, box, tile, samples) { _, _, row, column, old in
+            let hits = Picture.Renderer.CPU.Stage.nearest(stage.opaque, numbers, in: tile, samples: samples)
+            unsafe Self.visit(shared, box, tile, samples) { row, column in
                 let hit = hits[row * tile.width * samples + column]
-                guard hit.triangle >= 0, hit.depth <= upper else { return old }
-                return stage.colors[hit.triangle].composited(over: old)
+                return hit.triangle >= 0 && hit.depth <= upper
+            } value: { _, _, row, column, old in
+                stage.colors[hits[row * tile.width * samples + column].triangle].composited(over: old)
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }
@@ -314,13 +366,15 @@ extension Picture.Renderer.CPU.Canvas {
             let covers = opaque[part].triangles
             guard !numbers.isEmpty else { return }
             let hits = Picture.Renderer.CPU.Stage.hits(stage.glass, numbers, in: tile, samples: samples)
-            let nearest = Picture.Renderer.CPU.Stage.hits(stage.opaque, covers, in: tile, samples: samples)
-            unsafe Self.visit(shared, box, tile, samples) { x, y, row, column, old in
+            let nearest = Picture.Renderer.CPU.Stage.nearest(stage.opaque, covers, in: tile, samples: samples)
+            unsafe Self.visit(shared, box, tile, samples) { row, column in
                 let position = row * tile.width * samples + column
                 let hit = hits[position]
                 let cover = nearest[position]
                 let hidden = cover.triangle >= 0 && cover.depth <= upper && cover.depth <= hit.depth
-                guard hit.triangle >= 0, hit.depth <= upper, !hidden else { return old }
+                return hit.triangle >= 0 && hit.depth <= upper && !hidden
+            } value: { x, y, row, column, old in
+                let hit = hits[row * tile.width * samples + column]
                 let surface = stage.surfaces[hit.triangle]
                 let normal = Picture.Scene.Camera.direction(surface.normal(hit.weights), through: eyes[surface.model])
                 let shading = shadings[hit.triangle]
@@ -367,20 +421,32 @@ extension Picture.Renderer.CPU.Canvas {
     }
 
     /// For each pixel of a tile, the mean over its `samples` × `samples` points of what `value` gives for the
-    /// pixel as it is (row and column count sample points from the tile's corner), put in place by `finish`.
-    /// A pixel all of whose points give it back unchanged is left alone.
+    /// pixel as it is at a point that is `taken`, and of the pixel as it is at one that is not (row and column
+    /// count sample points from the tile's corner), put in place by `finish`. A pixel none of whose points is
+    /// taken is left alone and never read, as is one all of whose points give it back unchanged.
     static func visit(
         _ pixels: Picture.Renderer.CPU.Workers.Pixels,
         _ box: Picture.Renderer.CPU.Box,
         _ tile: Picture.Renderer.CPU.Box,
         _ samples: Int,
-        _ value: (_ x: Int, _ y: Int, _ row: Int, _ column: Int, _ old: Picture.Pixel) -> Picture.Pixel,
+        taken: (_ row: Int, _ column: Int) -> Bool,
+        value: (_ x: Int, _ y: Int, _ row: Int, _ column: Int, _ old: Picture.Pixel) -> Picture.Pixel,
         finish: (_ x: Int, _ y: Int, _ old: Picture.Pixel, _ mean: Picture.Pixel) -> Picture.Pixel
     ) {
         var y = tile.top
         while y < tile.bottom {
             var x = tile.left
             while x < tile.right {
+                var any = false
+                var point = 0
+                while point < samples * samples, !any {
+                    any = taken((y - tile.top) * samples + point / samples, (x - tile.left) * samples + point % samples)
+                    point += 1
+                }
+                guard any else {
+                    x += 1
+                    continue
+                }
                 let index = box.index(x, y)
                 let old = unsafe pixels[index]
                 var mean = old
@@ -390,7 +456,7 @@ extension Picture.Renderer.CPU.Canvas {
                 while row < (y - tile.top + 1) * samples {
                     var column = (x - tile.left) * samples
                     while column < (x - tile.left + 1) * samples {
-                        let sample = value(x, y, row, column, old)
+                        let sample = taken(row, column) ? value(x, y, row, column, old) : old
                         changed = changed || sample != old
                         mean = count == 0 ? sample : mean.interpolated(to: sample, at: 1 / Float(count + 1))
                         count += 1

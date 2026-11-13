@@ -180,4 +180,75 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         let together = try Self.drawn(Self.flat([.init(Self.square(0, 0, -1), material: .flat(Tests.red)), .init(Self.square(0, 0, -9), material: .flat(Tests.blue))]))
         #expect(Tests.at(together, 20, 20) == Tests.red.pixel)
     }
+
+    @Test
+    func `Flat triangles sampled tile by tile draw what one scan of the whole raster draws: thin, tiny, clipped and flat ones, and pixels none reaches stay as they were`() throws {
+        // Every number here is a whole number of sixteenths, so that moving a triangle to a tile's sample points is exact.
+        let projection = try Projection<Double>.orthographic(width: 128, height: 128, near: 0, far: 16, depth: .unit)
+        var corners: [[Vertex]] = [
+            // Long and thin across many tiles, one of them a hair wide; a stroke as two triangles.
+            [Vertex([-60, 50, -1]), Vertex([30, -20, -1]), Vertex([30.25, -20, -1])],
+            [Vertex([-64, -10, -2]), Vertex([40, 60, -2]), Vertex([40, 60.0625, -2])],
+            [Vertex([-50, 20, -3]), Vertex([20, 21, -3]), Vertex([20, 21.5, -3])],
+            [Vertex([-50, 20, -3]), Vertex([20, 21.5, -3]), Vertex([-50, 20.5, -3])],
+            // Smaller than a pixel, and around a pixel's centre.
+            [Vertex([-40.5, 10.5, -2]), Vertex([-40.25, 10.5, -2]), Vertex([-40.5, 10.25, -2])],
+            [Vertex([-20.75, 30.25, -2]), Vertex([-20.25, 30.25, -2]), Vertex([-20.5, 30.75, -2])],
+            // Corners far off the raster, behind everything else.
+            [Vertex([-4096, 40, -12]), Vertex([4096, 48, -12]), Vertex([0, -8192, -12])],
+            [Vertex([-65536, 60, -11]), Vertex([65536, 59, -11]), Vertex([65536, 61, -11])],
+            // Without area, and wholly off the raster.
+            [Vertex([-30, -30, -1]), Vertex([0, 0, -1]), Vertex([30, 30, -1])],
+            [Vertex([200, 200, -1]), Vertex([210, 200, -1]), Vertex([200, 210, -1])],
+        ]
+        var state: UInt64 = 7
+        func sixteenths(_ low: Double, _ high: Double) -> Double {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return low + ((high - low) * 16 * Double(state >> 40) / 16_777_216).rounded(.down) / 16
+        }
+        (0..<40).forEach { _ in
+            let start = Vertex([sixteenths(-70, 40), sixteenths(-20, 70), sixteenths(-10, -1)])
+            let end = Vertex([sixteenths(-70, 40), sixteenths(-20, 70), sixteenths(-10, -1)])
+            corners.append([start, end, Vertex([end[0] + sixteenths(-1, 1), end[1] + sixteenths(-1, 1), end[2]])])
+        }
+        let colors = corners.indices.map { index in
+            Picture.Color(red: Float(index % 5) / 4, green: Float(index % 3) / 2, blue: Float(index % 7) / 6, alpha: index.isMultiple(of: 2) ? 1 : 0.5)
+        }
+        let models = try zip(corners, colors).map { triangle, color in
+            Picture.Scene.Model(try Mesh(vertices: triangle, faces: [Polygon(0, 1, 2)]), material: .flat(color))
+        }
+        let scene = Picture.Scene(camera: .init(projection: projection), viewport: .init(llx: 0, lly: 0, urx: 128, ury: 128), models: models)
+        let drawn = try Tests.drawn([.scene(scene)], on: Tests.canvas(96, 80, Self.backdrop))
+
+        // The plain way: every triangle at four sample points a side over the whole raster in one scan, no
+        // tiles and no pixel passed over, and each pixel the running mean of its sixteen points.
+        let fine: [InlineArray<3, Point<3, Double>>] = try zip(corners, models).map { triangle, model in
+            let places = try triangle.map { corner in try #require(scene.position(of: corner, in: model)) }
+            return [
+                Point<3, Double>([places[0].point[0] * 4, places[0].point[1] * 4, places[0].depth]),
+                Point<3, Double>([places[1].point[0] * 4, places[1].point[1] * 4, places[1].depth]),
+                Point<3, Double>([places[2].point[0] * 4, places[2].point[1] * 4, places[2].depth]),
+            ]
+        }
+        let winners = Raster<Int>.fragments(of: fine, width: 384, height: 320, empty: -1) { triangle, depth in
+            depth <= 1 ? Int(bitPattern: triangle) : -1
+        }
+        let pixels = colors.map { $0.pixel }
+        var untouched = 0
+        let expected = Tests.Canvas(width: 96, height: 80) { x, y in
+            var mean = Self.backdrop
+            var changed = false
+            (0..<16).forEach { point in
+                let winner = winners[x: Ordinal(UInt(Int(bitPattern: x) * 4 + point % 4)), y: Ordinal(UInt(Int(bitPattern: y) * 4 + point / 4))]
+                let sample = winner >= 0 ? pixels[winner].composited(over: Self.backdrop) : Self.backdrop
+                changed = changed || sample != Self.backdrop
+                mean = point == 0 ? sample : mean.interpolated(to: sample, at: 1 / Float(point + 1))
+            }
+            if !changed { untouched += 1 }
+            return changed ? mean : Self.backdrop
+        }
+        #expect(drawn == expected)
+        #expect(Set(winners.pixels).count > 30)
+        #expect(untouched > 500)
+    }
 }
