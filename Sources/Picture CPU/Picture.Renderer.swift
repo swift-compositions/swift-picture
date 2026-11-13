@@ -13,12 +13,24 @@ extension Picture.Renderer {
     }
 
     /// The renderer in pure Swift on at most `threads` threads, the calling one among them; none counts as
-    /// one. Every count gives the same raster bit for bit.
+    /// one. Every count gives the same raster bit for bit. It keeps up to 2²⁵ pixels of what it draws for
+    /// images that name their picture.
     public static func cpu(threads: Cardinal) -> Self {
-        let workers = CPU.Workers(count: Swift.max(Int(bitPattern: threads), 1))
-        return Self(render: { (picture: borrowing Picture, raster: inout Raster<Picture.Pixel>) throws(Picture.Renderer.Error) in
+        cpu(threads: threads, keeping: Cardinal(UInt(CPU.keeping)))
+    }
+
+    /// The renderer in pure Swift on at most `threads` threads, keeping at most `pixels` pixels of what it
+    /// draws for images that name their picture, from one picture to the next, for as long as this value or
+    /// a copy of it lives. A pixel is 16 bytes. With no pixels to keep, every picture draws its images afresh.
+    public static func cpu(threads: Cardinal, keeping pixels: Cardinal) -> Self {
+        cpu(CPU.Workers(count: Swift.max(Int(bitPattern: threads), 1)), CPU.Store(bound: Int(clamping: pixels)))
+    }
+
+    /// The renderer on some workers that keeps what it draws for images in a store.
+    static func cpu(_ workers: CPU.Workers, _ store: CPU.Store) -> Self {
+        Self(render: { (picture: borrowing Picture, raster: inout Raster<Picture.Pixel>) throws(Picture.Renderer.Error) in
             var canvas = CPU.Canvas(raster)
-            try canvas.draw(copy picture, CPU.State(transform: .identity, mask: nil, workers: workers))
+            try canvas.draw(try store.resolved(copy picture, workers), CPU.State(transform: .identity, mask: nil, workers: workers))
             raster = canvas.raster
         })
     }

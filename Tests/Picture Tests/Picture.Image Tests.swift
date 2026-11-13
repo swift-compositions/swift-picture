@@ -64,6 +64,22 @@ extension `Picture Tests`.`A picture kept as an image is drawn once, at a scale,
     }
 
     @Test
+    func `An image made without a renderer names its picture, stands where the drawn one will, and paints nothing yet`() throws {
+        let picture: Picture = [Tests.shape(4, .white)]
+        let named = Picture.Image(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2, sampling: .nearest, edge: .extend)
+        #expect(named.source == Picture.Image.Source(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2))
+        #expect(named.raster.isEmpty)
+        #expect(named.placement == Picture.Transform(rows: [[0.25, 0, 3], [0, 0.25, -2]]))
+        #expect(named.pixel(at: Tests.at(4, -1.5)) == .transparent)
+        let drawn = try named.drawn(through: Self.stub)
+        #expect(drawn == (try Picture.Image(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2, sampling: .nearest, edge: .extend, through: Self.stub)))
+        #expect(drawn.source == nil)
+        #expect(drawn.raster.width == 10)
+        #expect(try drawn.drawn(through: .absent) == drawn)
+        #expect(throws: Picture.Renderer.Error.absent) { try named.drawn(through: .absent) }
+    }
+
+    @Test
     func `The renderer's own failure is the image's`() {
         #expect(throws: Picture.Renderer.Error.absent) {
             try Picture.Image(.empty, in: Self.rectangle(0, 0, 3, 3), scale: 1, through: .absent)

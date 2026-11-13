@@ -10,6 +10,10 @@ extension Picture {
         public var sampling: Raster<Picture.Pixel>.Sampling
         public var edge: Raster<Picture.Pixel>.Edge
 
+        /// The part of a picture the raster is still to be drawn from, by the renderer that draws the image;
+        /// nil for an image that holds its pixels.
+        public var source: Source?
+
         public init(
             _ raster: Raster<Picture.Pixel>,
             placement: Picture.Transform = .identity,
@@ -20,6 +24,7 @@ extension Picture {
             self.placement = placement
             self.sampling = sampling
             self.edge = edge
+            self.source = nil
         }
     }
 }
@@ -27,6 +32,7 @@ extension Picture {
 extension Picture.Image {
     /// The image's pixel at a point of the shape's space.
     public func pixel(at point: Picture.Plane.Point<2>) -> Picture.Pixel {
+        guard source == nil else { return .transparent }
         let inverse: Picture.Transform
         do throws(Matrix<2, 3, Double>.Error) { inverse = try placement.inverted() } catch { return .transparent }
         if raster.isEmpty {
@@ -42,16 +48,43 @@ extension Picture.Image {
 }
 
 extension Picture.Image {
-    /// The part of a picture inside a rectangle, drawn once by a renderer and kept as an image that stands
-    /// where that part stood, so that it can be drawn again, moved and repeated, for the price of an image.
+    /// The part of a picture inside a rectangle, to be drawn once and kept as an image that stands where that
+    /// part stood, so that it can be shown again, moved and repeated, for the price of an image.
     ///
-    /// The raster has `scale` pixels to a unit of the picture, rounded up to whole pixels along each side,
-    /// and starts transparent. With more than one `samples` the picture is drawn that many times as fine
-    /// along each side and every pixel is the mean of its square of samples. The placement puts the
+    /// The image holds no pixels yet: it names its `source`, and the renderer that draws a picture holding the
+    /// image draws the source first, when and where it chooses, and may keep the result for the next picture
+    /// that holds an equal source. The raster will have `scale` pixels to a unit of the picture, rounded up to
+    /// whole pixels along each side; with more than one `samples` the picture is drawn that many times as
+    /// fine along each side and every pixel is the mean of its square of samples. The placement puts the
     /// raster's first corner at the rectangle's and one pixel at one part in `scale` of a unit.
+    public init(
+        _ picture: Picture,
+        in rectangle: Picture.Plane.Rectangle,
+        scale: Double,
+        samples: Cardinal = 1,
+        sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
+    ) {
+        let source = Source(picture, in: rectangle, scale: scale, samples: samples)
+        self.init(Raster(width: .zero, height: .zero, repeating: .transparent), placement: source.placement, sampling: sampling, edge: edge)
+        self.source = source
+    }
+
+    /// This image holding its pixels: its source drawn by a renderer, and no source left. An image that
+    /// holds its pixels already is given back as it is.
     ///
     /// It fails with `.unsupported` for a rectangle with no area and for a scale that is not positive and
     /// finite, and with the renderer's own error otherwise.
+    public func drawn(through renderer: Picture.Renderer) throws(Picture.Renderer.Error) -> Self {
+        guard let source else { return self }
+        var image = self
+        image.raster = try source.raster(through: renderer)
+        image.source = nil
+        return image
+    }
+
+    /// The part of a picture inside a rectangle, drawn now by a renderer and kept as an image that holds its
+    /// pixels: `init(_:in:scale:samples:sampling:edge:)` and then `drawn(through:)`.
     public init(
         _ picture: borrowing Picture,
         in rectangle: Picture.Plane.Rectangle,
@@ -61,34 +94,6 @@ extension Picture.Image {
         edge: Raster<Picture.Pixel>.Edge = .constant(.transparent),
         through renderer: Picture.Renderer
     ) throws(Picture.Renderer.Error) {
-        let left = rectangle.llx.underlying
-        let top = rectangle.lly.underlying
-        let across = (rectangle.urx.underlying - left) * scale
-        let down = (rectangle.ury.underlying - top) * scale
-        let fine = Swift.max(Int(clamping: samples), 1)
-        guard scale > 0, scale.isFinite, across > 0, down > 0, across.isFinite, down.isFinite,
-            across < Double(Int32.max / Int32(clamping: fine)), down < Double(Int32.max / Int32(clamping: fine))
-        else { throw .unsupported }
-        let width = Int(across.rounded(.up))
-        let height = Int(down.rounded(.up))
-        let zoom = scale * Double(fine)
-        let moved = Picture.Transform(rows: [[zoom, 0, -left * zoom], [0, zoom, -top * zoom]])
-        var raster = Raster<Picture.Pixel>(
-            width: Cardinal(UInt(width * fine)),
-            height: Cardinal(UInt(height * fine)),
-            repeating: .transparent
-        )
-        try renderer.render([.group(Picture.Group(copy picture, transform: moved))], into: &raster)
-        if fine > 1 {
-            raster = raster.resampled(width: Cardinal(UInt(width)), height: Cardinal(UInt(height)), .box) { (from: Picture.Pixel, to: Picture.Pixel, parameter: Float) in
-                from.interpolated(to: to, at: parameter)
-            }
-        }
-        self.init(
-            raster,
-            placement: Picture.Transform(rows: [[1 / scale, 0, left], [0, 1 / scale, top]]),
-            sampling: sampling,
-            edge: edge
-        )
+        self = try Self(copy picture, in: rectangle, scale: scale, samples: samples, sampling: sampling, edge: edge).drawn(through: renderer)
     }
 }
