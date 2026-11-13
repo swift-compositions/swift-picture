@@ -8,9 +8,11 @@ let package = Package(
         .library(name: "Picture", targets: ["Picture"]),
         .library(name: "Picture CPU", targets: ["Picture CPU"]),
         .library(name: "Picture PNG Integration", targets: ["Picture PNG Integration"]),
+        .library(name: "Picture Store", targets: ["Picture Store"]),
     ],
     traits: [
         .trait(name: "PNG", description: "PNG integration"),
+        .trait(name: "Store", description: "Drawn pictures kept in a directory under a key of what decides their pixels"),
         .trait(name: "Threads", description: "Picture CPU draws a frame on several threads"),
     ],
     dependencies: [
@@ -36,6 +38,9 @@ let package = Package(
         .package(url: "https://github.com/swift-standards/swift-color-standard.git", branch: "main"),
         .package(url: "https://github.com/swift-w3c/swift-w3c-css.git", branch: "main"),
         .package(url: "https://github.com/swift-w3c/swift-w3c-png.git", branch: "main"),
+        .package(url: "https://github.com/swift-compositions/swift-file-system.git", branch: "main"),
+        .package(url: "https://github.com/swift-standards/swift-fips-180-4.git", branch: "main"),
+        .package(url: "https://github.com/swift-atoms/swift-standard-library-extensions.git", branch: "main"),
     ],
     targets: [
         .target(
@@ -80,6 +85,21 @@ let package = Package(
                 .product(name: "W3C PNG", package: "swift-w3c-png", condition: .when(traits: ["PNG"])),
             ]
         ),
+        .target(
+            name: "Picture Store",
+            dependencies: [
+                .target(name: "Picture"),
+                .target(name: "Picture CPU"),
+                .product(name: "Byte", package: "swift-byte"),
+                .product(name: "File System", package: "swift-file-system", condition: .when(traits: ["Store"])),
+                .product(name: "FIPS 180-4", package: "swift-fips-180-4", condition: .when(traits: ["Store"])),
+                .product(
+                    name: "Standard Library Extensions",
+                    package: "swift-standard-library-extensions",
+                    condition: .when(traits: ["Store"])
+                ),
+            ]
+        ),
         .testTarget(
             name: "Picture Tests",
             dependencies: [
@@ -93,6 +113,15 @@ let package = Package(
             dependencies: [
                 .target(name: "Picture CPU"),
                 .product(name: "Numeric", package: "swift-numeric"),
+            ]
+        ),
+        .testTarget(
+            name: "Picture Store Tests",
+            dependencies: [
+                .target(name: "Picture Store"),
+                .target(name: "Picture CPU"),
+                .product(name: "Byte", package: "swift-byte"),
+                .product(name: "File System", package: "swift-file-system"),
             ]
         ),
         .testTarget(
