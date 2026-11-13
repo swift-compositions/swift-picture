@@ -1,6 +1,6 @@
 public import Vector
 
-extension Picture.Scene.Material.Glass {
+extension Picture.Glass {
     /// What is around a scene for its glass to mirror, and to show where light leaves it too far aside to meet
     /// the picture behind: one colour overhead and one underfoot, running into each other at the horizon.
     public struct Surroundings: Sendable, Hashable {
@@ -23,7 +23,7 @@ extension Picture.Scene.Material.Glass {
     }
 }
 
-extension Picture.Scene.Material.Glass.Surroundings {
+extension Picture.Glass.Surroundings {
     /// How much of `above` a direction shows, 0 straight down to 1 straight up, level at both ends: for a
     /// direction whose unit length has the height h, s²(3 - 2s) with s = (h + 1) / 2. A half for no direction.
     public static func share(toward direction: Vector<3, Double>) -> Double {

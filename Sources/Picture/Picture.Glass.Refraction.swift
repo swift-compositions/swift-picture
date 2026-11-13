@@ -1,6 +1,6 @@
 public import Vector
 
-extension Picture.Scene.Material.Glass {
+extension Picture.Glass {
     /// Glass with a body: light bends where it goes into the surface and again where it comes out of the far
     /// side, so what is seen through a round body is turned over and squeezed toward its edges; the edges
     /// mirror their surroundings more than they pass; and the colours part a little where the bend is strong.
@@ -12,31 +12,61 @@ extension Picture.Scene.Material.Glass {
         /// along the eye's line of sight.
         public var distance: Double
 
-        /// How much the index differs between colours: red is bent by `index - dispersion`, green by `index`
-        /// and blue by `index + dispersion`.
-        public var dispersion: Double
+        /// How little the index differs between wavelengths: the Abbe number V = (n_d − 1) / (n_F − n_C), about
+        /// 60 for crown glass, 30 for dense flint and 17 for the most dispersive optical glass; lower parts the
+        /// colours more. Infinite, the default, is one index for every wavelength.
+        public var abbe: Double
 
         /// What the surface mirrors, by the share Fresnel's equations give, or nothing.
-        public var surroundings: Picture.Scene.Material.Glass.Surroundings?
+        public var surroundings: Picture.Glass.Surroundings?
 
         public init(
             index: Double = 1.5,
             distance: Double = 1,
-            dispersion: Double = 0,
-            surroundings: Picture.Scene.Material.Glass.Surroundings? = nil
+            abbe: Double = .infinity,
+            surroundings: Picture.Glass.Surroundings? = nil
         ) {
             self.index = index
             self.distance = distance
-            self.dispersion = dispersion
+            self.abbe = abbe
             self.surroundings = surroundings
         }
     }
 }
 
-extension Picture.Scene.Material.Glass.Refraction {
-    /// The index each colour is bent by, red, green and blue in order, none below 1.
-    public var indices: InlineArray<3, Double> {
-        [Swift.max(index - dispersion, 1), Swift.max(index, 1), Swift.max(index + dispersion, 1)]
+extension Picture.Glass.Refraction {
+    /// The Fraunhofer lines the Abbe number is defined at, in nanometres: d (helium, yellow), F (hydrogen, blue)
+    /// and C (hydrogen, red).
+    public static let lines: (d: Double, F: Double, C: Double) = (587.56, 486.13, 656.27)
+
+    /// The index at a wavelength in nanometres, by Cauchy's law n(λ) = A + B / λ²: B makes n_F − n_C equal
+    /// (index − 1) / abbe and A makes n_d equal `index`. So the index at the d line is `index` exactly, shorter
+    /// wavelengths bend more, and an infinite Abbe number, or one that is not positive, gives `index` at every
+    /// wavelength. Never below 1.
+    public func index(at wavelength: Double) -> Double {
+        let n = Swift.max(index, 1)
+        guard abbe.isFinite, abbe > 0, wavelength > 0, wavelength.isFinite else { return n }
+        let lines = Self.lines
+        let b = (n - 1) / abbe / (1 / (lines.F * lines.F) - 1 / (lines.C * lines.C))
+        return Swift.max(n + b * (1 / (wavelength * wavelength) - 1 / (lines.d * lines.d)), 1)
+    }
+
+    /// For red, green and blue, the mean over the spectrum of how far light bends compared with light of the
+    /// glass's own index: Σ w(λ) (n(λ) − 1) / (index − 1) over `Picture.Glass.Spectrum(count: 32)` with that
+    /// colour's weights w. All three are 1 for an infinite Abbe number or an index of 1; with dispersion blue's is
+    /// above 1 and red's below. `Picture.Glass.Shading.lit(_:facing:tilts:)` leans each colour's sheen by them.
+    public var tilts: InlineArray<3, Double> {
+        let n = Swift.max(index, 1)
+        guard abbe.isFinite, abbe > 0, n > 1 else { return [1, 1, 1] }
+        let spectrum = Picture.Glass.Spectrum(count: 32)
+        var sums = InlineArray<3, Double>(repeating: 0)
+        for (wavelength, weight) in zip(spectrum.wavelengths, spectrum.weights) {
+            let ratio = (index(at: wavelength) - 1) / (n - 1)
+            sums[0] += Double(weight.red) * ratio
+            sums[1] += Double(weight.green) * ratio
+            sums[2] += Double(weight.blue) * ratio
+        }
+        return sums
     }
 
     /// A unit direction after it crosses a surface, by Snell's law: `ratio` is the index of the side it comes

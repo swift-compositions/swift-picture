@@ -385,11 +385,16 @@ extension Picture.Renderer.CPU.Canvas {
             }
         }
         guard !stage.glass.isEmpty else { return }
-        let before = raster
-        let origin = box
+        let before = self
+        let scale = abs(state.transform[0, 0] * state.transform[1, 1] - state.transform[0, 1] * state.transform[1, 0]).squareRoot()
+        var frosts: [Double: Picture.Renderer.CPU.Frost] = [:]
+        for surface in stage.surfaces where frosts[surface.glass.frost] == nil {
+            frosts[surface.glass.frost] = Picture.Renderer.CPU.Frost(before, over: before.box, deviation: surface.glass.frost * scale, state.workers)
+        }
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
         let eyes = scene.models.map { scene.camera.eye(of: $0.transform) }
         let shadings = stage.surfaces.map { $0.glass.shading }
+        let tilts = stage.surfaces.map { $0.glass.refraction?.tilts ?? [1, 1, 1] }
         let lens = Picture.Renderer.CPU.Lens(scene, state.transform)
         let far = Picture.Renderer.CPU.Far(stage, eyes: eyes, over: area)
         unsafe tiles(glass.count, state.workers) { shared, box, part in
@@ -409,6 +414,11 @@ extension Picture.Renderer.CPU.Canvas {
                 let surface = stage.surfaces[hit.triangle]
                 let normal = Picture.Scene.Camera.direction(surface.normal(hit.weights), through: eyes[surface.model])
                 let shading = shadings[hit.triangle]
+                let frost = frosts[surface.glass.frost]
+                let frosting = Picture.Glass.frosting(facing: normal)
+                func read(_ x: Double, _ y: Double) -> Picture.Pixel {
+                    frost?.read(x, y, frosting: frosting) ?? .transparent
+                }
                 if let refraction = surface.glass.refraction {
                     let passage = Picture.Renderer.CPU.Passage(
                         from: surface.place(hit.weights),
@@ -421,20 +431,19 @@ extension Picture.Renderer.CPU.Canvas {
                         lens: lens,
                         far: far
                     )
-                    let reads = passage.reads
-                    let behind: InlineArray<3, Picture.Pixel> = [
-                        Self.sample(before, origin, reads[0].x, reads[0].y, edge: .extend),
-                        Self.sample(before, origin, reads[1].x, reads[1].y, edge: .extend),
-                        Self.sample(before, origin, reads[2].x, reads[2].y, edge: .extend),
-                    ]
+                    let behind = Picture.Renderer.CPU.Spectra.pixel(refraction, read: { index in
+                        let at = passage.read(for: index, lens: lens)
+                        return (at.x, at.y)
+                    }) { read($0, $1) }
                     return shading.pixel(
-                        over: behind,
+                        over: [behind, behind, behind],
                         through: passage.length,
                         leaving: passage.leaving,
                         beyond: passage.beyond,
                         mirroring: passage.mirrored,
                         by: passage.share,
-                        facing: normal
+                        facing: normal,
+                        tilts: tilts[hit.triangle]
                     )
                 }
                 let offset = surface.glass.offset(for: normal)
@@ -444,7 +453,7 @@ extension Picture.Renderer.CPU.Canvas {
                     x: Double(x) + (Double(column % samples) + 0.5) / Double(samples) + across,
                     y: Double(y) + (Double(row % samples) + 0.5) / Double(samples) + down
                 )
-                return shading.pixel(over: Self.sample(before, origin, point.x, point.y, edge: .extend), facing: normal)
+                return shading.pixel(over: read(point.x, point.y), facing: normal)
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }

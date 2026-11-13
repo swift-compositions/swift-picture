@@ -122,35 +122,35 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
 
     @Test
     func `Glass reads the picture behind it aside by its bend times the normal's x and minus its y`() {
-        let glass = Picture.Scene.Material.Glass(bend: 20)
+        let glass = Picture.Glass(bend: 20)
         #expect(glass.tint == .clear)
         #expect(glass.offset(for: Vector([0, 0, 1])) == .zero)
         #expect(glass.offset(for: Vector([1, 0, 0])) == Vector([20, 0]))
         #expect(glass.offset(for: Vector([0, 1, 0])) == Vector([0, -20]))
         #expect(glass.offset(for: Vector([0.6, -0.8, 0])) == Vector([12, 16]))
-        #expect(Picture.Scene.Material.Glass(bend: 0).offset(for: Vector([0.6, -0.8, 0])) == .zero)
+        #expect(Picture.Glass(bend: 0).offset(for: Vector([0.6, -0.8, 0])) == .zero)
     }
 
     @Test
     func `Glass shows what it reads under a coat of its tint`() {
         let behind = Tests.pixel(0.25, 0.5, 0.75, 1)
-        #expect(Picture.Scene.Material.Glass(bend: 20).pixel(over: behind) == behind)
-        #expect(Picture.Scene.Material.Glass(bend: 20).pixel(over: .transparent) == .transparent)
-        let tinted = Picture.Scene.Material.Glass(bend: 20, tint: .init(red: 1, green: 0, blue: 0, alpha: 0.5))
+        #expect(Picture.Glass(bend: 20).pixel(over: behind) == behind)
+        #expect(Picture.Glass(bend: 20).pixel(over: .transparent) == .transparent)
+        let tinted = Picture.Glass(bend: 20, tint: .init(red: 1, green: 0, blue: 0, alpha: 0.5))
         #expect(tinted.pixel(over: behind) == Tests.pixel(0.625, 0.25, 0.375, 1))
-        #expect(Picture.Scene.Material.Glass(bend: 20, tint: .black).pixel(over: behind) == Tests.pixel(0, 0, 0, 1))
+        #expect(Picture.Glass(bend: 20, tint: .black).pixel(over: behind) == Tests.pixel(0, 0, 0, 1))
     }
 
     @Test
     func `A light on glass is brightest where the surface faces halfway between the light and the eye`() {
-        let light = Picture.Scene.Material.Glass.Light(direction: Vector([0, 0, 1]), gloss: 10, rim: 0)
+        let light = Picture.Glass.Light(direction: Vector([0, 0, 1]), gloss: 10, rim: 0)
         #expect(Tests.close(light.reflection(for: Vector([0, 0, 1])), 1))
         #expect(Tests.close(light.reflection(for: Vector([0, 0, -3])), 1))
         #expect(light.reflection(for: Vector([0.6, 0, 0.8])) < 1)
         #expect(Tests.close(light.reflection(for: Vector([0.6, 0, 0.8])), 0.107_374_182_4))
         #expect(light.reflection(for: Vector([1, 0, 0])) == 0)
         #expect(light.reflection(for: .zero) == 0)
-        let side = Picture.Scene.Material.Glass.Light(direction: Vector([1, 0, 1]), gloss: 40, rim: 0)
+        let side = Picture.Glass.Light(direction: Vector([1, 0, 1]), gloss: 40, rim: 0)
         let half = Vector<3, Double>([0.382_683_432_365_089_8, 0, 0.923_879_532_511_286_7])
         #expect(Tests.close(side.reflection(for: half), 1))
         #expect(side.reflection(for: Vector([0, 0, 1])) < side.reflection(for: half))
@@ -158,11 +158,11 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
 
     @Test
     func `A light's rim grows as the surface turns edge-on to the eye, and the share stays within 0 and 1`() {
-        let rim = Picture.Scene.Material.Glass.Light(direction: Vector([0, 1, 0]), gloss: 1000, rim: 0.5)
+        let rim = Picture.Glass.Light(direction: Vector([1, 0, -1]), gloss: 1000, rim: 0.5, counter: 1)
         #expect(Tests.close(rim.reflection(for: Vector([0, 0, 1])), 0))
         #expect(Tests.close(rim.reflection(for: Vector([0.8, 0, 0.6])), 0.5 * 0.4 * 0.4 * 0.4))
         #expect(Tests.close(rim.reflection(for: Vector([-1, 0, 0])), 0.5))
-        let both = Picture.Scene.Material.Glass.Light(direction: Vector([0, 0, 1]), gloss: 0, rim: 1)
+        let both = Picture.Glass.Light(direction: Vector([0, 0, 1]), gloss: 0, rim: 1)
         #expect(both.reflection(for: Vector([0.8, 0, 0.6])) == 1)
     }
 
@@ -170,11 +170,11 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
     func `Lit glass adds its light's colour by the share it reflects, and unlit glass is its tint alone`() {
         let behind = Tests.pixel(0.25, 0.5, 0.75, 1)
         let normal = Vector<3, Double>([0.6, 0, 0.8])
-        let plain = Picture.Scene.Material.Glass(bend: 20)
+        let plain = Picture.Glass(bend: 20)
         #expect(plain.light == nil)
         #expect(plain.pixel(over: behind, facing: normal) == behind)
-        let light = Picture.Scene.Material.Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, rim: 0)
-        let lit = Picture.Scene.Material.Glass(bend: 20, light: light)
+        let light = Picture.Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, rim: 0)
+        let lit = Picture.Glass(bend: 20, light: light)
         let share = Float(light.reflection(for: normal))
         #expect(lit.pixel(over: behind, facing: normal) == Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: behind, operator: .lighter, coverage: share))
         #expect(lit.pixel(over: behind, facing: Vector([1, 0, 0])) == behind)
@@ -208,10 +208,10 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
         for normal in normals {
             #expect(Picture.Scene.Camera.direction(normal, through: eye) == camera.direction(normal, in: model))
         }
-        let light = Picture.Scene.Material.Glass.Light(direction: Vector([0.3, 0.5, 1]), color: .init(red: 1, green: 0.9, blue: 0.7), gloss: 30, rim: 0.6)
+        let light = Picture.Glass.Light(direction: Vector([0.3, 0.5, 1]), color: .init(red: 1, green: 0.9, blue: 0.7), gloss: 30, rim: 0.6)
         let glasses = [
-            Picture.Scene.Material.Glass(bend: 20, tint: .init(red: 1, green: 0.4, blue: 0.2, alpha: 0.3), light: light),
-            Picture.Scene.Material.Glass(bend: 20, tint: .init(red: 0.2, green: 0.4, blue: 1, alpha: 0.6)),
+            Picture.Glass(bend: 20, tint: .init(red: 1, green: 0.4, blue: 0.2, alpha: 0.3), light: light),
+            Picture.Glass(bend: 20, tint: .init(red: 0.2, green: 0.4, blue: 1, alpha: 0.6)),
         ]
         let behind = Picture.Pixel(color: .init(red: 0.2, green: 0.3, blue: 0.1), alpha: 0.8)
         for glass in glasses {

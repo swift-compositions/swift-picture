@@ -8,8 +8,8 @@ extension `Picture Tests` {
 
 extension `Picture Tests`.`Glass with a body bends light going in and coming out` {
     typealias Tests = `Picture Tests`
-    typealias Glass = Picture.Scene.Material.Glass
-    typealias Refraction = Picture.Scene.Material.Glass.Refraction
+    typealias Glass = Picture.Glass
+    typealias Refraction = Picture.Glass.Refraction
 
     static func close(_ a: Vector<3, Double>, _ b: Vector<3, Double>, within tolerance: Double = 1e-12) -> Bool {
         Tests.close(a[0], b[0], within: tolerance) && Tests.close(a[1], b[1], within: tolerance) && Tests.close(a[2], b[2], within: tolerance)
@@ -63,21 +63,56 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
     }
 
     @Test
-    func `Red is bent least and blue most, and no colour by an index below one`() {
-        let glass = Refraction(index: 1.5, dispersion: 0.25)
-        #expect(glass.indices[0] == 1.25)
-        #expect(glass.indices[1] == 1.5)
-        #expect(glass.indices[2] == 1.75)
+    func `The index follows Cauchy's law through the glass's own index at the d line and its Abbe number`() {
+        let glass = Refraction(index: 1.5, abbe: 30)
+        let lines = Refraction.lines
+        #expect(Tests.close(glass.index(at: lines.d), 1.5, within: 1e-12))
+        #expect(Tests.close(glass.index(at: lines.F) - glass.index(at: lines.C), 0.5 / 30, within: 1e-12))
+        #expect(glass.index(at: 420) > glass.index(at: 520))
+        #expect(glass.index(at: 520) > glass.index(at: 680))
         let plain = Refraction()
-        #expect(plain.index == 1.5 && plain.distance == 1 && plain.dispersion == 0 && plain.surroundings == nil)
-        #expect(plain.indices[0] == 1.5 && plain.indices[2] == 1.5)
-        let thin = Refraction(index: 1.1, dispersion: 0.3)
-        #expect(thin.indices[0] == 1)
+        #expect(plain.index == 1.5 && plain.distance == 1 && plain.abbe == .infinity && plain.surroundings == nil)
+        #expect(plain.index(at: 420) == 1.5 && plain.index(at: 680) == 1.5)
+        #expect(Refraction(index: 1.01, abbe: 0.01).index(at: 700) == 1)
         let normal = Vector<3, Double>([0, 0, 1])
         let slanted = Vector<3, Double>([0.6, 0, -0.8])
-        let red = Refraction.bent(slanted, at: normal, ratio: 1 / glass.indices[0])
-        let blue = Refraction.bent(slanted, at: normal, ratio: 1 / glass.indices[2])
+        let red = Refraction.bent(slanted, at: normal, ratio: 1 / glass.index(at: 680))
+        let blue = Refraction.bent(slanted, at: normal, ratio: 1 / glass.index(at: 420))
         #expect((red?[0] ?? 0) > (blue?[0] ?? 1))
+    }
+
+    @Test
+    func `A spectrum's weights gather white back to white, and one wavelength is the plain bend`() {
+        for count in [2, 3, 5, 7, 12, 32] {
+            let spectrum = Picture.Glass.Spectrum(count: count)
+            #expect(spectrum.wavelengths.count == count)
+            #expect(spectrum.wavelengths == spectrum.wavelengths.sorted())
+            let sums = spectrum.weights.reduce((Float(0), Float(0), Float(0))) { ($0.0 + $1.red, $0.1 + $1.green, $0.2 + $1.blue) }
+            #expect(Tests.close(sums.0, 1, within: 1e-5) && Tests.close(sums.1, 1, within: 1e-5) && Tests.close(sums.2, 1, within: 1e-5))
+            let white = Picture.Color.white.pixel
+            #expect(Tests.close(spectrum.gathered(Array(repeating: white, count: count)), white, within: 1e-5))
+        }
+        let one = Picture.Glass.Spectrum(count: 1)
+        #expect(one.wavelengths == [Refraction.lines.d])
+        #expect(one.weights == [.init(red: 1, green: 1, blue: 1)])
+        let seven = Picture.Glass.Spectrum(count: 7)
+        #expect(seven.weights[0].blue > seven.weights[0].red)
+        #expect(seven.weights[6].red > seven.weights[6].blue)
+        #expect(Picture.Glass.Spectrum.count(for: 0) == 1)
+        #expect(Picture.Glass.Spectrum.count(for: 10) == 12)
+        #expect(Picture.Glass.Spectrum.count(for: 1000) == 32)
+    }
+
+    @Test
+    func `With dispersion blue's sheen leans further than red's, and without it every colour's is the glass's`() {
+        #expect(Refraction(index: 1.5).tilts[0] == 1 && Refraction(index: 1.5).tilts[2] == 1)
+        let tilts = Refraction(index: 1.5, abbe: 20).tilts
+        #expect(tilts[2] > tilts[1] && tilts[1] > tilts[0])
+        #expect(abs(tilts[1] - 1) < 0.03)
+        let light = Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, highlight: 0, rim: 1, sharpness: 4)
+        let normal = Vector<3, Double>([0, 0.6, 0.8])
+        #expect(light.reflection(for: normal, tilt: 1) == light.reflection(for: normal))
+        #expect(light.reflection(for: normal, tilt: 1.2) > light.reflection(for: normal))
     }
 
     @Test

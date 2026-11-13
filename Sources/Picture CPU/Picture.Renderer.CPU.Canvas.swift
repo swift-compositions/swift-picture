@@ -165,6 +165,7 @@ extension Picture.Renderer.CPU.Canvas {
             case .scene(let scene): draw(scene, state)
             case .group(let group): try draw(group, state)
             case .layer(let layer): try draw(layer, state)
+            case .pane(let pane): draw(pane, state)
             }
         }
     }
@@ -312,6 +313,9 @@ extension Picture.Renderer.CPU.Canvas {
 
         case .scene:
             return nil
+
+        case .pane(let pane):
+            return Picture.Renderer.CPU.Slab.bounds(of: pane, transform)
 
         case .group(let group):
             let inner = transform.multiplied(by: group.transform)

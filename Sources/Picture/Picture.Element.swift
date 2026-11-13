@@ -17,6 +17,9 @@ extension Picture {
 
         /// A picture drawn on its own, changed by effects, and then put onto what is behind as one.
         case layer(Layer)
+
+        /// A flat pane of glass over what is behind it.
+        case pane(Glass.Pane)
     }
 }
 

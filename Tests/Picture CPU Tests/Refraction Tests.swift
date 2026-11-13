@@ -11,7 +11,7 @@ extension `Picture CPU Tests` {
 extension `Picture CPU Tests`.`A renderer draws glass with a body by the way light takes through it` {
     typealias Tests = `Picture CPU Tests`
     typealias Vertex = Point<3, Double>
-    typealias Glass = Picture.Scene.Material.Glass
+    typealias Glass = Picture.Glass
 
     /// An orthographic camera over x −2…2 and y −2…2 into a viewport of 40 × 40, depth 0 at z 0 and 1 at z −10.
     static func flat(_ models: [Picture.Scene.Model]) throws -> Picture.Scene {
@@ -97,24 +97,42 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
     }
 
     @Test
-    func `With a dispersion red and blue read apart and green stays where it was`() throws {
+    func `Glass with a body takes the same frost and adaptation as a pane`() throws {
+        let stripes: [Picture.Element] = [Tests.fill(Tests.rectangle(-40, -40, 120, 120), .black)]
+            + stride(from: -40.0, to: 80, by: 4).map { Tests.fill(Tests.rectangle($0, -40, 2, 120), .white) }
+        func drawn(_ glass: Glass) throws -> Tests.Canvas {
+            try Tests.drawn(Picture(stripes + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
+        }
+        let clear = try drawn(.init(refraction: .init(index: 1)))
+        let frosted = try drawn(.init(refraction: .init(index: 1), frost: 3))
+        let sharp = (17..<23).map { Tests.at(clear, UInt($0), 20).color.red }
+        let soft = (17..<23).map { Tests.at(frosted, UInt($0), 20).color.red }
+        #expect(sharp.max()! - sharp.min()! > 0.7)
+        #expect(soft.max()! - soft.min()! < 0.2)
+        let lifted = try drawn(.init(refraction: .init(index: 1), frost: 3, adaptation: .init(toward: .white, strength: 0.5)))
+        #expect(Tests.at(lifted, 20, 20).color.red > Tests.at(frosted, 20, 20).color.red)
+    }
+
+    @Test
+    func `With dispersion a ball fans a white line into colours, and keeps a white backdrop white`() throws {
         let stripes: [Picture.Element] = [
             Tests.fill(Tests.rectangle(-40, -40, 120, 120), .black),
             Tests.fill(Tests.rectangle(18, -40, 4, 120), .white),
         ]
-        func drawn(_ dispersion: Double) throws -> Tests.Canvas {
-            let ball = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: 4, dispersion: dispersion)))
-            return try Tests.drawn(Picture(stripes + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
+        func drawn(_ abbe: Double, over picture: [Picture.Element]) throws -> Tests.Canvas {
+            let ball = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: 4, abbe: abbe)))
+            return try Tests.drawn(Picture(picture + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
         }
-        let one = try drawn(0)
-        let split = try drawn(0.2)
+        let one = try drawn(.infinity, over: stripes)
+        let split = try drawn(10, over: stripes)
         var apart = false
         for (a, b) in zip(one.pixels, split.pixels) {
-            #expect(abs(a.color.green - b.color.green) <= 1e-5)
             #expect(abs(a.color.red - a.color.green) <= 1e-5 && abs(a.color.blue - a.color.green) <= 1e-5)
             if abs(b.color.red - b.color.blue) > 0.2 { apart = true }
         }
         #expect(apart)
+        let white = [Tests.fill(Tests.rectangle(-40, -40, 120, 120), .white)]
+        #expect(Tests.close(try drawn(10, over: white), try drawn(.infinity, over: white), within: 2e-5))
     }
 
     @Test

@@ -11,6 +11,6 @@ extension Picture.Scene {
         case points(Picture.Color, radius: Double)
 
         /// Every face showing what is behind it, bent by the surface.
-        case glass(Glass)
+        case glass(Picture.Glass)
     }
 }

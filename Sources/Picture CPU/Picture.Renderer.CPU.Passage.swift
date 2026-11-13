@@ -1,16 +1,28 @@
 import Picture
 
 extension Picture.Renderer.CPU {
-    /// What light does at one point of glass with a body: where in the raster each colour reads the picture
-    /// behind after going in at the point and out of the far side, the direction the surface mirrors there, and
-    /// the share of light it mirrors.
+    /// What light does at one point of glass with a body: the way light of the glass's own index takes in at the
+    /// point and out of the far side, from which `read(for:)` finds where light of any index reads the picture
+    /// behind; the direction the surface mirrors there, and the share of light it mirrors.
     struct Passage {
-        var reads: InlineArray<3, Read>
+        let place: Vector<3, Double>
+        let sight: Vector<3, Double>
+        let toward: Vector<3, Double>
+
+        /// The far side's normal where the light leaves, or none where no far side is found.
+        let exit: Vector<3, Double>?
+        let point: Read
+        let own: (x: Double, y: Double)?
+        let distance: Double
+
+        /// Where light of the glass's own index reads the picture.
+        var read: Read
 
         /// How far the light travels inside the body, in the scene's units.
         var length: Double
 
-        /// The direction green light leaves the far side in, and the share of it that misses the picture behind.
+        /// The direction light of the glass's own index leaves the far side in, and the share of it that misses
+        /// the picture behind.
         var leaving: Vector<3, Double>
         var beyond: Double
         var mirrored: Vector<3, Double>
@@ -24,41 +36,36 @@ extension Picture.Renderer.CPU.Passage {
     /// body's thickness along the line of sight and is corrected three times to end at the far side's depth
     /// where the path's end is drawn. There the light is bent out again by the far side's normal, or mirrored
     /// back in where none can leave, and reads the picture where it meets a plane the refraction's distance
-    /// behind. Green finds the way; red and blue follow paths of the same length under their own indices.
-    /// Where no far side is found the light goes straight on, and a place that cannot be drawn reads at `point`.
-    /// Places are drawn relative to where `place` itself is drawn, so that light going straight on reads at
-    /// `point` exactly.
+    /// behind. Light of the glass's own index finds the way; light of any other index, `read(for:lens:)`, follows
+    /// a path of the same length under its own. Where no far side is found the light goes straight on, and a
+    /// place that cannot be drawn reads at `point`. Places are drawn relative to where `place` itself is drawn,
+    /// so that light going straight on reads at `point` exactly.
     init(
         from place: Vector<3, Double>,
         normal: Vector<3, Double>,
         at point: Read,
-        through refraction: Picture.Scene.Material.Glass.Refraction,
+        through refraction: Picture.Glass.Refraction,
         lens: Picture.Renderer.CPU.Lens,
         far: Picture.Renderer.CPU.Far
     ) {
         let sight = lens.sight(through: place)
         let toward = Self.dot(normal, sight) > 0 ? Self.scaled(normal, -1) : normal
         let cosine = -Self.dot(sight, toward)
-        let indices = refraction.indices
-        let inner = Picture.Scene.Material.Glass.Refraction.bent(sight, at: toward, ratio: 1 / indices[1]) ?? sight
-
+        let index = Swift.max(refraction.index, 1)
+        let inner = Picture.Glass.Refraction.bent(sight, at: toward, ratio: 1 / index) ?? sight
         let own = lens.raster(of: place)
-        func drawn(_ end: Vector<3, Double>) -> Read? {
-            guard let own, let there = lens.raster(of: end) else { return nil }
-            return Read(x: point.x + there.x - own.x, y: point.y + there.y - own.y)
-        }
 
         var length = 0.0
-        var leaving: Vector<3, Double>?
+        var exit: Vector<3, Double>?
         if sight[2] < 0, let first = far.read(point.x, point.y) {
             length = Swift.max((first.depth - place[2]) / sight[2], 0)
-            leaving = first.normal
+            exit = first.normal
         }
-        if leaving != nil, inner[2] < 0 {
+        if exit != nil, inner[2] < 0 {
             var step = 0
             while step < 4 {
-                guard let end = drawn(Self.along(place, inner, length)), let found = far.read(end.x, end.y) else { break }
-                leaving = found.normal
+                guard let end = Self.drawn(Self.along(place, inner, length), own, point, lens), let found = far.read(end.x, end.y) else { break }
+                exit = found.normal
                 guard step < 3 else { break }
                 let next = (found.depth - place[2]) / inner[2]
                 guard next.isFinite else { break }
@@ -66,33 +73,43 @@ extension Picture.Renderer.CPU.Passage {
                 step += 1
             }
         }
-
-        var reads = InlineArray<3, Read>(repeating: point)
-        var away = sight
-        var channel = 0
-        while channel < 3 {
-            let within = channel == 1 ? inner : Picture.Scene.Material.Glass.Refraction.bent(sight, at: toward, ratio: 1 / indices[channel]) ?? sight
-            var out = within
-            if let leaving {
-                let against = Self.dot(leaving, within) > 0 ? Self.scaled(leaving, -1) : leaving
-                out =
-                    Picture.Scene.Material.Glass.Refraction.bent(within, at: against, ratio: indices[channel])
-                    ?? Picture.Scene.Material.Glass.Refraction.mirrored(within, at: against)
-            }
-            if channel == 1 { away = out }
-            let reach = refraction.distance / Swift.max(-out[2], 0.05)
-            let end = Self.along(Self.along(place, within, length), out, reach)
-            if let read = drawn(end) { reads[channel] = read }
-            channel += 1
-        }
-        self.init(
-            reads: reads,
-            length: length,
-            leaving: away,
-            beyond: refraction.surroundings?.share(leaving: away, along: sight) ?? 0,
-            mirrored: Picture.Scene.Material.Glass.Refraction.mirrored(sight, at: toward),
+        var passage = Self(
+            place: place, sight: sight, toward: toward, exit: exit, point: point, own: own,
+            distance: refraction.distance, read: point, length: length, leaving: sight, beyond: 0,
+            mirrored: Picture.Glass.Refraction.mirrored(sight, at: toward),
             share: refraction.surroundings == nil ? 0 : refraction.reflectance(cosine: cosine)
         )
+        let way = passage.way(for: index, lens: lens)
+        passage.read = way.read ?? point
+        passage.leaving = way.out
+        passage.beyond = refraction.surroundings?.share(leaving: way.out, along: sight) ?? 0
+        self = passage
+    }
+
+    /// Where light of an index reads the picture: bent in by it, along the path's length, bent out by it.
+    func read(for index: Double, lens: Picture.Renderer.CPU.Lens) -> Read {
+        way(for: index, lens: lens).read ?? point
+    }
+
+    func way(for index: Double, lens: Picture.Renderer.CPU.Lens) -> (read: Read?, out: Vector<3, Double>) {
+        let n = Swift.max(index, 1)
+        let within = Picture.Glass.Refraction.bent(sight, at: toward, ratio: 1 / n) ?? sight
+        var out = within
+        if let exit {
+            let against = Self.dot(exit, within) > 0 ? Self.scaled(exit, -1) : exit
+            out =
+                Picture.Glass.Refraction.bent(within, at: against, ratio: n)
+                ?? Picture.Glass.Refraction.mirrored(within, at: against)
+        }
+        let reach = distance / Swift.max(-out[2], 0.05)
+        let end = Self.along(Self.along(place, within, length), out, reach)
+        return (Self.drawn(end, own, point, lens), out)
+    }
+
+    /// Where a place in eye space is drawn, relative to where the passage's own place is drawn.
+    static func drawn(_ end: Vector<3, Double>, _ own: (x: Double, y: Double)?, _ point: Read, _ lens: Picture.Renderer.CPU.Lens) -> Read? {
+        guard let own, let there = lens.raster(of: end) else { return nil }
+        return Read(x: point.x + there.x - own.x, y: point.y + there.y - own.y)
     }
 
     static func dot(_ a: Vector<3, Double>, _ b: Vector<3, Double>) -> Double {

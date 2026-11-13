@@ -116,7 +116,7 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
             vertices: [Vertex([-1, -1, -5]), Vertex([1, -1, -5 + 2 * tilt]), Vertex([1, 1, -5 + 2 * tilt]), Vertex([-1, 1, -5])],
             faces: [Polygon(0, 1, 2, 3)]
         )
-        let glass = Picture.Scene.Material.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25))
+        let glass = Picture.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25))
         let cover = Picture.Scene.Model(try Self.square(0.75, 0, -2, side: 1), material: .flat(.white))
         let scene = try Self.flat([.init(pane, material: .glass(glass)), cover])
         let raster = try Tests.drawn([background, .scene(scene)], on: Tests.canvas(40, 40))
@@ -145,8 +145,8 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
             vertices: [Vertex([-1, -1, -5]), Vertex([1, -1, -5 + 2 * tilt]), Vertex([1, 1, -5 + 2 * tilt]), Vertex([-1, 1, -5])],
             faces: [Polygon(0, 1, 2, 3)]
         )
-        let light = Picture.Scene.Material.Glass.Light(direction: Vector([-1, 0.5, 1]), color: .white, gloss: 3, rim: 0.4)
-        let glass = Picture.Scene.Material.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25), light: light)
+        let light = Picture.Glass.Light(direction: Vector([-1, 0.5, 1]), color: .white, gloss: 3, rim: 0.4)
+        let glass = Picture.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25), light: light)
         let raster = try Tests.drawn([background, .scene(try Self.flat([.init(pane, material: .glass(glass))]))], on: Tests.canvas(40, 40))
         let length = (1 + tilt * tilt).squareRoot()
         let normal = Vector<3, Double>([-tilt / length, 0, 1 / length])

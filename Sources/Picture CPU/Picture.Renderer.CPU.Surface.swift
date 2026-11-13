@@ -6,7 +6,7 @@ extension Picture.Renderer.CPU {
     /// place in eye space, and whether the triangle faces the eye.
     struct Surface {
         let model: Int
-        let glass: Picture.Scene.Material.Glass
+        let glass: Picture.Glass
         let normals: InlineArray<3, Vector<3, Double>>
         let divisors: InlineArray<3, Double>
         let places: InlineArray<3, Vector<3, Double>>

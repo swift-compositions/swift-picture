@@ -145,7 +145,7 @@ extension Picture.Renderer.CPU {
 
             case .layer(let layer): images(of: layer.content, body)
 
-            case .sprites, .scene: break
+            case .sprites, .scene, .pane: break
             }
         }
     }
@@ -169,7 +169,7 @@ extension Picture.Renderer.CPU {
                     layer.content = mapped(layer.content, change)
                     return .layer(layer)
 
-                case .sprites, .scene:
+                case .sprites, .scene, .pane:
                     return element
                 }
             }
