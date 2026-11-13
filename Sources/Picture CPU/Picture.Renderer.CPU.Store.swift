@@ -46,7 +46,9 @@ extension Picture.Renderer.CPU.Store {
     /// A picture with every image that names its picture given its pixels: each distinct source is taken
     /// from the store or drawn, the ones to draw side by side on the workers, and what is drawn is kept.
     /// A source is drawn exactly as `Picture.Image.Source.raster(through:)` draws it through this renderer,
-    /// and a source inside a source is drawn the same way first.
+    /// and a source inside a source is drawn the same way first. Each raster is kept as soon as it is drawn and
+    /// the store is asked again just before a source is drawn, so a source that another source of the same
+    /// picture also names is drawn once when the two are not drawn at the same moment.
     func resolved(_ picture: Picture, _ workers: Picture.Renderer.CPU.Workers) throws(Picture.Renderer.Error) -> Picture {
         var places: [Key: Int] = [:]
         var keys: [Key] = []
@@ -69,19 +71,24 @@ extension Picture.Renderer.CPU.Store {
             let renderer = Picture.Renderer.cpu(Picture.Renderer.CPU.Workers(count: Swift.max(1, workers.count / missing.count)), self)
             let drawn = Mutex([Result<Raster<Picture.Pixel>, Picture.Renderer.Error>?](repeating: nil, count: missing.count))
             workers.run(missing.count) { part in
+                let key = keys[missing[part]]
                 let result: Result<Raster<Picture.Pixel>, Picture.Renderer.Error>
-                do throws(Picture.Renderer.Error) {
-                    result = .success(try keys[missing[part]].source.raster(through: renderer))
-                } catch {
-                    result = .failure(error)
+                if let kept = raster(for: key) {
+                    result = .success(kept)
+                } else {
+                    do throws(Picture.Renderer.Error) {
+                        let raster = try key.source.raster(through: renderer)
+                        keep(raster, for: key)
+                        result = .success(raster)
+                    } catch {
+                        result = .failure(error)
+                    }
                 }
                 drawn.withLock { $0[part] = result }
             }
             for (place, result) in zip(missing, drawn.withLock { $0 }) {
                 guard let result else { throw .unsupported }
-                let raster = try result.get()
-                rasters[place] = raster
-                keep(raster, for: keys[place])
+                rasters[place] = try result.get()
             }
         }
         var next = 0
@@ -106,8 +113,11 @@ extension Picture.Renderer.CPU {
             case .shape(let shape):
                 if case .image(let image) = shape.fill?.paint { body(image) }
                 if case .image(let image) = shape.stroke?.paint { body(image) }
+
             case .group(let group): images(of: group.content, body)
+
             case .layer(let layer): images(of: layer.content, body)
+
             case .sprites, .scene: break
             }
         }
@@ -123,12 +133,15 @@ extension Picture.Renderer.CPU {
                     if case .image(let image) = shape.fill?.paint { shape.fill?.paint = .image(change(image)) }
                     if case .image(let image) = shape.stroke?.paint { shape.stroke?.paint = .image(change(image)) }
                     return .shape(shape)
+
                 case .group(var group):
                     group.content = mapped(group.content, change)
                     return .group(group)
+
                 case .layer(var layer):
                     layer.content = mapped(layer.content, change)
                     return .layer(layer)
+
                 case .sprites, .scene:
                     return element
                 }

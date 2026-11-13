@@ -26,10 +26,13 @@ extension `Picture CPU Tests`.`An image that names its picture is drawn by the r
         return image
     }
 
+    /// What makes an image of a part of a picture, at a scale and a number of samples, with an edge.
+    typealias Make = (Picture, Picture.Plane.Rectangle, Double, Cardinal, Raster<Picture.Pixel>.Edge) throws(Picture.Renderer.Error) -> Picture.Image
+
     /// A frame that paints with images of pictures: one picture twice at two places, one drawn finer with its
     /// edge held, one as a stroke's paint, and one whose own picture paints with an image, inside a group and
     /// a blurred layer. `image` makes each image from its picture.
-    static func frame(_ image: (Picture, Picture.Plane.Rectangle, Double, Cardinal, Raster<Picture.Pixel>.Edge) throws(Picture.Renderer.Error) -> Picture.Image) throws(Picture.Renderer.Error) -> Picture {
+    static func frame(_ image: Make) throws(Picture.Renderer.Error) -> Picture {
         let first = try image(small, part(0, 0, 9, 7), 3, 1, .constant(.transparent))
         let fine = try image(small, part(2, 1, 5, 4), 2.5, 3, .extend)
         let inner = try image(small, part(1, 1, 6, 5), 2, 1, .constant(.transparent))
@@ -57,7 +60,7 @@ extension `Picture CPU Tests`.`An image that names its picture is drawn by the r
     @Test
     func `A frame of named images is the frame of images drawn beforehand, bit for bit, on any threads, kept or not, the first time and again`() throws {
         let plain = Picture.Renderer.cpu(threads: 1, keeping: 0)
-        let eager = try Self.frame { (picture, rectangle, scale, samples, edge) throws(Picture.Renderer.Error) in
+        let eager = try Self.frame { picture, rectangle, scale, samples, edge throws(Picture.Renderer.Error) in
             try Picture.Image(picture, in: rectangle, scale: scale, samples: samples, edge: edge, through: plain)
         }
         let named = try Self.frame { picture, rectangle, scale, samples, edge in
