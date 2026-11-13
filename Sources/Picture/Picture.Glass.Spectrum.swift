@@ -1,12 +1,13 @@
 import Numeric
+public import Refraction
 
 extension Picture.Glass {
     /// The visible spectrum cut into wavelengths at which a dispersive glass is sampled, each with the share of
     /// red, green and blue it gives: light that a glass parts by wavelength is gathered back into a pixel by
     /// these shares, so a white edge seen through a dispersive rim fans into a smooth rainbow.
     public struct Spectrum: Sendable, Hashable {
-        /// The wavelengths in nanometres, from short to long.
-        public let wavelengths: [Double]
+        /// The wavelengths, from short to long.
+        public let wavelengths: [Refraction::Refraction.Wavelength<Double>]
 
         /// For each wavelength, its share of red, green and blue; each colour's shares add up to 1.
         public let weights: [Weight]
@@ -29,8 +30,9 @@ extension Picture.Glass.Spectrum {
 }
 
 extension Picture.Glass.Spectrum {
-    /// The visible range sampled, in nanometres.
-    public static let range: ClosedRange<Double> = 400...700
+    /// The visible range sampled, 400 to 700 nanometres.
+    public static let range: ClosedRange<Refraction::Refraction.Wavelength<Double>> =
+        Refraction::Refraction.Wavelength(nanometres: 400)...Refraction::Refraction.Wavelength(nanometres: 700)
 
     /// `count` wavelengths at the midpoints of as many equal parts of `range`, each weighted by `response(at:)`
     /// and every colour's weights divided by their sum, so a flat white is gathered back to white. One
@@ -38,12 +40,14 @@ extension Picture.Glass.Spectrum {
     /// plain bend at the glass's own index.
     public init(count: Int) {
         guard count > 1 else {
-            self.init(wavelengths: [Picture.Glass.Refraction.lines.d], weights: [Weight(red: 1, green: 1, blue: 1)])
+            self.init(wavelengths: [.d], weights: [Weight(red: 1, green: 1, blue: 1)])
             return
         }
-        let low = Self.range.lowerBound
-        let width = Self.range.upperBound - low
-        let wavelengths = (0..<count).map { low + width * (Double($0) + 0.5) / Double(count) }
+        let low = Self.range.lowerBound.nanometres
+        let width = Self.range.upperBound.nanometres - low
+        let wavelengths = (0..<count).map {
+            Refraction::Refraction.Wavelength(nanometres: low + width * (Double($0) + 0.5) / Double(count))
+        }
         let raw = wavelengths.map(Self.response(at:))
         let total = raw.reduce((0.0, 0.0, 0.0)) { ($0.0 + $1.red, $0.1 + $1.green, $0.2 + $1.blue) }
         let weights = raw.map {
@@ -56,10 +60,12 @@ extension Picture.Glass.Spectrum {
         self.init(wavelengths: wavelengths, weights: weights)
     }
 
-    /// How much a wavelength in nanometres excites linear red, green and blue: the CIE 1931 colour matching
-    /// functions in the multi-lobe fit of Wyman, Sloan and Shirley (2013), taken from XYZ into linear sRGB, each
-    /// held at 0 or more.
-    public static func response(at wavelength: Double) -> (red: Double, green: Double, blue: Double) {
+    /// How much a wavelength excites linear red, green and blue: the CIE 1931 colour matching functions in the
+    /// multi-lobe fit of Wyman, Sloan and Shirley (2013), taken from XYZ into linear sRGB, each held at 0 or more.
+    public static func response(
+        at wavelength: Refraction::Refraction.Wavelength<Double>
+    ) -> (red: Double, green: Double, blue: Double) {
+        let wavelength = wavelength.nanometres
         func lobe(_ mean: Double, _ below: Double, _ above: Double) -> Double {
             let t = (wavelength - mean) / (wavelength < mean ? below : above)
             return Double.exp(-0.5 * t * t)

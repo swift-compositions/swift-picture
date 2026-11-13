@@ -9,6 +9,7 @@
 @_exported public import Point
 @_exported public import Projection
 @_exported public import Raster
+@_exported public import Refraction
 @_exported public import Renderer
 @_exported public import Threefry
 @_exported public import Vector

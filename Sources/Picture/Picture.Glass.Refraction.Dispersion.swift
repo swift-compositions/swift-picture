@@ -1,5 +1,5 @@
 extension Picture.Glass.Refraction {
-    /// Named strengths of dispersion, as Abbe numbers for `Picture.Glass.Refraction.abbe`.
+    /// Named strengths of dispersion, as Abbe numbers for the Abbe number of `Picture.Glass.Refraction.medium`.
     public enum Dispersion {
         /// One index for every wavelength: no colours part.
         public static let none: Double = .infinity

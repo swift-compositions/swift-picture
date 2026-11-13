@@ -20,11 +20,11 @@ extension Picture.Renderer.CPU.Spectra {
     /// a bright edge fans into a smooth rainbow, gathered by the spectrum's weights.
     static func pixel(
         _ refraction: Picture.Glass.Refraction,
-        read: (_ index: Double) -> (x: Double, y: Double),
+        read: (_ index: Refraction.Index<Double>) -> (x: Double, y: Double),
         sample: (_ x: Double, _ y: Double) -> Picture.Pixel
     ) -> Picture.Pixel {
-        let own = read(Swift.max(refraction.index, 1))
-        guard refraction.abbe.isFinite, refraction.abbe > 0 else { return sample(own.x, own.y) }
+        let own = read(refraction.index)
+        guard refraction.medium.isDispersive else { return sample(own.x, own.y) }
         let range = Picture.Glass.Spectrum.range
         let short = read(refraction.index(at: range.lowerBound))
         let long = read(refraction.index(at: range.upperBound))

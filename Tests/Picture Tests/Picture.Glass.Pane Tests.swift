@@ -14,7 +14,7 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
 
     static let box = Picture.Plane.Rectangle(llx: 0, lly: 0, urx: 200, ury: 100)
 
-    static func pane(index: Double = 1.5, abbe: Double = .infinity, distance: Double = 0) -> Pane {
+    static func pane(index: Refraction::Refraction.Index<Double> = 1.5, abbe: Double = .infinity, distance: Double = 0) -> Pane {
         Pane(
             .rectangle(box, radius: 30),
             glass: Picture.Glass(refraction: .init(index: index, distance: distance, abbe: abbe)),
@@ -51,7 +51,7 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
         for (x, y) in [(100.0, 50.0), (60.0, 40.0), (150.0, 70.0)] {
             let passage = pane.passage(at: Tests.at(x, y))
             #expect(passage.normal == Vector([0, 0, 1]))
-            for wavelength in [400.0, 550, 700] { #expect(passage.offset(for: pane.glass.refraction!.index(at: wavelength)) == .zero) }
+            for nanometres in [400.0, 550, 700] { #expect(passage.offset(for: pane.glass.refraction!.index(at: .init(nanometres: nanometres))) == .zero) }
             #expect(passage.length == 20)
         }
     }
@@ -86,11 +86,11 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
         let pane = Self.pane(abbe: 25, distance: 10)
         let refraction = pane.glass.refraction!
         let passage = pane.passage(at: Tests.at(6, 50))
-        #expect(passage.offset(for: refraction.index(at: 680))[0] < passage.offset(for: refraction.index(at: 550))[0])
-        #expect(passage.offset(for: refraction.index(at: 550))[0] < passage.offset(for: refraction.index(at: 420))[0])
+        #expect(passage.offset(for: refraction.index(at: .init(nanometres: 680)))[0] < passage.offset(for: refraction.index(at: .init(nanometres: 550)))[0])
+        #expect(passage.offset(for: refraction.index(at: .init(nanometres: 550)))[0] < passage.offset(for: refraction.index(at: .init(nanometres: 420)))[0])
         #expect(passage.offset(for: refraction.index) == passage.offset)
         let plain = Self.pane(distance: 10).passage(at: Tests.at(6, 50))
-        #expect(plain.offset(for: Refraction(index: 1.5, abbe: .infinity).index(at: 420)) == plain.offset)
+        #expect(plain.offset(for: Refraction(index: 1.5, abbe: .infinity).index(at: .init(nanometres: 420))) == plain.offset)
     }
 
     @Test

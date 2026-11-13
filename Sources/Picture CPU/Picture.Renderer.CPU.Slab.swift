@@ -170,7 +170,7 @@ extension Picture.Renderer.CPU.Slab {
         for step in 0...steps {
             let inward = start + (Swift.max(pane.rim, start) - start) * Double(step) / Double(steps)
             let passage = Picture.Glass.Pane.Passage(through: pane, for: .init(distance: -inward, gradient: Vector([1, 0])))
-            let index = pane.glass.refraction?.index(at: Picture.Glass.Spectrum.range.lowerBound) ?? 1
+            let index = pane.glass.refraction?.index(at: Picture.Glass.Spectrum.range.lowerBound) ?? .vacuum
             let offset = passage.offset(for: index)
             let length = (offset[0] * offset[0] + offset[1] * offset[1]).squareRoot()
             if length.isFinite { largest = Swift.max(largest, length) }

@@ -57,8 +57,8 @@ extension Picture.Renderer.CPU.Passage {
         let sight = lens.sight(through: place)
         let toward = Self.dot(normal, sight) > 0 ? Self.scaled(normal, -1) : normal
         let cosine = -Self.dot(sight, toward)
-        let index = Swift.max(refraction.index, 1)
-        let inner = Picture.Glass.Refraction.bent(sight, at: toward, ratio: 1 / index) ?? sight
+        let index = refraction.index
+        let inner = Refraction.Interface(from: .vacuum, into: index).refracted(sight, at: toward).transmission ?? sight
         let own = lens.raster(of: place)
 
         var length = 0.0
@@ -82,8 +82,8 @@ extension Picture.Renderer.CPU.Passage {
         var passage = Self(
             place: place, sight: sight, toward: toward, exit: exit, point: point, own: own, cosine: cosine,
             plane: plane, read: point, length: length, leaving: sight, beyond: 0,
-            mirrored: Picture.Glass.Refraction.mirrored(sight, at: toward),
-            share: refraction.surroundings == nil ? 0 : refraction.reflectance(cosine: cosine)
+            mirrored: Refraction.reflected(sight, at: toward),
+            share: refraction.surroundings == nil ? 0 : Refraction.Interface(from: .vacuum, into: index).reflectance(cosine: cosine)
         )
         let way = passage.way(for: index, lens: lens)
         passage.read = way.read ?? point
@@ -97,7 +97,7 @@ extension Picture.Renderer.CPU.Passage {
     /// itself, all the way at a cosine of 0 and not at all from `grazing` on, with no slope at either end: there a
     /// few pixels of silhouette would otherwise read far and wide, which shows as moiré, and the line along the
     /// outline covers them.
-    func read(for index: Double, lens: Picture.Renderer.CPU.Lens) -> Read {
+    func read(for index: Refraction.Index<Double>, lens: Picture.Renderer.CPU.Lens) -> Read {
         let read = way(for: index, lens: lens).read ?? point
         guard cosine < Self.grazing else { return read }
         let t = Swift.max(cosine, 0) / Self.grazing
@@ -108,15 +108,13 @@ extension Picture.Renderer.CPU.Passage {
     /// The cosine below which a grazing read is drawn back toward the point.
     static let grazing = 0.2
 
-    func way(for index: Double, lens: Picture.Renderer.CPU.Lens) -> (read: Read?, out: Vector<3, Double>) {
-        let n = Swift.max(index, 1)
-        let within = Picture.Glass.Refraction.bent(sight, at: toward, ratio: 1 / n) ?? sight
+    func way(for index: Refraction.Index<Double>, lens: Picture.Renderer.CPU.Lens) -> (read: Read?, out: Vector<3, Double>) {
+        let n = Swift.max(index, .vacuum)
+        let within = Refraction.Interface(from: .vacuum, into: n).refracted(sight, at: toward).transmission ?? sight
         var out = within
         if let exit {
             let against = Self.dot(exit, within) > 0 ? Self.scaled(exit, -1) : exit
-            out =
-                Picture.Glass.Refraction.bent(within, at: against, ratio: n)
-                ?? Picture.Glass.Refraction.mirrored(within, at: against)
+            out = Refraction.Interface(from: n, into: .vacuum).refracted(within, at: against).value
         }
         let leaving = Self.along(place, within, length)
         let reach = Swift.max(leaving[2] - plane, 0) / Swift.max(-out[2], 0.05)

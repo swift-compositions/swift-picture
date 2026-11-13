@@ -16,70 +16,17 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
     }
 
     @Test
-    func `Light bends by Snell's law, goes straight on head-on, and keeps unit length`() throws {
-        let normal = Vector<3, Double>([0, 0, 1])
-        #expect(Refraction.bent(Vector([0, 0, -1]), at: normal, ratio: 1 / 1.5) == Vector([0, 0, -1]))
-        let slanted = Vector<3, Double>([0.6, 0, -0.8])
-        let inside = try #require(Refraction.bent(slanted, at: normal, ratio: 1 / 1.5))
-        #expect(Tests.close(inside[0], 0.6 / 1.5, within: 1e-12))
-        #expect(inside[1] == 0)
-        #expect(Tests.close(inside[0] * inside[0] + inside[2] * inside[2], 1, within: 1e-12))
-        #expect(inside[2] < 0)
-        #expect(Refraction.bent(slanted, at: normal, ratio: 1) == slanted)
-    }
-
-    @Test
-    func `Light leaves through a parallel face in the direction it came, and none leaves beyond the critical angle`() throws {
-        let slanted = Vector<3, Double>([0.6, 0, -0.8])
-        let inside = try #require(Refraction.bent(slanted, at: Vector([0, 0, 1]), ratio: 1 / 1.5))
-        let outside = try #require(Refraction.bent(inside, at: Vector([0, 0, 1]), ratio: 1.5))
-        #expect(Self.close(outside, slanted))
-        #expect(Refraction.bent(Vector([0.8, 0, -0.6]), at: Vector([0, 0, 1]), ratio: 1.5) == nil)
-        #expect(Refraction.bent(Vector([0.66, 0, -(1 - 0.66 * 0.66).squareRoot()]), at: Vector([0, 0, 1]), ratio: 1.5) != nil)
-        #expect(Refraction.bent(Vector([0.67, 0, -(1 - 0.67 * 0.67).squareRoot()]), at: Vector([0, 0, 1]), ratio: 1.5) == nil)
-    }
-
-    @Test
-    func `A surface mirrors a direction about its normal`() {
-        #expect(Refraction.mirrored(Vector([0.6, 0, -0.8]), at: Vector([0, 0, 1])) == Vector([0.6, 0, 0.8]))
-        #expect(Refraction.mirrored(Vector([0, 0, -1]), at: Vector([0, 0, 1])) == Vector([0, 0, 1]))
-        #expect(Refraction.mirrored(Vector([0, 1, 0]), at: Vector([0, 0, 1])) == Vector([0, 1, 0]))
-    }
-
-    @Test
-    func `The share a surface mirrors is Fresnel's: four hundredths head-on at 1.5, all of it at a grazing angle`() {
-        let glass = Refraction(index: 1.5)
-        #expect(Tests.close(glass.reflectance(cosine: 1), 0.04, within: 1e-12))
-        #expect(Tests.close(glass.reflectance(cosine: 0), 1, within: 1e-12))
-        #expect(Tests.close(glass.reflectance(cosine: 0.5), 0.089_186_712_802_212_76, within: 1e-9))
-        var last = 0.0
-        for step in stride(from: 1.0, through: 0.0, by: -0.05) {
-            let share = glass.reflectance(cosine: step)
-            #expect(share >= last - 1e-12)
-            last = share
-        }
-        #expect(Tests.close(Refraction(index: 1).reflectance(cosine: 0.3), 0, within: 1e-12))
-        #expect(Tests.close(Refraction(index: 2).reflectance(cosine: 1), 1.0 / 9, within: 1e-12))
-    }
-
-    @Test
-    func `The index follows Cauchy's law through the glass's own index at the d line and its Abbe number`() {
+    func `The glass's index is its medium's by Cauchy's law, never below vacuum's`() {
         let glass = Refraction(index: 1.5, abbe: 30)
-        let lines = Refraction.lines
-        #expect(Tests.close(glass.index(at: lines.d), 1.5, within: 1e-12))
-        #expect(Tests.close(glass.index(at: lines.F) - glass.index(at: lines.C), 0.5 / 30, within: 1e-12))
-        #expect(glass.index(at: 420) > glass.index(at: 520))
-        #expect(glass.index(at: 520) > glass.index(at: 680))
+        #expect(glass.index(at: .d) == 1.5)
+        #expect(glass.index(at: .init(nanometres: 420)) > glass.index(at: .init(nanometres: 520)))
+        #expect(glass.index(at: .init(nanometres: 520)) > glass.index(at: .init(nanometres: 680)))
         let plain = Refraction()
-        #expect(plain.index == 1.5 && plain.distance == 1 && plain.abbe == Refraction.Dispersion.subtle && plain.surroundings == nil)
+        #expect(plain.index == 1.5 && plain.distance == 1 && plain.medium.abbe == Refraction.Dispersion.subtle && plain.surroundings == nil)
         let none = Refraction(abbe: Refraction.Dispersion.none)
-        #expect(none.index(at: 420) == 1.5 && none.index(at: 680) == 1.5)
-        #expect(Refraction(index: 1.01, abbe: 0.01).index(at: 700) == 1)
-        let normal = Vector<3, Double>([0, 0, 1])
-        let slanted = Vector<3, Double>([0.6, 0, -0.8])
-        let red = Refraction.bent(slanted, at: normal, ratio: 1 / glass.index(at: 680))
-        let blue = Refraction.bent(slanted, at: normal, ratio: 1 / glass.index(at: 420))
-        #expect((red?[0] ?? 0) > (blue?[0] ?? 1))
+        #expect(none.index(at: .init(nanometres: 420)) == 1.5 && none.index(at: .init(nanometres: 680)) == 1.5)
+        #expect(Refraction(index: 1.01, abbe: 0.01).index(at: .init(nanometres: 700)) == .vacuum)
+        #expect(Refraction(index: 0.8).index == .vacuum)
     }
 
     @Test
@@ -94,7 +41,7 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
             #expect(Tests.close(spectrum.gathered(Array(repeating: white, count: count)), white, within: 1e-5))
         }
         let one = Picture.Glass.Spectrum(count: 1)
-        #expect(one.wavelengths == [Refraction.lines.d])
+        #expect(one.wavelengths == [.d])
         #expect(one.weights == [.init(red: 1, green: 1, blue: 1)])
         let seven = Picture.Glass.Spectrum(count: 7)
         #expect(seven.weights[0].blue > seven.weights[0].red)
@@ -195,7 +142,7 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
     @Test
     func `A ball enlarges what touches it index over two less index times, and turns it over past its focus`() {
         for index in [1.3, 1.5, 1.7] {
-            let touching = Refraction(index: index, distance: 0).enlargement(radius: 15)
+            let touching = Refraction(index: .init(index), distance: 0).enlargement(radius: 15)
             #expect(Tests.close(touching, index / (2 - index), within: 1e-12))
         }
         #expect(Tests.close(Refraction(index: 1.5, distance: 0).enlargement(radius: 2), 3, within: 1e-12))
