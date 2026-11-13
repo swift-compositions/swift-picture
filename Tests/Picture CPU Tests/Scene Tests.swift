@@ -298,3 +298,36 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         #expect(Set(winners.pixels).isSuperset(of: [0, 1, 2]))
     }
 }
+extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is behind, the nearest surface showing` {
+    static let ramp = Picture.Gradient(evenly: [.black, .white])
+
+    @Test
+    func `A shaded face takes its ramp at the light it faces`() throws {
+        let lit = Picture.Scene.Material.Shade(ramp: Self.ramp, toward: Vector([0, 0, 1]))
+        let raster = try Self.drawn(Self.flat([.init(Self.square(0, 0, -5), material: .shaded(lit))]))
+        #expect(Tests.at(raster, 20, 20) == Picture.Color.white.pixel)
+        #expect(Tests.at(raster, 12, 27) == Picture.Color.white.pixel)
+        #expect(Tests.at(raster, 2, 2) == Self.backdrop)
+        let half = Picture.Scene.Material.Shade(ramp: Self.ramp, toward: Vector([0, 1, 1]))
+        let tilted = try Self.drawn(Self.flat([.init(Self.square(0, 0, -5), material: .shaded(half))]))
+        #expect(Tests.close(Tests.at(tilted, 20, 20), half.pixel(facing: Vector([0, 0, 1])), within: 1e-6))
+    }
+
+    @Test
+    func `A shaded ball is brightest where it faces the lamp`() throws {
+        let ball = Mesh<Vertex>.sphere(radius: 1.5, meridians: 64, parallels: 32)
+        for toward in [Vector<3, Double>([0.5, 0.5, 0.7071]), Vector([-0.6, 0.2, 0.77]), Vector([0, 0, 1])] {
+            let shade = Picture.Scene.Material.Shade(ramp: Self.ramp, toward: toward)
+            let scene = try Self.flat([.init(ball, transform: Matrix(rows: [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, -5], [0, 0, 0, 1]]), material: .shaded(shade))])
+            let raster = try Self.drawn(scene)
+            var brightest = (x: UInt(0), y: UInt(0), light: Float(-1))
+            for position in Tests.positions(40, 40) where Tests.at(raster, position.x, position.y).color.red > brightest.light {
+                brightest = (position.x, position.y, Tests.at(raster, position.x, position.y).color.red)
+            }
+            let length = (toward[0] * toward[0] + toward[1] * toward[1] + toward[2] * toward[2]).squareRoot()
+            let facing = (x: 20 + 15 * toward[0] / length, y: 20 - 15 * toward[1] / length)
+            let off = ((Double(brightest.x) + 0.5 - facing.x) * (Double(brightest.x) + 0.5 - facing.x) + (Double(brightest.y) + 0.5 - facing.y) * (Double(brightest.y) + 0.5 - facing.y)).squareRoot()
+            #expect(off <= 2, "toward \(toward): brightest at \(brightest), facing at \(facing)")
+        }
+    }
+}

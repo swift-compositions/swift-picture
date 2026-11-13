@@ -34,6 +34,18 @@ extension Picture.Scene {
         return Position(normalized, in: viewport)
     }
 
+    /// The point of the world the scene shows at a point of the picture, at a distance ahead of the eye:
+    /// `Camera.point(under:distance:viewport:)` through this scene's camera and viewport.
+    public func point(under point: Picture.Plane.Point<2>, distance: Double) -> Point::Point<3, Double>? {
+        camera.point(under: point, distance: distance, viewport: viewport)
+    }
+
+    /// The model transform that stands a model's origin at a point of the picture, at a distance ahead of the
+    /// eye: `Camera.placement(at:distance:viewport:)` through this scene's camera and viewport.
+    public func placement(at point: Picture.Plane.Point<2>, distance: Double) -> Matrix<4, 4, Double>? {
+        camera.placement(at: point, distance: distance, viewport: viewport)
+    }
+
     /// Where the scene draws a point of a model, with its distance ahead of the eye: `Camera.sight(of:in:viewport:)`
     /// through this scene's camera and viewport.
     public func sight(of point: Point::Point<3, Double>, in model: Model) -> Camera.Sight? {

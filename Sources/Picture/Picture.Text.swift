@@ -203,8 +203,23 @@ extension Picture.Text {
         anchor: Alignment = .left,
         level: Level = .baseline
     ) -> Picture.Element {
-        let move = Picture.Transform.translation(x: point[0] - anchor.indent(of: 0, in: measure), y: point[1] + level.height(in: metrics))
-        return .group(Picture.Group([.shape(shape(fill))], transform: move))
+        .group(Picture.Group([.shape(shape(fill))], transform: move(to: point, anchor: anchor, level: level)))
+    }
+
+    /// The box of the ink the text puts down where `placed(_:at:anchor:level:)` puts it: the bounding box of
+    /// every glyph's path, moved as that moves the text, so it holds every point a fill of the text covers and
+    /// none of the empty advance around it. Nil for a text that draws nothing, as one of spaces.
+    public func bounds(
+        at point: Picture.Plane.Point<2>,
+        anchor: Alignment = .left,
+        level: Level = .baseline
+    ) -> Picture.Plane.Rectangle? {
+        path.transformed(by: move(to: point, anchor: anchor, level: level)).boundingBox
+    }
+
+    /// The move `placed(_:at:anchor:level:)` makes.
+    func move(to point: Picture.Plane.Point<2>, anchor: Alignment, level: Level) -> Picture.Transform {
+        .translation(x: point[0] - anchor.indent(of: 0, in: measure), y: point[1] + level.height(in: metrics))
     }
 
     /// The whole text filled and centred on a point as a block: the point lies midway between the first

@@ -12,5 +12,8 @@ extension Picture.Scene {
 
         /// Every face showing what is behind it, bent by the surface.
         case glass(Picture.Glass)
+
+        /// Every point of every face in the colour a lamp and a rim light give it, from the surface's normal there.
+        case shaded(Shade)
     }
 }

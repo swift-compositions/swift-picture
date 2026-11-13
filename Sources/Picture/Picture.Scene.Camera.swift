@@ -1,5 +1,6 @@
 public import Angle
 public import Matrix
+import Numeric
 public import Point
 public import Projection
 public import Vector
@@ -103,6 +104,106 @@ extension Picture.Scene.Camera {
             .multiplied(by: .rotation(aboutY: -yaw.underlying))
             .multiplied(by: .translation(Vector([-place[0], -place[1], -place[2]])))
         self.init(projection: projection, view: view)
+    }
+}
+
+extension Picture.Scene.Camera {
+    /// A camera that shows `scale` picture units to a unit of the world at a `distance` from the eye: it stands
+    /// that far along +z from the world's origin and looks along −z through a centred perspective lens whose
+    /// field of view `Projection.field(focal:height:)` gives for a focal length of `scale` times the distance
+    /// and the viewport's height, at the viewport's aspect. So the plane z = 0 is drawn `scale` times as large
+    /// as the world, the origin at the viewport's middle, and what is nearer larger. It fails as the lens does:
+    /// for a viewport with no height, a distance or scale that gives no field of view, and the bounds of the
+    /// near and far planes.
+    public init(
+        distance: Double,
+        scale: Double,
+        viewport: Picture.Plane.Rectangle,
+        near: Double,
+        far: Double,
+        depth: Projection<Double>.Depth
+    ) throws(Projection<Double>.Error) {
+        let width = viewport.urx.underlying - viewport.llx.underlying
+        let height = viewport.ury.underlying - viewport.lly.underlying
+        try self.init(
+            fieldOfView: Projection<Double>.field(focal: scale * distance, height: height),
+            aspect: width / height,
+            near: near,
+            far: far,
+            depth: depth,
+            view: .translation(Vector([0, 0, -distance]))
+        )
+    }
+
+    /// A camera turned as `init(projection:at:yaw:pitch:roll:)` turns it and standing `distance` back along its
+    /// own line of sight from a target, so that it looks at the target, which it sees at the middle of a centred
+    /// lens: an eye on a sphere around the target, swung round it by `yaw` and over it by `pitch`. A positive yaw
+    /// stands the eye toward +x, looking left at the target, and a positive pitch below it, looking up.
+    public init(
+        projection: Projection<Double>,
+        around target: Point::Point<3, Double>,
+        distance: Double,
+        yaw: Radian<Double> = .zero,
+        pitch: Radian<Double> = .zero,
+        roll: Radian<Double> = .zero
+    ) {
+        let (across, along) = (yaw.underlying, pitch.underlying)
+        let back = (
+            x: Double.sin(across) * Double.cos(along),
+            y: -Double.sin(along),
+            z: Double.cos(across) * Double.cos(along)
+        )
+        let place = Point::Point<3, Double>([target[0] + distance * back.x, target[1] + distance * back.y, target[2] + distance * back.z])
+        self.init(projection: projection, at: place, yaw: yaw, pitch: pitch, roll: roll)
+    }
+
+    /// A camera at a place looking at a target, with `up` toward the top of the view: the view is
+    /// `Matrix.looking(at:from:up:)` of swift-matrix, and it fails as that does when the target is the place or
+    /// `up` lies along the line of sight.
+    public init(
+        projection: Projection<Double>,
+        at place: Point::Point<3, Double>,
+        looking target: Point::Point<3, Double>,
+        up: Vector<3, Double> = Vector([0, 1, 0])
+    ) throws(Matrix<4, 4, Double>.Error) {
+        let view = try Matrix<4, 4, Double>.looking(
+            at: Vector([target[0], target[1], target[2]]),
+            from: Vector([place[0], place[1], place[2]]),
+            up: up
+        )
+        self.init(projection: projection, view: view)
+    }
+}
+
+extension Picture.Scene.Camera {
+    /// The point of the world that this camera shows at a point of a viewport, at a distance ahead of the eye:
+    /// the way back from `sight(of:in:viewport:)`, whose position and distance for this point are the ones given,
+    /// up to rounding. It is nil for a viewport with no area, a point the lens does not take back, and a view
+    /// that is not a rigid motion, a rotation and a move, to within a millionth.
+    public func point(under point: Picture.Plane.Point<2>, distance: Double, viewport: Picture.Plane.Rectangle) -> Point::Point<3, Double>? {
+        let left = viewport.llx.underlying
+        let top = viewport.lly.underlying
+        let width = viewport.urx.underlying - left
+        let height = viewport.ury.underlying - top
+        guard width != 0, height != 0, let pose = Pose(view) else { return nil }
+        let x = 2 * (point[0] - left) / width - 1
+        let y = 1 - 2 * (point[1] - top) / height
+        guard let window = projection.eye(Point::Point<3, Double>([x, y, projection.depth.range.lowerBound])) else { return nil }
+        var eye = (x: window[0], y: window[1], z: -distance)
+        if projection.kind == .perspective {
+            guard window[2] < 0 else { return nil }
+            let stretch = distance / -window[2]
+            eye = (window[0] * stretch, window[1] * stretch, -distance)
+        }
+        let world = pose.rotation.transposed.applied(to: Vector([eye.x, eye.y, eye.z]))
+        let found = Point::Point<3, Double>([world[0] + pose.place[0], world[1] + pose.place[1], world[2] + pose.place[2]])
+        guard found[0].isFinite, found[1].isFinite, found[2].isFinite else { return nil }
+        return found
+    }
+
+    /// The model transform that stands a model's origin at `point(under:distance:viewport:)`, unturned.
+    public func placement(at point: Picture.Plane.Point<2>, distance: Double, viewport: Picture.Plane.Rectangle) -> Matrix<4, 4, Double>? {
+        self.point(under: point, distance: distance, viewport: viewport).map { .translation(Vector([$0[0], $0[1], $0[2]])) }
     }
 }
 

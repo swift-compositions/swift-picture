@@ -4,10 +4,11 @@ import Synchronization
 
 extension Picture.Renderer.CPU {
     /// A scene made ready for sampling: triangles in raster space with a depth at each corner, the colour
-    /// each opaque one draws, and for each glass one the surface it shows.
+    /// each opaque one draws or, for a shaded one, how it is shaded, and for each glass one the surface it shows.
     struct Stage {
         var opaque: [InlineArray<3, Point<3, Double>>] = []
         var colors: [Picture.Pixel] = []
+        var lights: [Picture.Renderer.CPU.Shaded?] = []
         var glass: [InlineArray<3, Point<3, Double>>] = []
         var surfaces: [Surface] = []
 
@@ -27,9 +28,12 @@ extension Picture.Renderer.CPU.Stage {
         let lens = Picture.Renderer.CPU.Lens(scene, transform)
         for (number, model) in zip(scene.models.indices, scene.models) {
             let mesh = model.mesh
-            var glassy = false
-            if case .glass = model.material { glassy = true }
-            let normals: [Vector<3, Double>] = glassy ? mesh.normals(per: .vertex) : [Vector<3, Double>](repeating: .zero, count: mesh.vertices.count)
+            var smooth = false
+            switch model.material {
+            case .glass, .shaded: smooth = true
+            case .flat, .wireframe, .points: smooth = false
+            }
+            let normals: [Vector<3, Double>] = smooth ? mesh.normals(per: .vertex) : [Vector<3, Double>](repeating: .zero, count: mesh.vertices.count)
             let eye = scene.camera.eye(of: model.transform)
             let whole = scene.camera.map(of: model.transform)
             func place(_ point: Point<3, Double>) -> Picture.Scene.Position? {
@@ -59,6 +63,23 @@ extension Picture.Renderer.CPU.Stage {
                     for triangle in Self.fan(polygon) {
                         guard let a = project(triangle.0), let b = project(triangle.1), let c = project(triangle.2) else { continue }
                         add([a, b, c], pixel)
+                    }
+                }
+
+            case .shaded(let shade):
+                let ramp = shade.ramp.ramp
+                for face in mesh.faces {
+                    let polygon = Self.clipped(face.vertices.map { corners[Int(bitPattern: $0)] })
+                    for triangle in Self.fan(polygon) {
+                        guard let a = project(triangle.0), let b = project(triangle.1), let c = project(triangle.2) else { continue }
+                        let shaded = Picture.Renderer.CPU.Shaded(
+                            shade: shade,
+                            ramp: ramp,
+                            eye: eye,
+                            normals: [triangle.0.normal, triangle.1.normal, triangle.2.normal],
+                            divisors: [triangle.0.divisor, triangle.1.divisor, triangle.2.divisor]
+                        )
+                        add([a, b, c], .transparent, shaded)
                     }
                 }
 
@@ -123,10 +144,11 @@ extension Picture.Renderer.CPU.Stage {
         }
     }
 
-    /// An opaque triangle in raster space and its colour.
-    mutating func add(_ triangle: [Point<3, Double>], _ pixel: Picture.Pixel) {
+    /// An opaque triangle in raster space and its colour, or how it is shaded.
+    mutating func add(_ triangle: [Point<3, Double>], _ pixel: Picture.Pixel, _ shaded: Picture.Renderer.CPU.Shaded? = nil) {
         opaque.append([triangle[0], triangle[1], triangle[2]])
         colors.append(pixel)
+        lights.append(shaded)
         widen(triangle)
     }
 
@@ -367,16 +389,23 @@ extension Picture.Renderer.CPU.Canvas {
         let upper = scene.camera.projection.depth.range.upperBound
         let haze = scene.haze.map { haze in (haze: haze, pixel: haze.color.pixel, distance: Picture.Renderer.CPU.Stage.distance(scene.camera.projection)) }
         let opaque = Picture.Renderer.CPU.Stage.tiles(stage.opaque, over: area)
+        // A shaded triangle's colour changes across it, so where a scene has one its points are weighed on corners.
+        let shaded = stage.lights.contains { $0 != nil }
         unsafe tiles(opaque.count, state.workers) { shared, box, part in
             let (tile, numbers) = opaque[part]
             guard !numbers.isEmpty else { return }
-            let hits = Picture.Renderer.CPU.Stage.nearest(stage.opaque, numbers, in: tile, samples: samples)
+            let weighed = shaded ? Picture.Renderer.CPU.Stage.hits(stage.opaque, numbers, in: tile, samples: samples) : []
+            let hits = shaded
+                ? weighed.map { Picture.Renderer.CPU.Hit.Nearest(triangle: $0.triangle, depth: $0.depth) }
+                : Picture.Renderer.CPU.Stage.nearest(stage.opaque, numbers, in: tile, samples: samples)
             unsafe Self.visit(shared, box, tile, samples) { row, column in
                 let hit = hits[row * tile.width * samples + column]
                 return hit.triangle >= 0 && hit.depth <= upper
             } value: { _, _, row, column, old in
-                let hit = hits[row * tile.width * samples + column]
-                let color = stage.colors[hit.triangle]
+                let position = row * tile.width * samples + column
+                let hit = hits[position]
+                var color = stage.colors[hit.triangle]
+                if shaded, let light = stage.lights[hit.triangle] { color = light.pixel(weighed[position].weights) }
                 guard let haze else { return color.composited(over: old) }
                 let share = haze.haze.share(at: haze.distance(hit.depth))
                 guard share > 0 else { return color.composited(over: old) }
