@@ -62,7 +62,7 @@ extension Picture.Shape: Swift.Mirror.Written {
         guard !writer.again(path.subpaths) else { return true }
         writer.number(path.subpaths.count)
         for subpath in path.subpaths {
-            guard writer.write(subpath.startPoint) else { return false }
+            point(subpath.startPoint, into: writer)
             writer.number(subpath.isClosed ? 1 : 0)
             guard !writer.again(subpath.segments) else { continue }
             writer.number(subpath.segments.count)
@@ -70,7 +70,8 @@ extension Picture.Shape: Swift.Mirror.Written {
                 switch segment {
                 case .line(let line):
                     writer.number(0)
-                    guard writer.write(line.start), writer.write(line.end) else { return false }
+                    point(line.start, into: writer)
+                    point(line.end, into: writer)
                 case .bezier(let bezier):
                     writer.number(1)
                     guard writer.write(bezier) else { return false }
@@ -84,6 +85,12 @@ extension Picture.Shape: Swift.Mirror.Written {
             }
         }
         return true
+    }
+
+    /// A point of the plane, by its two coordinates.
+    static func point(_ point: Picture.Plane.Point<2>, into writer: Swift.Mirror.Writer) {
+        writer.float(point[0])
+        writer.float(point[1])
     }
 }
 
