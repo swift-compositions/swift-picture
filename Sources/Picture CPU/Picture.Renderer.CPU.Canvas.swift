@@ -203,10 +203,48 @@ extension Picture.Renderer.CPU.Canvas {
         let coverage = try Self.coverage(of: path, rule: rule, in: area)
         var solid: Picture.Pixel?
         if case .solid = paint { solid = paint.pixel(at: .zero) }
+        var gradient: Picture.Gradient?
+        switch paint {
+        case .linear(let linear): gradient = linear.gradient
+        case .radial(let radial): gradient = radial.gradient
+        case .solid, .image: break
+        }
+        let offsets = gradient?.stops.map(\.offset) ?? []
+        let ramp = gradient?.stops.map(\.color.pixel) ?? []
+        /// What `Picture.Gradient.pixel(at:)` gives at a parameter, read from the gradient's stops as working
+        /// pixels, converted once for the shape instead of twice for every pixel.
+        func graded(_ parameter: Float) -> Picture.Pixel {
+            guard !ramp.isEmpty else { return .transparent }
+            guard parameter > offsets[0] else { return ramp[0] }
+            var previous = 0
+            var floor = offsets[0]
+            var stop = 1
+            while stop < ramp.count {
+                let offset = Swift.max(offsets[stop], floor)
+                if parameter < offset {
+                    let fraction = (parameter - floor) / (offset - floor)
+                    return ramp[previous].interpolated(to: ramp[stop], at: fraction)
+                }
+                previous = stop
+                floor = offset
+                stop += 1
+            }
+            return ramp[previous]
+        }
         update(area, state.workers) { x, y, old in
             let share = coverage[area.index(x, y)]
             guard share > 0 else { return old }
-            let source = solid ?? paint.pixel(at: Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
+            let source: Picture.Pixel
+            if let solid {
+                source = solid
+            } else {
+                let point = Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5)
+                switch paint {
+                case .linear(let linear): source = graded(Float(linear.parameter(at: point)))
+                case .radial(let radial): source = graded(Float(radial.parameter(at: point)))
+                case .solid, .image: source = paint.pixel(at: point)
+                }
+            }
             return Picture.Renderer.CPU.limited(old, source.composited(over: old, coverage: share), state.share(x, y))
         }
     }

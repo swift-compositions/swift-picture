@@ -35,6 +35,35 @@ extension `Picture CPU Tests`.`A renderer puts a fill's paint over what is behin
     }
 
     @Test
+    func `A gradient drawn from stops made ready once is the gradient read stop by stop at every pixel`() throws {
+        let gradients: [Picture.Gradient] = [
+            .init([]),
+            .init([.init(offset: 0.4, color: Tests.translucent)]),
+            .init([.init(offset: 0, color: Tests.red), .init(offset: 0.3, color: Tests.blue), .init(offset: 1, color: Tests.translucent)]),
+            // A hard edge, a stop out of order, and stops that begin after 0 and end before 1.
+            .init([
+                .init(offset: 0.2, color: Tests.red), .init(offset: 0.5, color: Tests.blue), .init(offset: 0.5, color: Tests.translucent),
+                .init(offset: 0.35, color: .white), .init(offset: 0.8, color: Tests.red),
+            ]),
+            Picture.Gradient([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.blue)]).oklab(steps: 6),
+        ]
+        for gradient in gradients {
+            let paints: [Picture.Paint] = [
+                .linear(.init(from: Tests.at(3, 1), to: Tests.at(31, 9), gradient)),
+                .linear(.init(from: Tests.at(5, 5), to: Tests.at(5, 5), gradient)),
+                .radial(.init(center: Tests.at(11, 6), radius: 14, gradient)),
+            ]
+            for paint in paints {
+                let drawn = try Tests.drawn([.shape(.init(Tests.rectangle(0, 0, 40, 12), fill: .init(paint)))], on: Tests.canvas(40, 12, Tests.blue.pixel))
+                let expected = Tests.Canvas(width: 40, height: 12) { x, y in
+                    paint.pixel(at: Tests.at(Double(Int(bitPattern: x)) + 0.5, Double(Int(bitPattern: y)) + 0.5)).composited(over: Tests.blue.pixel, coverage: 1)
+                }
+                #expect(drawn == expected)
+            }
+        }
+    }
+
+    @Test
     func `A paint is read at each pixel's centre in the shape's own space`() throws {
         let gradient = Picture.Gradient([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.translucent)])
         let linear = Picture.Paint.linear(.init(from: Tests.at(0, 0), to: Tests.at(4, 1), gradient))
