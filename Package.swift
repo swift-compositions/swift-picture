@@ -32,6 +32,7 @@ let package = Package(
         .package(url: "https://github.com/swift-iec/swift-iec-61966.git", branch: "main"),
         .package(url: "https://github.com/swift-iso/swift-iso-14496-22.git", branch: "main"),
         .package(url: "https://github.com/swift-molecules/swift-raster.git", branch: "main", traits: ["Geometry"]),
+        .package(url: "https://github.com/swift-standards/swift-color-standard.git", branch: "main"),
         .package(url: "https://github.com/swift-w3c/swift-w3c-css.git", branch: "main"),
         .package(url: "https://github.com/swift-w3c/swift-w3c-png.git", branch: "main"),
     ],
@@ -41,6 +42,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Angle", package: "swift-angle"),
                 .product(name: "Byte", package: "swift-byte"),
+                .product(name: "Color Standard", package: "swift-color-standard"),
                 .product(name: "Direction", package: "swift-direction"),
                 .product(name: "Geometry", package: "swift-geometry"),
                 .product(name: "IEC 61966", package: "swift-iec-61966"),
@@ -79,7 +81,8 @@ let package = Package(
         .testTarget(
             name: "Picture Tests",
             dependencies: [
-                .target(name: "Picture")
+                .target(name: "Picture"),
+                .product(name: "Color Standard", package: "swift-color-standard"),
             ]
         ),
         .testTarget(
