@@ -20,14 +20,29 @@ extension Picture.Scene {
 extension Picture.Scene.Camera {
     /// The clip coordinates of a point of a model: projection times view times model, applied to (x, y, z, 1).
     public func clip(_ point: Point::Point<3, Double>, in model: Matrix<4, 4, Double> = .identity) -> Vector<4, Double> {
-        Matrix(projection).multiplied(by: view).multiplied(by: model)
-            .applied(to: Vector([point[0], point[1], point[2], 1]))
+        Self.clip(point, through: map(of: model))
     }
 
     /// The normalised coordinates of a point of a model: its clip coordinates divided by the fourth.
     /// It is nil unless the fourth is positive, which is when the point is in front of the eye.
     public func normalized(_ point: Point::Point<3, Double>, in model: Matrix<4, 4, Double> = .identity) -> Point::Point<3, Double>? {
-        let clip = clip(point, in: model)
+        Self.normalized(point, through: map(of: model))
+    }
+
+    /// Projection times view times model: what takes a model's space into clip space.
+    public func map(of model: Matrix<4, 4, Double>) -> Matrix<4, 4, Double> {
+        Matrix(projection).multiplied(by: view).multiplied(by: model)
+    }
+
+    /// The clip coordinates of a point after a matrix into clip space, `map(of:)` of a model, so that
+    /// `clip(_:in:)` is this with the product made once per model instead of per point.
+    public static func clip(_ point: Point::Point<3, Double>, through map: Matrix<4, 4, Double>) -> Vector<4, Double> {
+        map.applied(to: Vector([point[0], point[1], point[2], 1]))
+    }
+
+    /// The normalised coordinates of a point after a matrix into clip space, as `normalized(_:in:)` gives them.
+    public static func normalized(_ point: Point::Point<3, Double>, through map: Matrix<4, 4, Double>) -> Point::Point<3, Double>? {
+        let clip = clip(point, through: map)
         guard clip[3] > 0 else { return nil }
         return Point::Point([clip[0] / clip[3], clip[1] / clip[3], clip[2] / clip[3]])
     }

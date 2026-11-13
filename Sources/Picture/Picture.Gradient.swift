@@ -10,22 +10,10 @@ extension Picture {
 }
 
 extension Picture.Gradient {
-    /// The pixel at a parameter.
+    /// The pixel at a parameter. A renderer that reads many pixels of one gradient reads them from its `ramp`,
+    /// which takes the stops' colours out of sRGB once.
     public func pixel(at parameter: Float) -> Picture.Pixel {
-        guard let first = stops.first else { return .transparent }
-        guard parameter > first.offset else { return first.color.pixel }
-        var previous = first
-        var floor = first.offset
-        for stop in stops.dropFirst() {
-            let offset = Swift.max(stop.offset, floor)
-            if parameter < offset {
-                let fraction = (parameter - floor) / (offset - floor)
-                return previous.color.pixel.interpolated(to: stop.color.pixel, at: fraction)
-            }
-            previous = stop
-            floor = offset
-        }
-        return previous.color.pixel
+        ramp.pixel(at: parameter)
     }
 }
 

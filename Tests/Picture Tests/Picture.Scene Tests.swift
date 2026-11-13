@@ -86,6 +86,23 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
     }
 
     @Test
+    func `Through the camera's map of a model, made once, a point has the clip coordinates, the normalised ones and the place it has in the model`() throws {
+        var scenes = [try Self.flat(), try Self.deep()]
+        scenes[1].camera.view = Self.translation(0.2, -0.1, -3).multiplied(by: Matrix(rows: [[0.6, -0.8, 0, 0], [0.8, 0.6, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]))
+        let model = Self.model(Self.translation(0.3, -0.7, -2).multiplied(by: Matrix(rows: [[1.5, 0, 0, 0], [0, 0, -1, 0], [0, 2, 0, 0], [0, 0, 0, 1]])))
+        let points: [Point<3, Double>] = [Point([0, 0, 0]), Point([0.3, -0.2, 0.1]), Point([-1.7, 2.9, -4.3]), Point([5, 5, 40]), Point([1e-9, -1e6, 0.5])]
+        for scene in scenes {
+            let map = scene.camera.map(of: model.transform)
+            #expect(map == Matrix(scene.camera.projection).multiplied(by: scene.camera.view).multiplied(by: model.transform))
+            for point in points {
+                #expect(Picture.Scene.Camera.clip(point, through: map) == scene.camera.clip(point, in: model.transform))
+                #expect(Picture.Scene.Camera.normalized(point, through: map) == scene.camera.normalized(point, in: model.transform))
+                #expect(scene.position(of: point, through: map) == scene.position(of: point, in: model))
+            }
+        }
+    }
+
+    @Test
     func `A direction goes through the view and the model without their translation and comes out at unit length`() throws {
         var camera = try Self.flat().camera
         #expect(camera.direction(Vector([0, 0, 5])) == Vector([0, 0, 1]))

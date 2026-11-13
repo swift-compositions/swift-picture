@@ -1,3 +1,4 @@
+public import Matrix
 public import Point
 
 extension Picture {
@@ -19,7 +20,13 @@ extension Picture.Scene {
     /// Where the scene draws a point of a model: its place in the picture and its depth.
     /// It is nil for a point in the plane of the eye or behind it.
     public func position(of point: Point::Point<3, Double>, in model: Model) -> Position? {
-        guard let normalized = camera.normalized(point, in: model.transform) else { return nil }
+        position(of: point, through: camera.map(of: model.transform))
+    }
+
+    /// Where the scene draws a point after a matrix into clip space, `Camera.map(of:)` of a model's transform,
+    /// so that `position(of:in:)` is this with the product made once per model instead of per point.
+    public func position(of point: Point::Point<3, Double>, through map: Matrix<4, 4, Double>) -> Position? {
+        guard let normalized = Camera.normalized(point, through: map) else { return nil }
         let left = viewport.llx.underlying
         let top = viewport.lly.underlying
         let width = viewport.urx.underlying - left

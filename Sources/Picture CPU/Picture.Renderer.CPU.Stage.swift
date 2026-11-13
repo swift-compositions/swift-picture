@@ -30,21 +30,12 @@ extension Picture.Renderer.CPU.Stage {
             if case .glass = model.material { glassy = true }
             let normals: [Vector<3, Double>] = glassy ? mesh.normals(per: .vertex) : [Vector<3, Double>](repeating: .zero, count: mesh.vertices.count)
             let eye = scene.camera.eye(of: model.transform)
-            let whole = Matrix(scene.camera.projection).multiplied(by: scene.camera.view).multiplied(by: model.transform)
-            let view = (left: scene.viewport.llx.underlying, top: scene.viewport.lly.underlying)
-            let size = (width: scene.viewport.urx.underlying - view.left, height: scene.viewport.ury.underlying - view.top)
-            /// What `Picture.Scene.position(of:in:)` gives for a point of this model, through the camera's whole
-            /// map worked out once for the model. Normals are worked out for glass alone, which alone reads them.
+            let whole = scene.camera.map(of: model.transform)
             func place(_ point: Point<3, Double>) -> Picture.Scene.Position? {
-                let clip = whole.applied(to: Vector([point[0], point[1], point[2], 1]))
-                guard clip[3] > 0 else { return nil }
-                return Picture.Scene.Position(
-                    point: Picture.Plane.Point<2>([view.left + (clip[0] / clip[3] + 1) / 2 * size.width, view.top + (1 - clip[1] / clip[3]) / 2 * size.height]),
-                    depth: clip[2] / clip[3]
-                )
+                scene.position(of: point, through: whole)
             }
             let corners = zip(mesh.vertices, normals).map { point, normal in
-                let clip = whole.applied(to: Vector([point[0], point[1], point[2], 1]))
+                let clip = Picture.Scene.Camera.clip(point, through: whole)
                 let place = eye.applied(to: Vector([point[0], point[1], point[2], 1]))
                 return Corner(
                     point: point,
