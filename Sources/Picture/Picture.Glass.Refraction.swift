@@ -14,7 +14,8 @@ extension Picture.Glass {
 
         /// How little the index differs between wavelengths: the Abbe number V = (n_d − 1) / (n_F − n_C), about
         /// 60 for crown glass, 30 for dense flint and 17 for the most dispersive optical glass; lower parts the
-        /// colours more. Infinite, the default, is one index for every wavelength.
+        /// colours more, and infinite is one index for every wavelength. `Dispersion` names three strengths; the
+        /// default is `Dispersion.subtle`.
         public var abbe: Double
 
         /// What the surface mirrors, by the share Fresnel's equations give, or nothing.
@@ -23,7 +24,7 @@ extension Picture.Glass {
         public init(
             index: Double = 1.5,
             distance: Double = 1,
-            abbe: Double = .infinity,
+            abbe: Double = Dispersion.subtle,
             surroundings: Picture.Glass.Surroundings? = nil
         ) {
             self.index = index

@@ -2,18 +2,43 @@ extension Picture.Image {
     /// The part of a picture an image is to be drawn from: the picture, the rectangle of it to keep, how many
     /// pixels of the raster one unit of the picture takes, and how many times as fine along each side it is
     /// drawn before every pixel takes the mean of its square.
-    public struct Source: Sendable, Hashable {
-        public var picture: Picture
-        public var rectangle: Picture.Plane.Rectangle
-        public var scale: Double
-        public var samples: Cardinal
+    ///
+    /// A source is hashed once, when it is made: its hash is that of its parts, and every later hash of the
+    /// source, however often a renderer looks it up, combines that one number. Two sources are equal when their
+    /// parts are; the hashes are compared first, so unequal sources are told apart without comparing their
+    /// pictures.
+    public struct Source: Sendable {
+        public let picture: Picture
+        public let rectangle: Picture.Plane.Rectangle
+        public let scale: Double
+        public let samples: Cardinal
+
+        /// The hash of the parts, made once.
+        let digest: Int
 
         public init(_ picture: Picture, in rectangle: Picture.Plane.Rectangle, scale: Double, samples: Cardinal = 1) {
             self.picture = picture
             self.rectangle = rectangle
             self.scale = scale
             self.samples = samples
+            var hasher = Hasher()
+            hasher.combine(picture)
+            hasher.combine(rectangle)
+            hasher.combine(scale)
+            hasher.combine(samples)
+            self.digest = hasher.finalize()
         }
+    }
+}
+
+extension Picture.Image.Source: Hashable {
+    public static func == (first: Self, second: Self) -> Bool {
+        first.digest == second.digest && first.scale == second.scale && first.samples == second.samples
+            && first.rectangle == second.rectangle && first.picture == second.picture
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(digest)
     }
 }
 

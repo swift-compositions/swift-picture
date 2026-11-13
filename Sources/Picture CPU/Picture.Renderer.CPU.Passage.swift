@@ -13,6 +13,9 @@ extension Picture.Renderer.CPU {
         let exit: Vector<3, Double>?
         let point: Read
         let own: (x: Double, y: Double)?
+
+        /// How squarely the line of sight meets the surface: the cosine between them.
+        let cosine: Double
         let distance: Double
 
         /// Where light of the glass's own index reads the picture.
@@ -74,7 +77,7 @@ extension Picture.Renderer.CPU.Passage {
             }
         }
         var passage = Self(
-            place: place, sight: sight, toward: toward, exit: exit, point: point, own: own,
+            place: place, sight: sight, toward: toward, exit: exit, point: point, own: own, cosine: cosine,
             distance: refraction.distance, read: point, length: length, leaving: sight, beyond: 0,
             mirrored: Picture.Glass.Refraction.mirrored(sight, at: toward),
             share: refraction.surroundings == nil ? 0 : refraction.reflectance(cosine: cosine)
@@ -86,10 +89,21 @@ extension Picture.Renderer.CPU.Passage {
         self = passage
     }
 
-    /// Where light of an index reads the picture: bent in by it, along the path's length, bent out by it.
+    /// Where light of an index reads the picture: bent in by it, along the path's length, bent out by it. Where
+    /// the line of sight grazes the surface, within a cosine of `grazing`, the read is drawn back toward the point
+    /// itself, all the way at a cosine of 0 and not at all from `grazing` on, with no slope at either end: there a
+    /// few pixels of silhouette would otherwise read far and wide, which shows as moiré, and the line along the
+    /// outline covers them.
     func read(for index: Double, lens: Picture.Renderer.CPU.Lens) -> Read {
-        way(for: index, lens: lens).read ?? point
+        let read = way(for: index, lens: lens).read ?? point
+        guard cosine < Self.grazing else { return read }
+        let t = Swift.max(cosine, 0) / Self.grazing
+        let share = t * t * (3 - 2 * t)
+        return Read(x: point.x + (read.x - point.x) * share, y: point.y + (read.y - point.y) * share)
     }
+
+    /// The cosine below which a grazing read is drawn back toward the point.
+    static let grazing = 0.2
 
     func way(for index: Double, lens: Picture.Renderer.CPU.Lens) -> (read: Read?, out: Vector<3, Double>) {
         let n = Swift.max(index, 1)

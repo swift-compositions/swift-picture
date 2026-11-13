@@ -158,11 +158,11 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
 
     @Test
     func `A light's rim grows as the surface turns edge-on to the eye, and the share stays within 0 and 1`() {
-        let rim = Picture.Glass.Light(direction: Vector([1, 0, -1]), gloss: 1000, rim: 0.5, counter: 1)
+        let rim = Picture.Glass.Light(direction: Vector([1, 0, -1]), gloss: 1000, sheen: 0.5, counter: 1)
         #expect(Tests.close(rim.reflection(for: Vector([0, 0, 1])), 0))
         #expect(Tests.close(rim.reflection(for: Vector([0.8, 0, 0.6])), 0.5 * 0.4 * 0.4 * 0.4))
         #expect(Tests.close(rim.reflection(for: Vector([-1, 0, 0])), 0.5))
-        let both = Picture.Glass.Light(direction: Vector([0, 0, 1]), gloss: 0, rim: 1)
+        let both = Picture.Glass.Light(direction: Vector([0, 0, 1]), gloss: 0, sheen: 1)
         #expect(both.reflection(for: Vector([0.8, 0, 0.6])) == 1)
     }
 
@@ -176,7 +176,10 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
         let light = Picture.Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, rim: 0)
         let lit = Picture.Glass(bend: 20, light: light)
         let share = Float(light.reflection(for: normal))
-        #expect(lit.pixel(over: behind, facing: normal) == Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: behind, operator: .lighter, coverage: share))
+        let added = Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: behind, operator: .lighter, coverage: share)
+        let alpha = Swift.min(Swift.max(added.alpha, 0), 1)
+        let held = Picture.Pixel(color: .init(red: Swift.min(added.color.red, alpha), green: Swift.min(added.color.green, alpha), blue: Swift.min(added.color.blue, alpha)), alpha: alpha)
+        #expect(lit.pixel(over: behind, facing: normal) == held)
         #expect(lit.pixel(over: behind, facing: Vector([1, 0, 0])) == behind)
     }
 
@@ -208,7 +211,7 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
         for normal in normals {
             #expect(Picture.Scene.Camera.direction(normal, through: eye) == camera.direction(normal, in: model))
         }
-        let light = Picture.Glass.Light(direction: Vector([0.3, 0.5, 1]), color: .init(red: 1, green: 0.9, blue: 0.7), gloss: 30, rim: 0.6)
+        let light = Picture.Glass.Light(direction: Vector([0.3, 0.5, 1]), color: .init(red: 1, green: 0.9, blue: 0.7), gloss: 30, sheen: 0.6)
         let glasses = [
             Picture.Glass(bend: 20, tint: .init(red: 1, green: 0.4, blue: 0.2, alpha: 0.3), light: light),
             Picture.Glass(bend: 20, tint: .init(red: 0.2, green: 0.4, blue: 1, alpha: 0.6)),

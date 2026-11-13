@@ -30,23 +30,19 @@ extension Picture.Glass {
         /// steeper at the boundary.
         public var profile: Double
 
-        /// The soft shadows the pane casts on the picture around it, drawn in order.
-        public var shadows: [Shadow]
 
         public init(
             _ region: Picture.Plane.Region,
             glass: Picture.Glass,
             thickness: Double = 24,
             rim: Double = 24,
-            profile: Double = 3,
-            shadows: [Shadow] = []
+            profile: Double = 3
         ) {
             self.region = region
             self.glass = glass
             self.thickness = thickness
             self.rim = rim
             self.profile = profile
-            self.shadows = shadows
         }
     }
 }

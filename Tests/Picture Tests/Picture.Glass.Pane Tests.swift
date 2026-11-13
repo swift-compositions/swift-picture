@@ -90,7 +90,7 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
         #expect(passage.offset(for: refraction.index(at: 550))[0] < passage.offset(for: refraction.index(at: 420))[0])
         #expect(passage.offset(for: refraction.index) == passage.offset)
         let plain = Self.pane(distance: 10).passage(at: Tests.at(6, 50))
-        #expect(plain.offset(for: Refraction(index: 1.5).index(at: 420)) == plain.offset)
+        #expect(plain.offset(for: Refraction(index: 1.5, abbe: .infinity).index(at: 420)) == plain.offset)
     }
 
     @Test
@@ -117,7 +117,7 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
 
     @Test
     func `A shadow is half on the moved boundary and falls evenly from inside to outside`() {
-        let shadow = Pane.Shadow(softness: 10)
+        let shadow = Picture.Glass.Shadow(softness: 10)
         #expect(shadow.share(at: 0) == 0.5)
         var previous = 1.0
         for step in -50...50 {
@@ -126,8 +126,8 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
             #expect(Tests.close(share + shadow.share(at: -Double(step)), 1, within: 1e-12))
             previous = share
         }
-        #expect(Pane.Shadow(softness: 0).share(at: 0.1) == 0)
-        #expect(Pane.Shadow(softness: 0).share(at: -0.1) == 1)
+        #expect(Picture.Glass.Shadow(softness: 0).share(at: 0.1) == 0)
+        #expect(Picture.Glass.Shadow(softness: 0).share(at: -0.1) == 1)
     }
 }
 
@@ -155,14 +155,49 @@ extension `Picture Tests`.`A glass adapts to its backdrop and lights its rim` {
 
     @Test
     func `The rim's sheen is brightest on the side toward the light and keeps the counter share on the other`() {
-        let light = Picture.Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, rim: 1, sharpness: 1, counter: 0.25)
+        let light = Picture.Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, sheen: 1, sharpness: 1, counter: 0.25)
         let up = light.reflection(for: Vector([0, 1, 0]))
         let down = light.reflection(for: Vector([0, -1, 0]))
         let aside = light.reflection(for: Vector([1, 0, 0]))
         #expect(Tests.close(up, 1))
         #expect(Tests.close(down, 0.25))
         #expect(Tests.close(aside, 0.25 * 1.25))
-        let straight = Picture.Glass.Light(direction: Vector([0, 0, 1]), gloss: 1000, rim: 1, sharpness: 1)
+        let straight = Picture.Glass.Light(direction: Vector([0, 0, 1]), gloss: 1000, sheen: 1, sharpness: 1)
         #expect(Tests.close(straight.reflection(for: Vector([1, 0, 0])), straight.reflection(for: Vector([0, -1, 0]))))
+    }
+
+    @Test
+    func `The line along the outline is full to one width in, gone from two and a half, and none outside`() {
+        let light = Picture.Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, rim: 0.8, width: 2, counter: 1, focus: 2)
+        let up = (x: 0.0, y: 1.0)
+        #expect(light.line(at: -0.1, across: up) == 0)
+        #expect(Tests.close(light.line(at: 0, across: up), 0.8))
+        #expect(Tests.close(light.line(at: 2, across: up), 0.8))
+        #expect(light.line(at: 3, across: up) < 0.8 && light.line(at: 3, across: up) > 0)
+        #expect(light.line(at: 5, across: up) == 0)
+        var previous = 1.0
+        for step in 0...60 {
+            let value = light.line(at: Double(step) / 10, across: up)
+            #expect(value <= previous)
+            previous = value
+        }
+        #expect(Picture.Glass.Light(direction: Vector([0, 1, 1]), rim: 1, width: 0).line(at: 0, across: up) == 0)
+        let focused = Picture.Glass.Light(direction: Vector([0, 1, 1]), rim: 1, width: 2, counter: 1, focus: 6)
+        #expect(Tests.close(focused.line(at: 1, across: up), 1))
+        #expect(Tests.close(focused.line(at: 1, across: (x: 1, y: 0)), 2.0 / 64))
+    }
+
+    @Test
+    func `Adaptation moves a backdrop's lightness and keeps its hue and chroma`() {
+        let toward = Picture.Glass.Adaptation(toward: .white, strength: 0.6)
+        let navy = Picture.Color(red: 0.08, green: 0.08, blue: 0.2).pixel
+        let before = Picture.Glass.Adaptation.oklab(of: navy)
+        let after = Picture.Glass.Adaptation.oklab(of: toward.pixel(navy))
+        #expect(after.L > before.L + 0.2)
+        #expect(Tests.close(after.a, before.a, within: 2e-3) && Tests.close(after.b, before.b, within: 2e-3))
+        let white = Picture.Color.white.pixel
+        #expect(Tests.close(Picture.Glass.Adaptation.lightness(of: white), 1, within: 1e-4))
+        let back = Picture.Glass.Adaptation.color(L: before.L, a: before.a, b: before.b)
+        #expect(Tests.close(back.red, navy.color.red, within: 1e-4) && Tests.close(back.blue, navy.color.blue, within: 1e-4))
     }
 }

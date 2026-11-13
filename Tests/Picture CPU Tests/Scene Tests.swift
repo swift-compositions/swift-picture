@@ -145,7 +145,7 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
             vertices: [Vertex([-1, -1, -5]), Vertex([1, -1, -5 + 2 * tilt]), Vertex([1, 1, -5 + 2 * tilt]), Vertex([-1, 1, -5])],
             faces: [Polygon(0, 1, 2, 3)]
         )
-        let light = Picture.Glass.Light(direction: Vector([-1, 0.5, 1]), color: .white, gloss: 3, rim: 0.4)
+        let light = Picture.Glass.Light(direction: Vector([-1, 0.5, 1]), color: .white, gloss: 3, sheen: 0.4)
         let glass = Picture.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25), light: light)
         let raster = try Tests.drawn([background, .scene(try Self.flat([.init(pane, material: .glass(glass))]))], on: Tests.canvas(40, 40))
         let length = (1 + tilt * tilt).squareRoot()

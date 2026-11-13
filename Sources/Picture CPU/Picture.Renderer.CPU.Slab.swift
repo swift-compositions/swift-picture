@@ -11,7 +11,7 @@ extension Picture.Renderer.CPU.Slab {
     static func bounds(of pane: Picture.Glass.Pane, _ transform: Picture.Transform) -> Picture.Renderer.CPU.Box {
         guard let rectangle = pane.region.boundingBox else { return .empty }
         var reach = 0.0
-        for shadow in pane.shadows {
+        for shadow in pane.glass.shadows {
             reach = Swift.max(reach, abs(shadow.x) + abs(shadow.y) + 4 * Swift.max(shadow.softness, 0))
         }
         guard reach.isFinite else { return .empty }
@@ -26,10 +26,10 @@ extension Picture.Renderer.CPU.Slab {
 }
 
 extension Picture.Renderer.CPU.Canvas {
-    /// Draws a pane: its shadows over what is behind, then over the region the glass's pixel of the picture as it
-    /// stood before the shadows, read through the pane. Pixels on the boundary take the mean of 3 × 3 points
-    /// and those in the outer two fifths of the rim, where the bend changes fast, of 2 × 2; a point outside the
-    /// region keeps what was there.
+    /// Draws a pane: its glass's shadows over what is behind, then over the region the glass's pixel of the
+    /// picture as it stood before the shadows, read through the pane. Pixels on the boundary and under the light's
+    /// line take the mean of 3 × 3 points and those in the outer two fifths of the rim, where the bend changes
+    /// fast, of 2 × 2; a point outside the region keeps what was there.
     mutating func draw(_ pane: Picture.Glass.Pane, _ state: Picture.Renderer.CPU.State) {
         guard let inverse = state.inverse else { return }
         let transform = state.transform
@@ -43,7 +43,7 @@ extension Picture.Renderer.CPU.Canvas {
         let outer = Picture.Renderer.CPU.Slab.bounds(of: pane, transform).intersection(reach)
         let coarse = Picture.Renderer.CPU.Slab.Coarse(region, over: outer, inverse, scale: scale)
 
-        for shadow in pane.shadows where shadow.color.alpha > 0 {
+        for shadow in pane.glass.shadows where shadow.color.alpha > 0 {
             let area = outer
             let color = shadow.color.with(alpha: 1).pixel
             let strength = shadow.color.alpha
@@ -77,6 +77,7 @@ extension Picture.Renderer.CPU.Canvas {
 
         func glass(_ pane: Picture.Glass.Pane, _ x: Double, _ y: Double, _ sample: Picture.Plane.Region.Sample) -> Picture.Pixel {
             let passage = Picture.Glass.Pane.Passage(through: pane, for: sample)
+            let outline = Picture.Glass.Outline(inward: -sample.distance, x: sample.gradient[0], y: -sample.gradient[1])
             let frosting = Picture.Glass.frosting(facing: passage.normal)
             func place(_ offset: Vector<2, Double>) -> (x: Double, y: Double) {
                 (x + linear.0 * offset[0] + linear.1 * offset[1], y + linear.2 * offset[0] + linear.3 * offset[1])
@@ -98,12 +99,14 @@ extension Picture.Renderer.CPU.Canvas {
                 mirroring: passage.mirrored,
                 by: passage.share,
                 facing: passage.normal,
+                outline: outline,
                 tilts: tilts
             )
         }
 
         let level = Picture.Glass.Pane.Passage(through: pane, for: .init(distance: -.infinity, gradient: .zero))
-        let rimDepth = rimPixels + 1.5
+        let lineBand = 2.5 * Swift.max(pane.glass.light?.width ?? 0, 0) * scale
+        let rimDepth = Swift.max(rimPixels, lineBand) + 1.5
 
         update(inside, state.workers, making: {
         var pane = pane
@@ -130,7 +133,7 @@ extension Picture.Renderer.CPU.Canvas {
             let centre = region.sample(at: Picture.Renderer.CPU.point(inverse, cx, cy))
             let depth = -centre.distance * scale
             guard depth > -1.5 else { return old }
-            let samples = depth < 1.5 ? 3 : (depth < rimPixels * 0.4 ? 2 : 1)
+            let samples = depth < Swift.max(1.5, lineBand + 0.5) ? 3 : (depth < rimPixels * 0.4 ? 2 : 1)
             guard samples > 1 else { return Picture.Renderer.CPU.limited(old, glass(pane, cx, cy, centre), state.share(x, y)) }
             var mean = Picture.Pixel.transparent
             var count = 0

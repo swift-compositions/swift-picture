@@ -1,16 +1,17 @@
 import Numeric
 
-extension Picture.Glass.Pane {
-    /// A soft shadow a pane casts on the picture around it: the region moved by an offset and blurred by a
-    /// softness, in a colour whose alpha is its strength. It falls only outside the pane, which shows the
-    /// picture without it.
+extension Picture.Glass {
+    /// A soft shadow a glass casts on the picture around it: its outline as drawn, a pane's region or a body's
+    /// silhouette, moved by an offset and blurred by a softness, in a colour whose alpha is its strength. It falls
+    /// only outside the glass, which shows the picture without it. A thin dark one hugging the outline is the
+    /// glass's dark edge.
     public struct Shadow: Sendable, Hashable {
         public var color: Picture.Color
 
         /// How soft the edge is, in picture units: about the deviation of a Gaussian blur of the region.
         public var softness: Double
 
-        /// How far the shadow is moved from the pane, in picture units.
+        /// How far the shadow is moved from the glass, in picture units.
         public var x: Double
         public var y: Double
 
@@ -23,7 +24,7 @@ extension Picture.Glass.Pane {
     }
 }
 
-extension Picture.Glass.Pane.Shadow {
+extension Picture.Glass.Shadow {
     /// The share of the colour at a signed distance from the moved region's boundary: 1 / (1 + e^(1.7·d / softness)),
     /// the logistic curve that stands within 0.01 of a Gaussian-blurred edge: a half on the boundary, toward 1
     /// inside and 0 outside, falling evenly; a hard edge for a softness that is not positive.

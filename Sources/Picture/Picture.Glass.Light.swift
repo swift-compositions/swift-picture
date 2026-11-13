@@ -2,9 +2,10 @@ import Numeric
 public import Vector
 
 extension Picture.Glass {
-    /// A light the glass reflects: a highlight where the surface faces halfway between the light and the
-    /// eye, and a sheen at the rim where the surface turns away from the eye, brightest on the side that faces
-    /// the light across the eye's view and fainter on the side opposite, as light caught inside the glass.
+    /// A light the glass reflects: a highlight where the surface faces halfway between the light and the eye; a
+    /// thin bright line along the glass's outline, as light caught in its edge; and a sheen where the surface
+    /// turns away from the eye. Line and sheen are brightest on the side that faces the light across the eye's
+    /// view and fainter on the side opposite.
     public struct Light: Sendable, Hashable {
         /// Toward the light, in eye space, where the eye looks along minus z.
         public var direction: Vector<3, Double>
@@ -16,31 +17,48 @@ extension Picture.Glass {
         /// How strong the highlight is, 0 to 1; the rim's sheen does not depend on it.
         public var highlight: Double
 
-        /// How much light the rim reflects where the surface is edge-on to the eye, 0 to 1.
+        /// How bright the line along the outline is, 0 to 1.
         public var rim: Double
 
-        /// How fast the sheen falls off away from edge-on: the power its share of `rim` is raised to.
+        /// How wide the line is at full brightness, in picture units; it fades out over one and a half times
+        /// that further in.
+        public var width: Double
+
+        /// How much light the surface reflects where it is edge-on to the eye, 0 to 1, apart from the line.
+        public var sheen: Double
+
+        /// How fast the sheen falls off away from edge-on: the power its share of `sheen` is raised to.
         public var sharpness: Double
 
-        /// How much of the sheen the side of the rim turned away from the light keeps, 0 to 1.
+        /// How much of the line and the sheen the side turned away from the light keeps, 0 to 1.
         public var counter: Double
+
+        /// How closely line and sheen keep to the sides facing toward and away from the light: the power their
+        /// share across the view is raised to, 2 by default.
+        public var focus: Double
 
         public init(
             direction: Vector<3, Double>,
             color: Picture.Color = .white,
             gloss: Double = 40,
             highlight: Double = 1,
-            rim: Double = 0.5,
+            rim: Double = 0,
+            width: Double = 2,
+            sheen: Double = 0,
             sharpness: Double = 3,
-            counter: Double = 0.5
+            counter: Double = 0.5,
+            focus: Double = 2
         ) {
             self.direction = direction
             self.color = color
             self.gloss = gloss
             self.highlight = highlight
             self.rim = rim
+            self.width = width
+            self.sheen = sheen
             self.sharpness = sharpness
             self.counter = counter
+            self.focus = focus
         }
     }
 }
@@ -65,14 +83,14 @@ extension Picture.Glass.Light {
         let edge = 1 - Swift.min(Swift.max(n.2, 0), 1)
         let power = Swift.max(sharpness, 0)
         let falloff = edge > 0 ? Double.exp(power * Double.log(edge)) : (power == 0 ? 1 : 0)
-        let sheen = Swift.min(Swift.max(rim, 0), 1) * falloff * side(of: n)
-        return Swift.min(Swift.max(highlight + sheen, 0), 1)
+        let shone = Swift.min(Swift.max(sheen, 0), 1) * falloff * side(of: n)
+        return Swift.min(Swift.max(highlight + shone, 0), 1)
     }
 
     /// How much of the sheen a unit normal's side of the rim takes: for the cosine a between the normal's
-    /// direction across the view (x and y) and the light's, ((1 + a) / 2)² + `counter` × ((1 − a) / 2)², so 1
-    /// on the side toward the light, `counter` on the side away and a quarter of 1 + `counter` across; 1 where
-    /// either has no direction across the view.
+    /// direction across the view (x and y) and the light's, ((1 + a) / 2)^f + `counter` × ((1 − a) / 2)^f for f
+    /// the `focus`, so 1 on the side toward the light, `counter` on the side away and (1 + `counter`) / 2^f across;
+    /// 1 where either has no direction across the view.
     func side(of n: (Double, Double, Double)) -> Double {
         let across = (n.0 * n.0 + n.1 * n.1).squareRoot()
         let light = (direction[0] * direction[0] + direction[1] * direction[1]).squareRoot()
@@ -80,7 +98,9 @@ extension Picture.Glass.Light {
         let a = (n.0 * direction[0] + n.1 * direction[1]) / (across * light)
         let toward = (1 + a) / 2
         let away = (1 - a) / 2
-        return toward * toward + Swift.min(Swift.max(counter, 0), 1) * away * away
+        let f = Swift.max(focus, 0)
+        func power(_ value: Double) -> Double { f == 2 ? value * value : (value > 0 ? Double.exp(f * Double.log(value)) : (f == 0 ? 1 : 0)) }
+        return power(toward) + Swift.min(Swift.max(counter, 0), 1) * power(away)
     }
 }
 
@@ -98,5 +118,28 @@ extension Picture.Glass.Light {
         let angle = Swift.min(Double.atan2(across, abs(normal[2])) * Swift.max(tilt, 0), Double.pi / 2)
         let lean = Double.sin(angle) / across
         return reflection(for: Vector([normal[0] * lean, normal[1] * lean, sign * Double.cos(angle)]))
+    }
+}
+
+extension Picture.Glass.Light {
+    /// The share of the light the line along the outline sends to the eye at a point `inward` in from the outline,
+    /// in picture units, where the outline's outward direction across the view, x right and y up, is `across`:
+    /// `rim` times the line's profile at inward / `width` times the side's share (as for the sheen). The profile is
+    /// 1 from the outline to one width in, then falls to 0 at two and a half widths with no slope at either end,
+    /// and is 0 outside the glass; a width that is not positive draws no line.
+    public func line(at inward: Double, across: (x: Double, y: Double)) -> Double {
+        guard width > 0, inward >= 0, inward.isFinite else { return 0 }
+        let u = inward / width
+        let profile: Double
+        if u <= 1 {
+            profile = 1
+        } else if u >= 2.5 {
+            profile = 0
+        } else {
+            let t = (u - 1) / 1.5
+            profile = 1 - t * t * (3 - 2 * t)
+        }
+        guard profile > 0 else { return 0 }
+        return Swift.min(Swift.max(rim, 0), 1) * profile * side(of: (across.x, across.y, 0))
     }
 }

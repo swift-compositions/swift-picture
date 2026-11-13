@@ -14,8 +14,8 @@ extension Picture.Glass {
         let gain: Float
         let saturation: Float
 
-        /// The adaptation's colour as a working pixel and its strength held to 0…1, or none.
-        let adaptation: (color: Picture.Pixel, strength: Float)?
+        /// The adaptation, or none.
+        let adaptation: Picture.Glass.Adaptation?
     }
 }
 
@@ -37,10 +37,7 @@ extension Picture.Glass.Shading {
     func adapted(_ read: Picture.Pixel) -> Picture.Pixel {
         let pixel = Picture.Glass.saturated(read, by: saturation, gain: gain)
         guard let adaptation, adaptation.strength > 0 else { return pixel }
-        let target = Picture.Glass.Adaptation.lightness(of: adaptation.color)
-        let share = adaptation.strength * abs(target - Picture.Glass.Adaptation.lightness(of: pixel))
-        guard share > 0 else { return pixel }
-        return pixel.interpolated(to: adaptation.color, at: share)
+        return adaptation.pixel(pixel)
     }
 
     /// The pixel of glass with a body. Red, green and blue each come from the pixel that colour's light reads,
@@ -57,6 +54,7 @@ extension Picture.Glass.Shading {
         mirroring mirrored: Vector<3, Double>,
         by share: Double,
         facing normal: Vector<3, Double>,
+        outline: Picture.Glass.Outline? = nil,
         tilts: InlineArray<3, Double> = [1, 1, 1]
     ) -> Picture.Pixel {
         let split = Picture.Pixel(
@@ -74,25 +72,51 @@ extension Picture.Glass.Shading {
             let around = below.interpolated(to: above, at: Float(Picture.Glass.Surroundings.share(toward: mirrored)))
             coated = coated.interpolated(to: around, at: Float(Swift.min(Swift.max(share, 0), 1)))
         }
-        return lit(coated, facing: normal, tilts: tilts)
+        return lit(coated, facing: normal, outline: outline, tilts: tilts)
     }
 
-    /// A pixel of the glass with the light it reflects at a normal added, each colour's at the normal leaned by
-    /// that colour's tilt (`Picture.Glass.Light.reflection(for:tilt:)`), so a dispersive rim's sheen parts into
-    /// colours as the light bent through it does. Tilts of 1 give `lit(_:facing:)`.
-    public func lit(_ coated: Picture.Pixel, facing normal: Vector<3, Double>, tilts: InlineArray<3, Double>) -> Picture.Pixel {
-        guard let light, tilts[0] != 1 || tilts[1] != 1 || tilts[2] != 1 else { return lit(coated, facing: normal) }
+    /// A pixel of the glass with the light it reflects added: at the normal (`Picture.Glass.Light.reflection(for:)`)
+    /// and, where the point's place from the outline is known, the line along it (`Picture.Glass.Light.line(at:across:)`).
+    /// Each colour takes its own tilt: its reflection at the normal leaned by it
+    /// (`Picture.Glass.Light.reflection(for:tilt:)`) and its line at `inward` times it, so with dispersion the
+    /// light parts into colours as the light bent through the glass does, and without it, tilts of 1, every colour
+    /// takes the same share. The result is held at white: no colour above its alpha.
+    public func lit(
+        _ coated: Picture.Pixel,
+        facing normal: Vector<3, Double>,
+        outline: Picture.Glass.Outline?,
+        tilts: InlineArray<3, Double>
+    ) -> Picture.Pixel {
+        guard let light else { return coated }
+        let neutral = tilts[0] == 1 && tilts[1] == 1 && tilts[2] == 1
+        func share(_ tilt: Double) -> Float {
+            var total = tilt == 1 ? light.reflection(for: normal) : light.reflection(for: normal, tilt: tilt)
+            if let outline { total += light.line(at: outline.inward * tilt, across: (outline.x, outline.y)) }
+            return Float(Swift.min(Swift.max(total, 0), 1))
+        }
+        if neutral {
+            let one = share(1)
+            return one > 0 ? Self.held(shine.composited(over: coated, operator: .lighter, coverage: one)) : coated
+        }
         var channels = InlineArray<3, Float>(repeating: 0)
         var alpha: Float = coated.alpha
         var channel = 0
         while channel < 3 {
-            let share = Float(light.reflection(for: normal, tilt: tilts[channel]))
-            let shone = share > 0 ? shine.composited(over: coated, operator: .lighter, coverage: share) : coated
+            let amount = share(tilts[channel])
+            let shone = amount > 0 ? shine.composited(over: coated, operator: .lighter, coverage: amount) : coated
             channels[channel] = channel == 0 ? shone.color.red : channel == 1 ? shone.color.green : shone.color.blue
             if channel == 1 { alpha = shone.alpha }
             channel += 1
         }
-        return Picture.Pixel(color: .init(red: channels[0], green: channels[1], blue: channels[2]), alpha: alpha)
+        return Self.held(Picture.Pixel(color: .init(red: channels[0], green: channels[1], blue: channels[2]), alpha: alpha))
+    }
+
+    /// A pixel with each colour held to 0 up to its alpha and its alpha to 0…1, as light added to glass saturates
+    /// at white.
+    static func held(_ pixel: Picture.Pixel) -> Picture.Pixel {
+        let alpha = Swift.min(Swift.max(pixel.alpha, 0), 1)
+        func hold(_ value: Float) -> Float { Swift.min(Swift.max(value, 0), alpha) }
+        return Picture.Pixel(color: .init(red: hold(pixel.color.red), green: hold(pixel.color.green), blue: hold(pixel.color.blue)), alpha: alpha)
     }
 
     /// A pixel of the glass with the light it reflects at a normal added.
@@ -100,6 +124,6 @@ extension Picture.Glass.Shading {
         guard let light else { return coated }
         let share = Float(light.reflection(for: normal))
         guard share > 0 else { return coated }
-        return shine.composited(over: coated, operator: .lighter, coverage: share)
+        return Self.held(shine.composited(over: coated, operator: .lighter, coverage: share))
     }
 }

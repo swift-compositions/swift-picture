@@ -13,8 +13,10 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
 
     static let region = Picture.Plane.Region.rectangle(.init(llx: 10, lly: 10, urx: 70, ury: 50), radius: 12)
 
-    static func pane(_ glass: Picture.Glass, shadow: Picture.Glass.Pane.Shadow? = nil) -> Picture.Element {
-        .pane(Picture.Glass.Pane(region, glass: glass, thickness: 8, rim: 10, shadows: shadow.map { [$0] } ?? []))
+    static func pane(_ glass: Picture.Glass, shadow: Picture.Glass.Shadow? = nil) -> Picture.Element {
+        var glass = glass
+        glass.shadows = shadow.map { [$0] } ?? []
+        return .pane(Picture.Glass.Pane(region, glass: glass, thickness: 8, rim: 10))
     }
 
     /// Black and white stripes four pixels wide.
@@ -61,7 +63,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     @Test
     func `A shadow darkens around the pane and the pane shows the picture without it`() throws {
         let white = Picture.Color.white
-        let shadow = Picture.Glass.Pane.Shadow(color: Picture.Color(red: 0, green: 0, blue: 0, alpha: 0.5), softness: 4, x: 0, y: 4)
+        let shadow = Picture.Glass.Shadow(color: Picture.Color(red: 0, green: 0, blue: 0, alpha: 0.5), softness: 4, x: 0, y: 4)
         let raster = try Tests.drawn(
             [Tests.fill(Tests.rectangle(-100, -100, 300, 300), white), Self.pane(Picture.Glass(refraction: .init()), shadow: shadow)],
             on: Tests.canvas(80, 60)
@@ -127,5 +129,21 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
         let white = [Tests.fill(Tests.rectangle(-100, -100, 300, 300), .white)]
         #expect(Tests.close(try drawn(12, over: white), try drawn(.infinity, over: white), within: 2e-5))
         #expect(Tests.close(try drawn(1e12, over: line), plain, within: 1e-4))
+    }
+
+    @Test
+    func `The light's line brightens a band along the boundary, brightest on the side toward the light`() throws {
+        let black = [Tests.fill(Tests.rectangle(-100, -100, 300, 300), .black)]
+        let plain = Picture.Glass(refraction: .init(index: 1))
+        var lit = plain
+        lit.light = Picture.Glass.Light(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, rim: 1, width: 1.5, counter: 0.5, focus: 2)
+        let dark = try Tests.drawn(Picture(black + [Self.pane(plain)]), on: Tests.canvas(80, 60))
+        let bright = try Tests.drawn(Picture(black + [Self.pane(lit)]), on: Tests.canvas(80, 60))
+        // The top edge is at y 10, the bottom at y 50; picture space's y runs down, so up on the screen is the top.
+        #expect(Tests.at(bright, 40, 10).color.red > 0.6)
+        #expect(Tests.at(bright, 40, 49).color.red > 0.2)
+        #expect(Tests.at(bright, 40, 10).color.red > Tests.at(bright, 40, 49).color.red)
+        #expect(Tests.at(dark, 40, 10).color.red < 1e-6)
+        #expect(Tests.close(Tests.at(bright, 40, 30), Tests.at(dark, 40, 30), within: 1e-6))
     }
 }

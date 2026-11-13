@@ -37,6 +37,9 @@ extension Picture {
         /// that content on the glass stays legible; none changes nothing.
         public var adaptation: Adaptation?
 
+        /// The soft shadows the glass casts on the picture around it, drawn in order before it.
+        public var shadows: [Shadow]
+
         public init(
             bend: Double = 0,
             tint: Picture.Color = .clear,
@@ -45,7 +48,8 @@ extension Picture {
             frost: Double = 0,
             gain: Double = 1,
             saturation: Double = 1,
-            adaptation: Adaptation? = nil
+            adaptation: Adaptation? = nil,
+            shadows: [Shadow] = []
         ) {
             self.bend = bend
             self.tint = tint
@@ -55,6 +59,7 @@ extension Picture {
             self.gain = gain
             self.saturation = saturation
             self.adaptation = adaptation
+            self.shadows = shadows
         }
     }
 }
@@ -86,9 +91,13 @@ extension Picture.Glass {
         mirroring mirrored: Vector<3, Double>,
         by share: Double,
         facing normal: Vector<3, Double>,
+        outline: Outline? = nil,
         tilts: InlineArray<3, Double> = [1, 1, 1]
     ) -> Picture.Pixel {
-        shading.pixel(over: behind, through: length, leaving: leaving, beyond: beyond, mirroring: mirrored, by: share, facing: normal, tilts: tilts)
+        shading.pixel(
+            over: behind, through: length, leaving: leaving, beyond: beyond, mirroring: mirrored, by: share,
+            facing: normal, outline: outline, tilts: tilts
+        )
     }
 
     /// The glass with its colours taken into working pixels once, for drawing many points of it.
@@ -101,7 +110,7 @@ extension Picture.Glass {
             below: refraction?.surroundings?.below.pixel,
             gain: Float(gain),
             saturation: Float(saturation),
-            adaptation: adaptation.map { ($0.color.pixel, Float(Swift.min(Swift.max($0.strength, 0), 1))) }
+            adaptation: adaptation
         )
     }
 }

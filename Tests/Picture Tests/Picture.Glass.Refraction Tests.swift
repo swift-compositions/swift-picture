@@ -71,8 +71,9 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
         #expect(glass.index(at: 420) > glass.index(at: 520))
         #expect(glass.index(at: 520) > glass.index(at: 680))
         let plain = Refraction()
-        #expect(plain.index == 1.5 && plain.distance == 1 && plain.abbe == .infinity && plain.surroundings == nil)
-        #expect(plain.index(at: 420) == 1.5 && plain.index(at: 680) == 1.5)
+        #expect(plain.index == 1.5 && plain.distance == 1 && plain.abbe == Refraction.Dispersion.subtle && plain.surroundings == nil)
+        let none = Refraction(abbe: Refraction.Dispersion.none)
+        #expect(none.index(at: 420) == 1.5 && none.index(at: 680) == 1.5)
         #expect(Refraction(index: 1.01, abbe: 0.01).index(at: 700) == 1)
         let normal = Vector<3, Double>([0, 0, 1])
         let slanted = Vector<3, Double>([0.6, 0, -0.8])
@@ -105,11 +106,11 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
 
     @Test
     func `With dispersion blue's sheen leans further than red's, and without it every colour's is the glass's`() {
-        #expect(Refraction(index: 1.5).tilts[0] == 1 && Refraction(index: 1.5).tilts[2] == 1)
+        #expect(Refraction(index: 1.5, abbe: .infinity).tilts[0] == 1 && Refraction(index: 1.5, abbe: .infinity).tilts[2] == 1)
         let tilts = Refraction(index: 1.5, abbe: 20).tilts
         #expect(tilts[2] > tilts[1] && tilts[1] > tilts[0])
         #expect(abs(tilts[1] - 1) < 0.03)
-        let light = Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, highlight: 0, rim: 1, sharpness: 4)
+        let light = Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, highlight: 0, sheen: 1, sharpness: 4)
         let normal = Vector<3, Double>([0, 0.6, 0.8])
         #expect(light.reflection(for: normal, tilt: 1) == light.reflection(for: normal))
         #expect(light.reflection(for: normal, tilt: 1.2) > light.reflection(for: normal))
@@ -180,8 +181,11 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
         #expect(Tests.close(pixel(glass, beyond: 1, by: 0.5), Tests.pixel(0.5, 0.5, 0.5, 1)))
         #expect(pixel(Glass(bend: 0, refraction: .init()), beyond: 1, by: 1) == grey)
         let light = Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, rim: 0)
-        let lit = Glass(bend: 0, light: light, refraction: .init(surroundings: around))
-        #expect(pixel(lit, beyond: 0, by: 0) == Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: grey, operator: .lighter, coverage: 1))
+        let lit = Glass(bend: 0, light: light, refraction: .init(abbe: .infinity, surroundings: around))
+        let added = Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: grey, operator: .lighter, coverage: 1)
+        let alpha = Swift.min(Swift.max(added.alpha, 0), 1)
+        let held = Picture.Pixel(color: .init(red: Swift.min(added.color.red, alpha), green: Swift.min(added.color.green, alpha), blue: Swift.min(added.color.blue, alpha)), alpha: alpha)
+        #expect(pixel(lit, beyond: 0, by: 0) == held)
         let shaded = lit.shading.pixel(over: reads, through: 1, leaving: normal, beyond: 0.3, mirroring: normal, by: 0.2, facing: normal)
         #expect(shaded == lit.pixel(over: reads, through: 1, leaving: normal, beyond: 0.3, mirroring: normal, by: 0.2, facing: normal))
     }

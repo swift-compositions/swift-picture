@@ -97,6 +97,22 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
     }
 
     @Test
+    func `A body takes the same line along its silhouette and the same shadow outside it as a pane`() throws {
+        let black: [Picture.Element] = [Tests.fill(Tests.rectangle(-40, -40, 120, 120), Picture.Color(gray: 0.5))]
+        var glass = Glass(refraction: .init(index: 1))
+        let plain = try Tests.drawn(Picture(black + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
+        glass.light = .init(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, rim: 1, width: 1, counter: 1, focus: 2)
+        glass.shadows = [.init(color: .init(red: 0, green: 0, blue: 0, alpha: 0.8), softness: 2, x: 0, y: 0)]
+        let lit = try Tests.drawn(Picture(black + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
+        // The ball's top is at y 5 and its bottom at y 35; its middle is untouched by line or shadow.
+        #expect(Tests.at(lit, 20, 5).color.red > Tests.at(plain, 20, 5).color.red + 0.1)
+        #expect(Tests.at(lit, 20, 34).color.red > Tests.at(plain, 20, 34).color.red + 0.1)
+        #expect(Tests.at(lit, 20, 4).color.red < Tests.at(plain, 20, 4).color.red - 0.05)
+        #expect(Tests.at(lit, 20, 5).color.red <= Tests.at(lit, 20, 5).alpha)
+        #expect(Tests.close(Tests.at(lit, 20, 20), Tests.at(plain, 20, 20), within: 1e-5))
+    }
+
+    @Test
     func `Glass with a body takes the same frost and adaptation as a pane`() throws {
         let stripes: [Picture.Element] = [Tests.fill(Tests.rectangle(-40, -40, 120, 120), .black)]
             + stride(from: -40.0, to: 80, by: 4).map { Tests.fill(Tests.rectangle($0, -40, 2, 120), .white) }

@@ -86,3 +86,48 @@ extension `Picture Tests`.`A picture kept as an image is drawn once, at a scale,
         }
     }
 }
+
+extension `Picture Tests` {
+    @Suite
+    struct `A source is hashed once, when it is made` {}
+}
+
+extension `Picture Tests`.`A source is hashed once, when it is made` {
+    typealias Source = Picture.Image.Source
+
+    static let rectangle = Picture.Plane.Rectangle(llx: 0, lly: 0, urx: 8, ury: 6)
+
+    static func picture(_ level: Float) -> Picture {
+        let raster = Raster(width: 64, height: 64, repeating: Picture.Color(red: level, green: 0.5, blue: 0.25).pixel)
+        let corners: [Picture.Plane.Point<2>] = [.init([0, 0]), .init([8, 0]), .init([8, 6]), .init([0, 6])]
+        let sides = zip(corners, corners.dropFirst() + corners.prefix(1)).map { Picture.Plane.Path.Segment.line(.init(start: $0, end: $1)) }
+        let path = Picture.Plane.Path(subpaths: [.init(startPoint: corners[0], segments: sides, isClosed: true)])
+        return [.fill(path, .image(Picture.Image(raster)))]
+    }
+
+    @Test
+    func `Sources made apart from equal parts are equal and hash alike, and any differing part tells them apart`() {
+        let first = Source(Self.picture(0.5), in: Self.rectangle, scale: 2, samples: 2)
+        let second = Source(Self.picture(0.5), in: Self.rectangle, scale: 2, samples: 2)
+        #expect(first == second)
+        #expect(first.hashValue == second.hashValue)
+        #expect(Set([first, second]).count == 1)
+        #expect(first != Source(Self.picture(0.6), in: Self.rectangle, scale: 2, samples: 2))
+        #expect(first != Source(Self.picture(0.5), in: Self.rectangle, scale: 3, samples: 2))
+        #expect(first != Source(Self.picture(0.5), in: Self.rectangle, scale: 2, samples: 1))
+        #expect(first != Source(Self.picture(0.5), in: .init(llx: 0, lly: 0, urx: 8, ury: 7), scale: 2, samples: 2))
+    }
+
+    @Test
+    func `The hash made once is the hash of the parts`() {
+        let source = Source(Self.picture(0.5), in: Self.rectangle, scale: 2, samples: 2)
+        var parts = Hasher()
+        parts.combine(source.picture)
+        parts.combine(source.rectangle)
+        parts.combine(source.scale)
+        parts.combine(source.samples)
+        var once = Hasher()
+        once.combine(parts.finalize())
+        #expect(source.hashValue == once.finalize())
+    }
+}

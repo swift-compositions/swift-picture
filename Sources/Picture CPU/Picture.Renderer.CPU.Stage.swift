@@ -1,5 +1,6 @@
 import Numeric
 import Picture
+import Synchronization
 
 extension Picture.Renderer.CPU {
     /// A scene made ready for sampling: triangles in raster space with a depth at each corner, the colour
@@ -388,11 +389,38 @@ extension Picture.Renderer.CPU.Canvas {
         let before = self
         let scale = abs(state.transform[0, 0] * state.transform[1, 1] - state.transform[0, 1] * state.transform[1, 0]).squareRoot()
         var frosts: [Double: Picture.Renderer.CPU.Frost] = [:]
+        // The picture behind is read around the scene, as far again as the scene is wide or tall; past that a
+        // read finds the nearest pixel kept.
+        let around = area.expanded(Swift.max(area.width, area.height) / 2, Swift.max(area.width, area.height) / 2).intersection(before.box)
         for surface in stage.surfaces where frosts[surface.glass.frost] == nil {
-            frosts[surface.glass.frost] = Picture.Renderer.CPU.Frost(before, over: before.box, deviation: surface.glass.frost * scale, state.workers)
+            frosts[surface.glass.frost] = Picture.Renderer.CPU.Frost(before, over: around, deviation: surface.glass.frost * scale, state.workers)
         }
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
         let eyes = scene.models.map { scene.camera.eye(of: $0.transform) }
+        let shadows = stage.surfaces.first { !$0.glass.shadows.isEmpty }?.glass.shadows ?? []
+        let lined = stage.surfaces.contains { ($0.glass.light?.rim ?? 0) > 0 && ($0.glass.light?.width ?? 0) > 0 }
+        var reachOfShadows = 0.0
+        for shadow in shadows {
+            reachOfShadows = Swift.max(reachOfShadows, (abs(shadow.x) + abs(shadow.y) + 4 * Swift.max(shadow.softness, 0)) * scale)
+        }
+        let outlined = shadows.isEmpty && !lined
+            ? nil
+            : Self.silhouette(stage, glass: glass, opaque: opaque, over: area.expanded(Int(reachOfShadows) + 2, Int(reachOfShadows) + 2).intersection(state.reach(in: box)), upper: upper, state.workers)
+        if let outlined {
+            for shadow in shadows where shadow.color.alpha > 0 {
+                let color = shadow.color.with(alpha: 1).pixel
+                let strength = shadow.color.alpha
+                let across = state.transform[0, 0] * shadow.x + state.transform[0, 1] * shadow.y
+                let down = state.transform[1, 0] * shadow.x + state.transform[1, 1] * shadow.y
+                update(outlined.box, state.workers) { x, y, old in
+                    let distance = outlined.distance(Double(x) + 0.5 - across, Double(y) + 0.5 - down)
+                    guard distance.isFinite else { return old }
+                    let share = Float(shadow.share(at: distance / scale)) * strength
+                    guard share > 0 else { return old }
+                    return Picture.Renderer.CPU.limited(old, color.composited(over: old, coverage: share), state.share(x, y))
+                }
+            }
+        }
         let shadings = stage.surfaces.map { $0.glass.shading }
         let tilts = stage.surfaces.map { $0.glass.refraction?.tilts ?? [1, 1, 1] }
         let lens = Picture.Renderer.CPU.Lens(scene, state.transform)
@@ -403,7 +431,7 @@ extension Picture.Renderer.CPU.Canvas {
             guard !numbers.isEmpty else { return }
             let hits = Picture.Renderer.CPU.Stage.hits(stage.glass, numbers, in: tile, samples: samples)
             let nearest = Picture.Renderer.CPU.Stage.nearest(stage.opaque, covers, in: tile, samples: samples)
-            unsafe Self.visit(shared, box, tile, samples) { row, column in
+            unsafe Self.visit(shared, box, tile, samples, thin: true) { row, column in
                 let position = row * tile.width * samples + column
                 let hit = hits[position]
                 let cover = nearest[position]
@@ -416,6 +444,20 @@ extension Picture.Renderer.CPU.Canvas {
                 let shading = shadings[hit.triangle]
                 let frost = frosts[surface.glass.frost]
                 let frosting = Picture.Glass.frosting(facing: normal)
+                let sampleX = Double(x) + (Double(column % samples) + 0.5) / Double(samples)
+                let sampleY = Double(y) + (Double(row % samples) + 0.5) / Double(samples)
+                var outline: Picture.Glass.Outline?
+                if let outlined {
+                    let across = (normal[0] * normal[0] + normal[1] * normal[1]).squareRoot()
+                    let inward = -outlined.distance(sampleX, sampleY) / scale
+                    if inward.isFinite {
+                        outline = Picture.Glass.Outline(
+                            inward: Swift.max(inward, 0),
+                            x: across > 0 ? normal[0] / across : 0,
+                            y: across > 0 ? normal[1] / across : 0
+                        )
+                    }
+                }
                 func read(_ x: Double, _ y: Double) -> Picture.Pixel {
                     frost?.read(x, y, frosting: frosting) ?? .transparent
                 }
@@ -423,10 +465,7 @@ extension Picture.Renderer.CPU.Canvas {
                     let passage = Picture.Renderer.CPU.Passage(
                         from: surface.place(hit.weights),
                         normal: normal,
-                        at: .init(
-                            x: Double(x) + (Double(column % samples) + 0.5) / Double(samples),
-                            y: Double(y) + (Double(row % samples) + 0.5) / Double(samples)
-                        ),
+                        at: .init(x: sampleX, y: sampleY),
                         through: refraction,
                         lens: lens,
                         far: far
@@ -443,6 +482,7 @@ extension Picture.Renderer.CPU.Canvas {
                         mirroring: passage.mirrored,
                         by: passage.share,
                         facing: normal,
+                        outline: outline,
                         tilts: tilts[hit.triangle]
                     )
                 }
@@ -453,7 +493,7 @@ extension Picture.Renderer.CPU.Canvas {
                     x: Double(x) + (Double(column % samples) + 0.5) / Double(samples) + across,
                     y: Double(y) + (Double(row % samples) + 0.5) / Double(samples) + down
                 )
-                return shading.pixel(over: read(point.x, point.y), facing: normal)
+                return shading.lit(shading.coat(read(point.x, point.y)), facing: normal, outline: outline, tilts: [1, 1, 1])
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }
@@ -463,12 +503,22 @@ extension Picture.Renderer.CPU.Canvas {
     /// For each pixel of a tile, the mean over its `samples` × `samples` points of what `value` gives for the
     /// pixel as it is at a point that is `taken`, and of the pixel as it is at one that is not (row and column
     /// count sample points from the tile's corner), put in place by `finish`. A pixel none of whose points is
-    /// taken is left alone and never read, as is one all of whose points give it back unchanged.
+    /// taken is left alone and never read, as is one all of whose points give it back unchanged. When `thin`,
+    /// a pixel all of whose points are taken takes the mean of only its central half along each side, a quarter
+    /// of them and centred on the pixel's centre, since inside a surface what changes across a pixel is smooth;
+    /// a pixel on an edge keeps every point.
+    /// Whether a sample point along one side of a pixel lies in the pixel's central half.
+    static func central(_ index: Int, _ samples: Int) -> Bool {
+        let place = index % samples
+        return place >= samples / 4 && place < samples - samples / 4
+    }
+
     static func visit(
         _ pixels: Picture.Renderer.CPU.Workers.Pixels,
         _ box: Picture.Renderer.CPU.Box,
         _ tile: Picture.Renderer.CPU.Box,
         _ samples: Int,
+        thin: Bool = false,
         taken: (_ row: Int, _ column: Int) -> Bool,
         value: (_ x: Int, _ y: Int, _ row: Int, _ column: Int, _ old: Picture.Pixel) -> Picture.Pixel,
         finish: (_ x: Int, _ y: Int, _ old: Picture.Pixel, _ mean: Picture.Pixel) -> Picture.Pixel
@@ -478,11 +528,15 @@ extension Picture.Renderer.CPU.Canvas {
             var x = tile.left
             while x < tile.right {
                 var any = false
+                var all = true
                 var point = 0
-                while point < samples * samples, !any {
-                    any = taken((y - tile.top) * samples + point / samples, (x - tile.left) * samples + point % samples)
+                while point < samples * samples, !any || (thin && all) {
+                    let hit = taken((y - tile.top) * samples + point / samples, (x - tile.left) * samples + point % samples)
+                    any = any || hit
+                    all = all && hit
                     point += 1
                 }
+                let sparse = thin && all && samples >= 2
                 guard any else {
                     x += 1
                     continue
@@ -496,6 +550,10 @@ extension Picture.Renderer.CPU.Canvas {
                 while row < (y - tile.top + 1) * samples {
                     var column = (x - tile.left) * samples
                     while column < (x - tile.left + 1) * samples {
+                        if sparse, !Self.central(row, samples) || !Self.central(column, samples) {
+                            column += 1
+                            continue
+                        }
                         let sample = taken(row, column) ? value(x, y, row, column, old) : old
                         changed = changed || sample != old
                         mean = count == 0 ? sample : mean.interpolated(to: sample, at: 1 / Float(count + 1))
@@ -526,5 +584,47 @@ extension Picture.Renderer.CPU.Canvas {
             let shared = unsafe Picture.Renderer.CPU.Workers.Pixels(base: base)
             workers.run(count) { part in unsafe body(shared, box, part) }
         }
+    }
+}
+
+extension Picture.Renderer.CPU.Canvas {
+    /// The outline of a scene's glass as drawn over a box: at the silhouette's fine points, whether the nearest
+    /// glass is nearer than every opaque model there and within the far plane, and from that the signed distance.
+    static func silhouette(
+        _ stage: Picture.Renderer.CPU.Stage,
+        glass: [(tile: Picture.Renderer.CPU.Box, triangles: [Int])],
+        opaque: [(tile: Picture.Renderer.CPU.Box, triangles: [Int])],
+        over box: Picture.Renderer.CPU.Box,
+        upper: Double,
+        _ workers: Picture.Renderer.CPU.Workers
+    ) -> Picture.Renderer.CPU.Silhouette {
+        let fine = Picture.Renderer.CPU.Silhouette.fine
+        let columns = box.width * fine
+        var inside = [Bool](repeating: false, count: columns * box.height * fine)
+        let parts = Mutex([[Bool]?](repeating: nil, count: glass.count))
+        workers.run(glass.count) { part in
+            let (tile, numbers) = glass[part]
+            guard !numbers.isEmpty, tile.intersection(box).area > 0 else { return }
+            let hits = Picture.Renderer.CPU.Stage.nearest(stage.glass, numbers, in: tile, samples: fine)
+            let covers = Picture.Renderer.CPU.Stage.nearest(stage.opaque, opaque[part].triangles, in: tile, samples: fine)
+            let taken = zip(hits, covers).map { hit, cover in
+                let hidden = cover.triangle >= 0 && cover.depth <= upper && cover.depth <= hit.depth
+                return hit.triangle >= 0 && hit.depth <= upper && !hidden
+            }
+            parts.withLock { $0[part] = taken }
+        }
+        let found = parts.withLock { $0 }
+        for (part, taken) in zip(found.indices, found) {
+            guard let taken else { continue }
+            let tile = glass[part].tile
+            let width = tile.width * fine
+            for (position, value) in zip(taken.indices, taken) where value {
+                let x = (tile.left - box.left) * fine + position % width
+                let y = (tile.top - box.top) * fine + position / width
+                guard x >= 0, y >= 0, x < columns, y < box.height * fine else { continue }
+                inside[y * columns + x] = true
+            }
+        }
+        return Picture.Renderer.CPU.Silhouette(box, inside: inside, workers)
     }
 }
