@@ -24,8 +24,10 @@ extension Picture.Glass {
         /// How far in from the boundary the top falls to it, in picture units.
         public var rim: Double
 
-        /// The power p of the rim's profile, a superellipse's quarter: 2 is a quarter circle; more is flatter on
-        /// top and steeper at the boundary.
+        /// The power p of the rim's profile, a superellipse's quarter. From 3 on, the default, the top meets its
+        /// level middle with no bend, so lines seen through the rim bend smoothly into the middle; 2 is a quarter
+        /// circle, which meets it with a bend that shows as a kink in such lines; more is flatter on top and
+        /// steeper at the boundary.
         public var profile: Double
 
         /// The soft shadows the pane casts on the picture around it, drawn in order.
@@ -36,7 +38,7 @@ extension Picture.Glass {
             glass: Picture.Glass,
             thickness: Double = 24,
             rim: Double = 24,
-            profile: Double = 2,
+            profile: Double = 3,
             shadows: [Shadow] = []
         ) {
             self.region = region
