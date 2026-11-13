@@ -12,7 +12,8 @@ extension `Picture CPU Tests`.`Glass in a layer reads the picture beneath the la
     typealias Tests = `Picture CPU Tests`
 
     /// Black and white stripes four pixels wide under a red square.
-    static let backdrop: [Picture.Element] = [Tests.fill(Tests.rectangle(0, 0, 80, 60), .black)]
+    static let backdrop: [Picture.Element] =
+        [Tests.fill(Tests.rectangle(0, 0, 80, 60), .black)]
         + stride(from: 0.0, to: 80, by: 8).map { Tests.fill(Tests.rectangle($0, 0, 4, 60), .white) }
         + [Tests.fill(Tests.rectangle(30, 20, 14, 14), Tests.red)]
 

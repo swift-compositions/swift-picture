@@ -20,7 +20,9 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
         #expect(Self.near(up.direction, Vector([0, 1, 0])))
         #expect(Picture.Scene.Camera(projection: projection, view: .scale(Vector([1, 2, 1]))).pose == nil)
         let orbit = Picture.Scene.Camera.Pose(around: Point([0, 0, -10]), distance: 4, yaw: Radian(0.3), pitch: Radian(-0.2))
-        #expect(Picture.Scene.Camera(projection: projection, pose: orbit) == Picture.Scene.Camera(projection: projection, around: Point([0, 0, -10]), distance: 4, yaw: Radian(0.3), pitch: Radian(-0.2)))
+        #expect(
+            Picture.Scene.Camera(projection: projection, pose: orbit) == Picture.Scene.Camera(projection: projection, around: Point([0, 0, -10]), distance: 4, yaw: Radian(0.3), pitch: Radian(-0.2))
+        )
         let toward = Vector<3, Double>([0 - orbit.place[0], 0 - orbit.place[1], -10 - orbit.place[2]])
         #expect(Self.near(orbit.direction, Vector([toward[0] / 4, toward[1] / 4, toward[2] / 4])))
         let looking = try Picture.Scene.Camera.Pose(at: Point([3, 4, 5]), looking: Point([3, 4, 0]))

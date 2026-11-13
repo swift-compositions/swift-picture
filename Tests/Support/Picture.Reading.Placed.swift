@@ -1,4 +1,5 @@
 import Numeric
+
 extension Picture.Reading {
     /// A character found in a picture: its origin in picture space, the angle of its baseline, its size and advance.
     struct Placed: Sendable {

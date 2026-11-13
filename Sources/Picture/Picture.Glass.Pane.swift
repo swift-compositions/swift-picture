@@ -30,7 +30,6 @@ extension Picture.Glass {
         /// steeper at the boundary.
         public var profile: Double
 
-
         public init(
             _ region: Picture.Plane.Region,
             glass: Picture.Glass,

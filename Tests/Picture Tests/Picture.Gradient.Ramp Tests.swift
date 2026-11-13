@@ -55,4 +55,33 @@ extension `Picture Tests`.`A gradient's ramp reads as the gradient does` {
             }
         }
     }
+
+    /// The law of `Picture.Gradient.color(at:)` as it was written before the ramp was kept: a ramp made afresh
+    /// from the stops at every call.
+    static func color(_ gradient: Picture.Gradient, at parameter: Float) -> Picture.Color {
+        var ramp = Picture.Gradient([]).ramp
+        ramp.offsets = gradient.stops.map(\.offset)
+        ramp.pixels = gradient.stops.map(\.color.pixel)
+        guard let place = ramp.place(of: parameter) else { return .clear }
+        guard place.from != place.to, place.fraction != 0 else { return gradient.stops[place.from].color }
+        return Picture.Color(ramp.pixels[place.from].interpolated(to: ramp.pixels[place.to], at: place.fraction))
+    }
+
+    @Test
+    func `The ramp is made once, with the stops, and the colours read through it are the colours a fresh ramp gives`() {
+        let parameters: [Float] = (-8...40).map { Float($0) / 32 } + [0.1, 0.4, 0.5, 0.9, .nan, .infinity, -.infinity]
+        for gradient in Self.gradients + [Picture.Gradient.glow(.init(red: 1, green: 0.8, blue: 0.4))] {
+            for parameter in parameters {
+                let kept = gradient.color(at: parameter)
+                let fresh = Self.color(gradient, at: parameter)
+                #expect(kept == fresh || (kept.red.isNaN && fresh.red.isNaN))
+            }
+        }
+        var changed = Self.gradients[2]
+        changed.stops.append(.init(offset: 1, color: .init(red: 1, green: 0, blue: 0)))
+        #expect(changed.ramp.offsets == changed.stops.map(\.offset))
+        #expect(changed.ramp.pixels == changed.stops.map(\.color.pixel))
+        #expect(changed.ramp == Picture.Gradient.Ramp(changed))
+        #expect(changed != Self.gradients[2])
+    }
 }

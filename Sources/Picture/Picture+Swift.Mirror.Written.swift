@@ -1,9 +1,8 @@
 public import Standard_Library_Extensions
 
-// A picture's parts met in their thousands write themselves for `Swift.Mirror.bytes(of:)`, where reflection costs
-// about a microsecond a part. Every stored property is written, in order; the tests in `Picture Tests` list each
-// type's stored properties by `Mirror` and fail when one is added, and each `switch` is exhaustive.
-
+/// A picture's parts met in their thousands write themselves for `Swift.Mirror.bytes(of:)`, where reflection costs
+/// about a microsecond a part. Every stored property is written, in order; the tests in `Picture Tests` list each
+/// type's stored properties by `Mirror` and fail when one is added, and each `switch` is exhaustive.
 extension Picture: Swift.Mirror.Written {
     public func write(into writer: Swift.Mirror.Writer) -> Bool {
         guard !writer.again(elements) else { return true }
@@ -21,18 +20,23 @@ extension Picture.Element: Swift.Mirror.Written {
         case .shape(let shape):
             writer.number(0)
             return shape.write(into: writer)
+
         case .sprites(let sprites):
             writer.number(1)
             return writer.write(sprites)
+
         case .scene(let scene):
             writer.number(2)
             return writer.write(scene)
+
         case .group(let group):
             writer.number(3)
             return writer.write(group)
+
         case .layer(let layer):
             writer.number(4)
             return writer.write(layer)
+
         case .pane(let pane):
             writer.number(5)
             return writer.write(pane)
@@ -76,12 +80,15 @@ extension Picture.Shape: Swift.Mirror.Written {
                     writer.number(0)
                     point(line.start, into: writer)
                     point(line.end, into: writer)
+
                 case .bezier(let bezier):
                     writer.number(1)
                     guard writer.write(bezier) else { return false }
+
                 case .arc(let arc):
                     writer.number(2)
                     guard writer.write(arc) else { return false }
+
                 case .ellipticalArc(let arc):
                     writer.number(3)
                     guard writer.write(arc) else { return false }
@@ -108,12 +115,15 @@ extension Picture.Paint: Swift.Mirror.Written {
             writer.float(Double(color.blue))
             writer.float(Double(color.alpha))
             return true
+
         case .linear(let linear):
             writer.number(1)
             return writer.write(linear)
+
         case .radial(let radial):
             writer.number(2)
             return writer.write(radial)
+
         case .image(let image):
             writer.number(3)
             return image.write(into: writer)
@@ -123,13 +133,14 @@ extension Picture.Paint: Swift.Mirror.Written {
 
 extension Picture.Image: Swift.Mirror.Written {
     public func write(into writer: Swift.Mirror.Writer) -> Bool {
-        writer.number(UInt64(raster.width.rawValue))
-        writer.number(UInt64(raster.height.rawValue))
+        writer.number(UInt64(Int(clamping: raster.width)))
+        writer.number(UInt64(Int(clamping: raster.height)))
         guard writer.write(raster.pixels), writer.write(placement), writer.write(sampling) else { return false }
         switch edge {
         case .extend: writer.number(0)
         case .wrap: writer.number(1)
         case .mirror: writer.number(2)
+
         case .constant(let pixel):
             writer.number(3)
             guard writer.write(pixel) else { return false }
@@ -140,5 +151,20 @@ extension Picture.Image: Swift.Mirror.Written {
         }
         writer.number(1)
         return writer.write(source)
+    }
+}
+
+extension Picture.Gradient: Swift.Mirror.Written {
+    /// Its stops, each its offset and its colour; the ramp is made from them.
+    public func write(into writer: Swift.Mirror.Writer) -> Bool {
+        writer.number(UInt64(stops.count))
+        for stop in stops {
+            writer.float(Double(stop.offset))
+            writer.float(Double(stop.color.red))
+            writer.float(Double(stop.color.green))
+            writer.float(Double(stop.color.blue))
+            writer.float(Double(stop.color.alpha))
+        }
+        return true
     }
 }

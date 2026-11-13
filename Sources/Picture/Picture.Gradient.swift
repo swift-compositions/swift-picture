@@ -1,11 +1,27 @@
 extension Picture {
     /// Colours along a line from parameter 0 to 1.
-    public struct Gradient: Sendable, Hashable {
-        public var stops: [Stop]
+    public struct Gradient: Sendable {
+        public var stops: [Stop] {
+            didSet { ramp = Ramp(stops: stops) }
+        }
+
+        /// The stops made ready to be read many times, made when the stops are set.
+        public private(set) var ramp: Ramp
 
         public init(_ stops: [Stop]) {
             self.stops = stops
+            self.ramp = Ramp(stops: stops)
         }
+    }
+}
+
+extension Picture.Gradient: Hashable {
+    public static func == (first: Self, second: Self) -> Bool {
+        first.stops == second.stops
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(stops)
     }
 }
 
@@ -19,8 +35,7 @@ extension Picture.Gradient {
 }
 
 extension Picture.Gradient {
-    /// The pixel at a parameter. A renderer that reads many pixels of one gradient reads them from its `ramp`,
-    /// which takes the stops' colours out of sRGB once.
+    /// The pixel at a parameter, read from the `ramp`, which takes the stops' colours out of sRGB once.
     public func pixel(at parameter: Float) -> Picture.Pixel {
         ramp.pixel(at: parameter)
     }
@@ -30,7 +45,6 @@ extension Picture.Gradient {
     /// `Picture.Color(_:)`. The gradient mixes in linear light, premultiplied, and so does this. No stops
     /// give `clear`.
     public func color(at parameter: Float) -> Picture.Color {
-        let ramp = self.ramp
         guard let place = ramp.place(of: parameter) else { return .clear }
         guard place.from != place.to, place.fraction != 0 else { return stops[place.from].color }
         return Picture.Color(ramp.pixels[place.from].interpolated(to: ramp.pixels[place.to], at: place.fraction))

@@ -46,9 +46,9 @@ extension Picture.Renderer.CPU.Store {
     /// A picture with every image that names its picture given its pixels: each distinct source is taken
     /// from the store or drawn, the ones to draw side by side on the workers, and what is drawn is kept.
     /// A source is drawn exactly as `Picture.Image.Source.raster(through:)` draws it through this renderer,
-    /// and a source inside a source is drawn the same way first. Each raster is kept as soon as it is drawn and
+    /// and a source inside the pictures a source's drawing names is drawn the same way first. Each raster is kept as soon as it is drawn and
     /// the store is asked again just before a source is drawn. The sources are drawn in rounds: a source waits
-    /// until every other source of the picture that its own picture names, however deep, is drawn and kept, so
+    /// until every other source of the picture that its own pictures name, however deep, is drawn and kept, so
     /// a source that another source also names is drawn once, and before the one that names it.
     func resolved(_ picture: Picture, _ workers: Picture.Renderer.CPU.Workers) throws(Picture.Renderer.Error) -> Picture {
         var places: [Key: Int] = [:]
@@ -71,7 +71,9 @@ extension Picture.Renderer.CPU.Store {
         let inside: [Int: Set<Key>] = Dictionary(
             uniqueKeysWithValues: missing.map { place in
                 var named = Set<Key>()
-                Self.sources(of: keys[place].source.picture, into: &named)
+                for picture in keys[place].source.pictures {
+                    Self.sources(of: picture, into: &named)
+                }
                 return (place, named)
             }
         )
@@ -117,15 +119,17 @@ extension Picture.Renderer.CPU.Store {
 }
 
 extension Picture.Renderer.CPU.Store {
-    /// Adds the source of every image a picture paints with to a set, and the sources their pictures name, as
-    /// deep as they go.
+    /// Adds the source of every image a picture paints with to a set, and the sources their drawings' pictures
+    /// name, as deep as they go.
     static func sources(of picture: Picture, into named: inout Set<Key>) {
         var found: [Picture.Image.Source] = []
         Picture.Renderer.CPU.images(of: picture) { image in
             if let source = image.source { found.append(source) }
         }
         for source in found where named.insert(Key(source)).inserted {
-            sources(of: source.picture, into: &named)
+            for inner in source.pictures {
+                sources(of: inner, into: &named)
+            }
         }
     }
 }

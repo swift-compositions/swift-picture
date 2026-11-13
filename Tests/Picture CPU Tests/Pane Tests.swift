@@ -20,7 +20,8 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     }
 
     /// Black and white stripes four pixels wide.
-    static let stripes: [Picture.Element] = [Tests.fill(Tests.rectangle(0, 0, 80, 60), .black)]
+    static let stripes: [Picture.Element] =
+        [Tests.fill(Tests.rectangle(0, 0, 80, 60), .black)]
         + stride(from: 0.0, to: 80, by: 8).map { Tests.fill(Tests.rectangle($0, 0, 4, 60), .white) }
 
     @Test

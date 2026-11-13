@@ -48,8 +48,15 @@ extension Picture.Glass.Pane.Passage {
         guard let refraction = pane.glass.refraction else {
             let offset = pane.glass.offset(for: normal)
             self.init(
-                normal: normal, height: 0, distance: 0, offset: Vector([offset[0], offset[1]]), length: 0,
-                leaving: sight, mirrored: mirrored, share: 0, body: false
+                normal: normal,
+                height: 0,
+                distance: 0,
+                offset: Vector([offset[0], offset[1]]),
+                length: 0,
+                leaving: sight,
+                mirrored: mirrored,
+                share: 0,
+                body: false
             )
             return
         }
@@ -59,8 +66,15 @@ extension Picture.Glass.Pane.Passage {
         let height = pane.height(at: -sample.distance)
         let distance = Swift.max(refraction.distance, 0)
         var passage = Self(
-            normal: normal, height: height, distance: distance, offset: .zero, length: height,
-            leaving: sight, mirrored: mirrored, share: share, body: true
+            normal: normal,
+            height: height,
+            distance: distance,
+            offset: .zero,
+            length: height,
+            leaving: sight,
+            mirrored: mirrored,
+            share: share,
+            body: true
         )
         if -sample.distance >= pane.rim, pane.thickness > 0 {
             self = passage

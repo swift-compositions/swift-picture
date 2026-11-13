@@ -12,7 +12,10 @@ extension `Picture CPU Tests`.`A picture kept as an image shows the picture wher
             let raster = try Tests.drawn([element], on: Tests.canvas(14, 9))
             let image = try Picture.Image(Self.picture, in: part, scale: 1, sampling: .nearest, edge: edge, through: Tests.renderer)
             for (x, y) in Tests.positions(14, 9) {
-                #expect(Tests.close(Tests.at(raster, x, y), image.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5))), "\(edge) \(x) \(y) \(Tests.at(raster, x, y)) \(image.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5)))")
+                #expect(
+                    Tests.close(Tests.at(raster, x, y), image.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5))),
+                    "\(edge) \(x) \(y) \(Tests.at(raster, x, y)) \(image.pixel(at: Tests.at(Double(x) + 0.5, Double(y) + 0.5)))"
+                )
             }
             #expect(Tests.at(raster, 0, 0).alpha > 0)
         }

@@ -96,8 +96,15 @@ extension Picture.Glass {
         tilts: InlineArray<3, Double> = [1, 1, 1]
     ) -> Picture.Pixel {
         shading.pixel(
-            over: behind, through: length, leaving: leaving, beyond: beyond, mirroring: mirrored, by: share,
-            facing: normal, outline: outline, tilts: tilts
+            over: behind,
+            through: length,
+            leaving: leaving,
+            beyond: beyond,
+            mirroring: mirrored,
+            by: share,
+            facing: normal,
+            outline: outline,
+            tilts: tilts
         )
     }
 

@@ -1,7 +1,8 @@
 import Numeric
-@testable import Picture_CPU
 import Picture
 import Testing
+
+@testable import Picture_CPU
 
 extension `Picture CPU Tests` {
     @Suite
@@ -23,10 +24,10 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
 
     /// The digests of the pictures by name, at `recorded`.
     static let digests: [String: UInt64] = [
-        "blur": 16365094295220398297, "body": 1074315639956906798, "fill": 13478648827929281320,
-        "glow": 5255089816006074967, "gradient": 7014402895066774693, "image": 17824492936900664916,
-        "pane": 8503239913984148697, "scene": 4145786458600151407, "stroke": 1018931843031873205,
-        "text": 14706559016298247301,
+        "blur": 16_365_094_295_220_398_297, "body": 1_074_315_639_956_906_798, "fill": 13_478_648_827_929_281_320,
+        "glow": 5_255_089_816_006_074_967, "gradient": 7_014_402_895_066_774_693, "image": 17_824_492_936_900_664_916,
+        "pane": 8_503_239_913_984_148_697, "scene": 4_145_786_458_600_151_407, "stroke": 1_018_931_843_031_873_205,
+        "text": 14_706_559_016_298_247_301,
     ]
 
     static let backdrop: [Picture.Element] = [

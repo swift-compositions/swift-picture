@@ -26,8 +26,10 @@ extension Picture.Reading.Contour {
             switch segment {
             case .line(let line):
                 points += [line.end[0], line.end[1]]
+
             case .bezier(let bezier):
                 for point in bezier.controlPoints.dropFirst() { points += [point[0], point[1]] }
+
             case .arc, .ellipticalArc:
                 return nil
             }

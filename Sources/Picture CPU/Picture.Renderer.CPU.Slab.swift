@@ -51,19 +51,23 @@ extension Picture.Renderer.CPU.Canvas {
             let strength = shadow.color.alpha
             let shift = (abs(shadow.x) + abs(shadow.y)) * scale
             let far = 8 * Swift.max(shadow.softness, 0) * scale
-            update(area, state.workers, making: {
-            let region = Picture.Renderer.CPU.Slab.unshared(region)
-            return { x, y, old in
-                let bound = coarse.bound(x, y)
-                // Deep inside the pane, which covers it, or so far out that the shadow there is below 1/2000.
-                guard bound.upper > -(shift + 1.5), bound.lower < shift + far + 1 else { return old }
-                let point = Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5)
-                let moved = Picture.Plane.Point<2>([point[0] - shadow.x, point[1] - shadow.y])
-                let share = Float(shadow.share(at: region.distance(to: moved))) * strength
-                guard share > 0 else { return old }
-                return Picture.Renderer.CPU.limited(old, color.composited(over: old, coverage: share), state.share(x, y))
-            }
-            })
+            update(
+                area,
+                state.workers,
+                making: {
+                    let region = Picture.Renderer.CPU.Slab.unshared(region)
+                    return { x, y, old in
+                        let bound = coarse.bound(x, y)
+                        // Deep inside the pane, which covers it, or so far out that the shadow there is below 1/2000.
+                        guard bound.upper > -(shift + 1.5), bound.lower < shift + far + 1 else { return old }
+                        let point = Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5)
+                        let moved = Picture.Plane.Point<2>([point[0] - shadow.x, point[1] - shadow.y])
+                        let share = Float(shadow.share(at: region.distance(to: moved))) * strength
+                        guard share > 0 else { return old }
+                        return Picture.Renderer.CPU.limited(old, color.composited(over: old, coverage: share), state.share(x, y))
+                    }
+                }
+            )
         }
         guard inside.area > 0 else { return }
 
@@ -109,53 +113,57 @@ extension Picture.Renderer.CPU.Canvas {
         let lineBand = 2.5 * Swift.max(pane.glass.light?.width ?? 0, 0) * scale
         let rimDepth = Swift.max(rimPixels, lineBand) + 1.5
 
-        update(inside, state.workers, making: {
-        var pane = pane
-        pane.region = Picture.Renderer.CPU.Slab.unshared(region)
-        let region = pane.region
-        return { x, y, old in
-            let bound = coarse.bound(x, y)
-            guard bound.lower < 1.5 else { return old }
-            let cx = Double(x) + 0.5
-            let cy = Double(y) + 0.5
-            if bound.upper < -rimDepth {
-                let read = frost.read(cx, cy)
-                let pixel = shading.pixel(
-                    over: [read, read, read],
-                    through: 1,
-                    leaving: level.leaving,
-                    beyond: 0,
-                    mirroring: level.mirrored,
-                    by: level.share,
-                    facing: level.normal
-                )
-                return Picture.Renderer.CPU.limited(old, pixel, state.share(x, y))
-            }
-            let centre = region.sample(at: Picture.Renderer.CPU.point(inverse, cx, cy))
-            let depth = -centre.distance * scale
-            guard depth > -1.5 else { return old }
-            let samples = depth < Swift.max(1.5, lineBand + 0.5) ? 3 : (depth < rimPixels * 0.4 ? 2 : 1)
-            guard samples > 1 else { return Picture.Renderer.CPU.limited(old, glass(pane, cx, cy, centre), state.share(x, y)) }
-            var mean = Picture.Pixel.transparent
-            var count = 0
-            var row = 0
-            while row < samples {
-                var column = 0
-                while column < samples {
-                    let sx = Double(x) + (Double(column) + 0.5) / Double(samples)
-                    let sy = Double(y) + (Double(row) + 0.5) / Double(samples)
-                    let sample = region.sample(at: Picture.Renderer.CPU.point(inverse, sx, sy))
-                    let value = sample.distance > 0 ? old : glass(pane, sx, sy, sample)
-                    mean = count == 0 ? value : mean.interpolated(to: value, at: 1 / Float(count + 1))
-                    count += 1
-                    column += 1
+        update(
+            inside,
+            state.workers,
+            making: {
+                var pane = pane
+                pane.region = Picture.Renderer.CPU.Slab.unshared(region)
+                let region = pane.region
+                return { x, y, old in
+                    let bound = coarse.bound(x, y)
+                    guard bound.lower < 1.5 else { return old }
+                    let cx = Double(x) + 0.5
+                    let cy = Double(y) + 0.5
+                    if bound.upper < -rimDepth {
+                        let read = frost.read(cx, cy)
+                        let pixel = shading.pixel(
+                            over: [read, read, read],
+                            through: 1,
+                            leaving: level.leaving,
+                            beyond: 0,
+                            mirroring: level.mirrored,
+                            by: level.share,
+                            facing: level.normal
+                        )
+                        return Picture.Renderer.CPU.limited(old, pixel, state.share(x, y))
+                    }
+                    let centre = region.sample(at: Picture.Renderer.CPU.point(inverse, cx, cy))
+                    let depth = -centre.distance * scale
+                    guard depth > -1.5 else { return old }
+                    let samples = depth < Swift.max(1.5, lineBand + 0.5) ? 3 : (depth < rimPixels * 0.4 ? 2 : 1)
+                    guard samples > 1 else { return Picture.Renderer.CPU.limited(old, glass(pane, cx, cy, centre), state.share(x, y)) }
+                    var mean = Picture.Pixel.transparent
+                    var count = 0
+                    var row = 0
+                    while row < samples {
+                        var column = 0
+                        while column < samples {
+                            let sx = Double(x) + (Double(column) + 0.5) / Double(samples)
+                            let sy = Double(y) + (Double(row) + 0.5) / Double(samples)
+                            let sample = region.sample(at: Picture.Renderer.CPU.point(inverse, sx, sy))
+                            let value = sample.distance > 0 ? old : glass(pane, sx, sy, sample)
+                            mean = count == 0 ? value : mean.interpolated(to: value, at: 1 / Float(count + 1))
+                            count += 1
+                            column += 1
+                        }
+                        row += 1
+                    }
+                    let pixel = mean
+                    return Picture.Renderer.CPU.limited(old, pixel, state.share(x, y))
                 }
-                row += 1
             }
-            let pixel = mean
-            return Picture.Renderer.CPU.limited(old, pixel, state.share(x, y))
-        }
-        })
+        )
     }
 }
 

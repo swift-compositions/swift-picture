@@ -119,13 +119,11 @@ extension `Picture Tests`.`A source is hashed once, when it is made` {
     }
 
     @Test
-    func `The hash made once is the hash of the parts`() {
+    func `The hash made once is the hash of the drawing's type and value`() {
         let source = Source(Self.picture(0.5), in: Self.rectangle, scale: 2, samples: 2)
         var parts = Hasher()
-        parts.combine(source.picture)
-        parts.combine(source.rectangle)
-        parts.combine(source.scale)
-        parts.combine(source.samples)
+        parts.combine(ObjectIdentifier(Picture.Image.Part.self))
+        parts.combine(Picture.Image.Part(Self.picture(0.5), in: Self.rectangle, scale: 2, samples: 2))
         var once = Hasher()
         once.combine(parts.finalize())
         #expect(source.hashValue == once.finalize())

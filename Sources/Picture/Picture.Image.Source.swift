@@ -1,84 +1,67 @@
-extension Picture.Image {
-    /// The part of a picture an image is to be drawn from: the picture, the rectangle of it to keep, how many
-    /// pixels of the raster one unit of the picture takes, and how many times as fine along each side it is
-    /// drawn before every pixel takes the mean of its square.
-    ///
-    /// A source is hashed once, when it is made: its hash is that of its parts, and every later hash of the
-    /// source, however often a renderer looks it up, combines that one number. Two sources are equal when their
-    /// parts are; the hashes are compared first, so unequal sources are told apart without comparing their
-    /// pictures.
-    public struct Source: Sendable {
-        public let picture: Picture
-        public let rectangle: Picture.Plane.Rectangle
-        public let scale: Double
-        public let samples: Cardinal
+public import Raster
 
-        /// The hash of the parts, made once.
+extension Picture.Image {
+    /// What an image is still to be drawn from: a drawing of any type, and a hash of it made once.
+    ///
+    /// A source is hashed once, when it is made, from its drawing's type and value, never from pixels: every
+    /// later hash of the source, however often a renderer looks it up, combines that one number. Two sources are
+    /// equal when their drawings are of one type and equal; the hashes are compared first, so unequal sources are
+    /// told apart without comparing their drawings. One picture holds drawings of many types, so a source keeps
+    /// its drawing's type out of its own: it holds what the drawing names, how it draws, and how to compare it.
+    public struct Source: Sendable {
+        /// The pictures the drawing draws through the renderer it is given.
+        public let pictures: [Picture]
+
+        /// The drawing's raster, drawn now.
+        let draw: @Sendable (Picture.Renderer) throws(Picture.Renderer.Error) -> Raster<Picture.Pixel>
+
+        /// The drawing's value.
+        let value: @Sendable () -> Any
+
+        /// Whether a value is a drawing of the same type, equal to this one.
+        let same: @Sendable (Any) -> Bool
+
+        /// The hash of the drawing's type and value, made once.
         let digest: Int
 
-        public init(_ picture: Picture, in rectangle: Picture.Plane.Rectangle, scale: Double, samples: Cardinal = 1) {
-            self.picture = picture
-            self.rectangle = rectangle
-            self.scale = scale
-            self.samples = samples
+        public init<Value: Drawing>(_ drawing: Value) {
+            self.pictures = drawing.pictures
+            self.draw = { (renderer: Picture.Renderer) throws(Picture.Renderer.Error) -> Raster<Picture.Pixel> in
+                try drawing.raster(through: renderer)
+            }
+            self.value = { drawing }
+            self.same = { other in (other as? Value) == drawing }
             var hasher = Hasher()
-            hasher.combine(picture)
-            hasher.combine(rectangle)
-            hasher.combine(scale)
-            hasher.combine(samples)
+            hasher.combine(ObjectIdentifier(Value.self))
+            hasher.combine(drawing)
             self.digest = hasher.finalize()
         }
     }
 }
 
+extension Picture.Image.Source {
+    /// The part of a picture inside a rectangle, `Picture.Image.Part(_:in:scale:samples:)`.
+    public init(_ picture: Picture, in rectangle: Picture.Plane.Rectangle, scale: Double, samples: Cardinal = 1) {
+        self.init(Picture.Image.Part(picture, in: rectangle, scale: scale, samples: samples))
+    }
+
+    /// The drawing, if it is of a type.
+    public func drawing<Value: Picture.Image.Drawing>(as type: Value.Type) -> Value? {
+        value() as? Value
+    }
+
+    /// The source drawn by a renderer: its drawing's raster.
+    public func raster(through renderer: Picture.Renderer) throws(Picture.Renderer.Error) -> Raster<Picture.Pixel> {
+        try draw(renderer)
+    }
+}
+
 extension Picture.Image.Source: Hashable {
     public static func == (first: Self, second: Self) -> Bool {
-        first.digest == second.digest && first.scale == second.scale && first.samples == second.samples
-            && first.rectangle == second.rectangle && first.picture == second.picture
+        first.digest == second.digest && first.same(second.value())
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(digest)
-    }
-}
-
-extension Picture.Image.Source {
-    /// Where the raster drawn from this source stands: its first corner at the rectangle's, and one pixel at
-    /// one part in `scale` of a unit.
-    public var placement: Picture.Transform {
-        Picture.Transform(rows: [[1 / scale, 0, rectangle.llx.underlying], [0, 1 / scale, rectangle.lly.underlying]])
-    }
-
-    /// The source drawn by a renderer: the picture, moved and scaled so that the rectangle's first corner is
-    /// the raster's and `scale` pixels are one unit, drawn into a transparent raster of the rectangle's size
-    /// in pixels, each side rounded up.
-    ///
-    /// It fails with `.unsupported` for a rectangle with no area and for a scale that is not positive and
-    /// finite, and with the renderer's own error otherwise.
-    public func raster(through renderer: Picture.Renderer) throws(Picture.Renderer.Error) -> Raster<Picture.Pixel> {
-        let left = rectangle.llx.underlying
-        let top = rectangle.lly.underlying
-        let across = (rectangle.urx.underlying - left) * scale
-        let down = (rectangle.ury.underlying - top) * scale
-        let fine = Swift.max(Int(clamping: samples), 1)
-        guard scale > 0, scale.isFinite, across > 0, down > 0, across.isFinite, down.isFinite,
-            across < Double(Int32.max / Int32(clamping: fine)), down < Double(Int32.max / Int32(clamping: fine))
-        else { throw .unsupported }
-        let width = Int(across.rounded(.up))
-        let height = Int(down.rounded(.up))
-        let zoom = scale * Double(fine)
-        let moved = Picture.Transform(rows: [[zoom, 0, -left * zoom], [0, zoom, -top * zoom]])
-        var raster = Raster<Picture.Pixel>(
-            width: Cardinal(UInt(width * fine)),
-            height: Cardinal(UInt(height * fine)),
-            repeating: .transparent
-        )
-        try renderer.render([.group(Picture.Group(picture, transform: moved))], into: &raster)
-        if fine > 1 {
-            raster = raster.resampled(width: Cardinal(UInt(width)), height: Cardinal(UInt(height)), .box) { (from: Picture.Pixel, to: Picture.Pixel, parameter: Float) in
-                from.interpolated(to: to, at: parameter)
-            }
-        }
-        return raster
     }
 }

@@ -6,15 +6,14 @@ extension Picture.Gradient {
         public var pixels: [Picture.Pixel]
 
         public init(_ gradient: Picture.Gradient) {
-            self.offsets = gradient.stops.map(\.offset)
-            self.pixels = gradient.stops.map(\.color.pixel)
+            self = gradient.ramp
+        }
+
+        init(stops: [Picture.Gradient.Stop]) {
+            self.offsets = stops.map(\.offset)
+            self.pixels = stops.map(\.color.pixel)
         }
     }
-}
-
-extension Picture.Gradient {
-    /// This gradient made ready to be read many times.
-    public var ramp: Ramp { Ramp(self) }
 }
 
 extension Picture.Gradient.Ramp {

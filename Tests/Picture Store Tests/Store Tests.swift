@@ -1,5 +1,6 @@
-@testable import Picture_Store
 import Testing
+
+@testable import Picture_Store
 
 #if Store
     import Byte
@@ -83,9 +84,9 @@ import Testing
             let picture: Picture = [.fill(Picture.Plane.Path(subpaths: []), .image(image))]
             let store = Picture.Store(try Self.directory(), edition: "fixed")
             // Written by an earlier run: the image's source keeps a `Hasher` value that differs per process,
-            // which its canonical value leaves out.
+            // which its canonical value, the part it names, leaves out.
             let hex = try Self.key(store, picture).hex
-            #expect(hex == "cd8bfb6738b2506c93d9077b840ed4038932fd11bf6250c9310681e3437ebc98")
+            #expect(hex == "f96abac74c3ed3dc5183f72a23f0b32af2475b3e0eb36300ce164efefe5ec18d")
         }
 
         @Test func `processes keeping one entry at once leave one whole entry`() async throws {

@@ -80,8 +80,18 @@ extension Picture.Renderer.CPU.Passage {
             }
         }
         var passage = Self(
-            place: place, sight: sight, toward: toward, exit: exit, point: point, own: own, cosine: cosine,
-            plane: plane, read: point, length: length, leaving: sight, beyond: 0,
+            place: place,
+            sight: sight,
+            toward: toward,
+            exit: exit,
+            point: point,
+            own: own,
+            cosine: cosine,
+            plane: plane,
+            read: point,
+            length: length,
+            leaving: sight,
+            beyond: 0,
             mirrored: Refraction.reflected(sight, at: toward),
             share: refraction.surroundings == nil ? 0 : Refraction.Interface(from: .vacuum, into: index).reflectance(cosine: cosine)
         )

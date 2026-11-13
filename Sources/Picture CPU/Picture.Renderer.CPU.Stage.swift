@@ -249,6 +249,7 @@ extension Picture.Renderer.CPU.Stage {
                 guard denominator != 0 else { return .infinity }
                 return -(-offset / denominator)
             }
+
         case .orthographic:
             return { depth in -((depth - offset) / scale) }
         }
@@ -395,7 +396,8 @@ extension Picture.Renderer.CPU.Canvas {
             let (tile, numbers) = opaque[part]
             guard !numbers.isEmpty else { return }
             let weighed = shaded ? Picture.Renderer.CPU.Stage.hits(stage.opaque, numbers, in: tile, samples: samples) : []
-            let hits = shaded
+            let hits =
+                shaded
                 ? weighed.map { Picture.Renderer.CPU.Hit.Nearest(triangle: $0.triangle, depth: $0.depth) }
                 : Picture.Renderer.CPU.Stage.nearest(stage.opaque, numbers, in: tile, samples: samples)
             unsafe Self.visit(shared, box, tile, samples) { row, column in
@@ -434,9 +436,17 @@ extension Picture.Renderer.CPU.Canvas {
         for shadow in shadows {
             reachOfShadows = Swift.max(reachOfShadows, (abs(shadow.x) + abs(shadow.y) + 4 * Swift.max(shadow.softness, 0)) * scale)
         }
-        let outlined = shadows.isEmpty && !lined
+        let outlined =
+            shadows.isEmpty && !lined
             ? nil
-            : Self.silhouette(stage, glass: glass, opaque: opaque, over: area.expanded(Int(reachOfShadows) + 2, Int(reachOfShadows) + 2).intersection(state.reach(in: box)), upper: upper, state.workers)
+            : Self.silhouette(
+                stage,
+                glass: glass,
+                opaque: opaque,
+                over: area.expanded(Int(reachOfShadows) + 2, Int(reachOfShadows) + 2).intersection(state.reach(in: box)),
+                upper: upper,
+                state.workers
+            )
         if let outlined {
             for shadow in shadows where shadow.color.alpha > 0 {
                 let color = shadow.color.with(alpha: 1).pixel
@@ -503,10 +513,13 @@ extension Picture.Renderer.CPU.Canvas {
                         lens: lens,
                         far: far
                     )
-                    let behind = Picture.Renderer.CPU.Spectra.pixel(refraction, read: { index in
-                        let at = passage.read(for: index, lens: lens)
-                        return (at.x, at.y)
-                    }) { read($0, $1) }
+                    let behind = Picture.Renderer.CPU.Spectra.pixel(
+                        refraction,
+                        read: { index in
+                            let at = passage.read(for: index, lens: lens)
+                            return (at.x, at.y)
+                        }
+                    ) { read($0, $1) }
                     return shading.pixel(
                         over: [behind, behind, behind],
                         through: passage.length / (bodies[surface.model]?.thickness ?? 1),

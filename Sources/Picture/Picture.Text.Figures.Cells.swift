@@ -25,10 +25,13 @@ extension Picture.Text.Figures.Cells {
         case .connectorPunctuation, .dashPunctuation, .openPunctuation, .closePunctuation, .initialPunctuation,
             .finalPunctuation, .otherPunctuation:
             return punctuation
+
         case .mathSymbol, .currencySymbol, .modifierSymbol, .otherSymbol:
             return symbols
+
         case .spaceSeparator:
             return spaces
+
         default:
             return nil
         }

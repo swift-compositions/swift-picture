@@ -324,9 +324,11 @@ extension Picture.Scene.Camera {
     /// Two views mixed as rigid motions where both are, and entry by entry where either is not.
     static func mixed(_ first: Matrix<4, 4, Double>, _ second: Matrix<4, 4, Double>, at share: Double) -> Matrix<4, 4, Double> {
         guard let start = Picture.Scene.Camera.Pose(first), let end = Picture.Scene.Camera.Pose(second) else {
-            return Matrix<4, 4, Double>(rows: InlineArray { row in
-                InlineArray { column in first[row, column] + (second[row, column] - first[row, column]) * share }
-            })
+            return Matrix<4, 4, Double>(
+                rows: InlineArray { row in
+                    InlineArray { column in first[row, column] + (second[row, column] - first[row, column]) * share }
+                }
+            )
         }
         let turn = Quaternion(start.rotation).interpolated(to: Quaternion(end.rotation), at: share)
         let rotation = Matrix<3, 3, Double>(turn)

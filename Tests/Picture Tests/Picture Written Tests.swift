@@ -25,12 +25,17 @@ import Testing
         #expect(Self.labels(Picture.Shape.Stroke(.solid(.white), pen: .init(width: 1, join: .round, cap: .round))) == ["paint", "pen"])
         #expect(Self.labels(Self.path) == ["subpaths"])
         #expect(Self.labels(Self.path.subpaths[0]) == ["startPoint", "segments", "isClosed"])
-        guard case .line(let line) = Self.path.subpaths[0].segments[0] else { Issue.record("a line"); return }
+        guard case .line(let line) = Self.path.subpaths[0].segments[0] else {
+            Issue.record("a line")
+            return
+        }
         #expect(Self.labels(line) == ["start", "end"])
         #expect(Self.labels(Self.corners[0]) == ["position"])
         #expect(Self.labels(Picture.Color.white) == ["red", "green", "blue", "alpha"])
         let tile = Raster<Picture.Pixel>(width: 2, height: 2, repeating: .transparent)
-        #expect(Self.labels(Picture.Image(tile)) == ["raster", "placement", "sampling", "edge", "source"])
+        #expect(Self.labels(Picture.Image(tile)) == ["held", "placement", "sampling", "edge", "source"])
+        #expect(Self.labels(Picture.Gradient([.init(offset: 0, color: .white)])) == ["stops", "ramp"])
+        #expect(Self.labels(Picture.Gradient.Stop(offset: 0, color: .white)) == ["offset", "color"])
         #expect(Self.labels(tile) == ["width", "height", "storage"])
     }
 
@@ -50,6 +55,8 @@ import Testing
             [.fill(Self.path, .image(Picture.Image(tile)))],
             [.fill(Self.path, .image(image))],
             [.group(Picture.Group([.shape(shape)]))],
+            [.fill(Self.path, .linear(.init(from: Self.corners[0], to: Self.corners[1], Picture.Gradient(evenly: [.white, .black]))))],
+            [.fill(Self.path, .linear(.init(from: Self.corners[0], to: Self.corners[1], Picture.Gradient(evenly: [.white, .clear]))))],
         ]
         let bytes = try pictures.map { try #require(Mirror.bytes(of: $0)) }
         #expect(Set(bytes).count == pictures.count)

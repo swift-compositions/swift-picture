@@ -2,9 +2,14 @@ public import Matrix
 public import Raster
 
 extension Picture {
-    /// A raster of working pixels placed in a shape's space.
-    public struct Image: Sendable, Hashable {
-        public var raster: Raster<Picture.Pixel>
+    /// A raster of working pixels placed in a shape's space, or the drawing it is still to be drawn from.
+    ///
+    /// An image's identity is cheap: an image that holds pixels hashes them once, the first time it is hashed or
+    /// compared, and keeps that number for all its copies; an image with a source is its source, hashed once
+    /// when it was made from the source's value, never from pixels.
+    public struct Image: Sendable {
+        /// The raster, kept with the hash of its pixels.
+        var held: Held
 
         /// Where the raster stands: a projective map of the plane from the raster's own space, one unit a
         /// pixel, into the shape's. An affine placement, whose last row is (0, 0, 1), moves the image as a
@@ -13,8 +18,8 @@ extension Picture {
         public var sampling: Raster<Picture.Pixel>.Sampling
         public var edge: Raster<Picture.Pixel>.Edge
 
-        /// The part of a picture the raster is still to be drawn from, by the renderer that draws the image;
-        /// nil for an image that holds its pixels.
+        /// The drawing the raster is still to be drawn from, by the renderer that draws the image; nil for an
+        /// image that holds its pixels.
         public var source: Source?
 
         public init(
@@ -23,12 +28,59 @@ extension Picture {
             sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
             edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
         ) {
-            self.raster = raster
+            self.held = Held(raster)
             self.placement = placement
             self.sampling = sampling
             self.edge = edge
             self.source = nil
         }
+    }
+}
+
+extension Picture.Image {
+    /// The raster of working pixels; empty until a renderer draws an image that has a source.
+    public var raster: Raster<Picture.Pixel> {
+        get { held.raster }
+        set { held = Held(newValue) }
+    }
+
+    /// An image that holds no pixels yet and names a drawing as its source, under a placement of the raster the
+    /// drawing will draw.
+    public init(
+        _ drawing: some Drawing,
+        placement: Matrix<3, 3, Double>,
+        sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
+    ) {
+        self.init(Raster(width: .zero, height: .zero, repeating: .transparent), placement: placement, sampling: sampling, edge: edge)
+        self.source = Source(drawing)
+    }
+
+    /// An image naming a drawing, under an affine placement: `init(_:placement:sampling:edge:)` of the placement's lift.
+    public init(
+        _ drawing: some Drawing,
+        placement: Picture.Transform,
+        sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
+    ) {
+        self.init(drawing, placement: Matrix<3, 3, Double>(placement), sampling: sampling, edge: edge)
+    }
+}
+
+extension Picture.Image: Hashable {
+    public static func == (first: Self, second: Self) -> Bool {
+        guard first.placement == second.placement, first.sampling == second.sampling, first.edge == second.edge,
+            first.source == second.source
+        else { return false }
+        return first.held === second.held || (first.held.hash == second.held.hash && first.held.raster == second.held.raster)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(held.hash)
+        hasher.combine(placement)
+        hasher.combine(sampling)
+        hasher.combine(edge)
+        hasher.combine(source)
     }
 }
 
@@ -54,9 +106,9 @@ extension Picture.Image {
     /// The part of a picture inside a rectangle, to be drawn once and kept as an image that stands where that
     /// part stood, so that it can be shown again, moved and repeated, for the price of an image.
     ///
-    /// The image holds no pixels yet: it names its `source`, and the renderer that draws a picture holding the
-    /// image draws the source first, when and where it chooses, and may keep the result for the next picture
-    /// that holds an equal source. The raster will have `scale` pixels to a unit of the picture, rounded up to
+    /// The image holds no pixels yet: it names its `source`, a `Part`, and the renderer that draws a picture
+    /// holding the image draws the source first, when and where it chooses, and may keep the result for the next
+    /// picture that holds an equal source. Making the image draws nothing. The raster will have `scale` pixels to a unit of the picture, rounded up to
     /// whole pixels along each side; with more than one `samples` the picture is drawn that many times as
     /// fine along each side and every pixel is the mean of its square of samples. The placement puts the
     /// raster's first corner at the rectangle's and one pixel at one part in `scale` of a unit.
@@ -68,9 +120,8 @@ extension Picture.Image {
         sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
         edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
     ) {
-        let source = Source(picture, in: rectangle, scale: scale, samples: samples)
-        self.init(Raster(width: .zero, height: .zero, repeating: .transparent), placement: Matrix<3, 3, Double>(source.placement), sampling: sampling, edge: edge)
-        self.source = source
+        let part = Part(picture, in: rectangle, scale: scale, samples: samples)
+        self.init(part, placement: part.placement, sampling: sampling, edge: edge)
     }
 
     /// This image holding its pixels: its source drawn by a renderer, and no source left. An image that

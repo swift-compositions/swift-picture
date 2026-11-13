@@ -114,7 +114,8 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
 
     @Test
     func `Glass with a body takes the same frost and adaptation as a pane`() throws {
-        let stripes: [Picture.Element] = [Tests.fill(Tests.rectangle(-40, -40, 120, 120), .black)]
+        let stripes: [Picture.Element] =
+            [Tests.fill(Tests.rectangle(-40, -40, 120, 120), .black)]
             + stride(from: -40.0, to: 80, by: 4).map { Tests.fill(Tests.rectangle($0, -40, 2, 120), .white) }
         func drawn(_ glass: Glass) throws -> Tests.Canvas {
             try Tests.drawn(Picture(stripes + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
@@ -250,8 +251,10 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
 extension `Picture CPU Tests`.`Bloom and rays add the light of a picture's bright parts, and a gradient paints its colours` {
     @Test
     func `A glow that spares a mask leaves the picture as drawn where the mask is opaque, and glows elsewhere`() throws {
-        let ring = Picture.Plane.Path(subpaths: Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(12))).subpaths
-            + Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(8))).subpaths)
+        let ring = Picture.Plane.Path(
+            subpaths: Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(12))).subpaths
+                + Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(8))).subpaths
+        )
         let picture: Picture = [Tests.fill(ring, .white, rule: .evenodd)]
         let mask: Picture = [Tests.fill(Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(6))), .black)]
         let plain = try Self.drawn(picture)

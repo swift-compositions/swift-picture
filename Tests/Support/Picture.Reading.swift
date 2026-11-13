@@ -1,5 +1,5 @@
-import Numeric
 public import ISO_14496_22
+import Numeric
 
 extension Picture {
     /// The words a picture shows, read from its value rather than its pixels: every shape whose contours are a
@@ -83,10 +83,13 @@ extension Picture.Reading {
             switch element {
             case .shape(let shape):
                 read(shape, transform, opacity: opacity, into: &placed)
+
             case .group(let group):
                 walk(group.content, transform.multiplied(by: group.transform), opacity: opacity, into: &placed)
+
             case .layer(let layer):
                 walk(layer.content, transform, opacity: opacity * Double(layer.opacity), into: &placed)
+
             case .sprites, .scene, .pane:
                 continue
             }
@@ -100,9 +103,13 @@ extension Picture.Reading {
             switch paint {
             case .solid(let color):
                 alpha = Swift.max(alpha, Double(color.alpha))
+
             case .image(let image):
                 alpha = 1
-                if let source = image.source { walk(source.picture, transform, opacity: opacity, into: &placed) }
+                if let part = image.source?.drawing(as: Picture.Image.Part.self) {
+                    walk(part.picture, transform, opacity: opacity, into: &placed)
+                }
+
             case .linear, .radial:
                 alpha = 1
             }
