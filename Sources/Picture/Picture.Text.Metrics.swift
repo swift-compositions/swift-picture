@@ -1,5 +1,5 @@
-public import ISO_14496_22
 import Geometry
+public import ISO_14496_22
 
 extension Picture.Text {
     /// The heights and widths a font gives at a size, each in picture units: how far the font rises and falls

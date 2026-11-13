@@ -1,3 +1,4 @@
+public import Angle
 public import Byte
 public import Geometry
 public import ISO_14496_22
@@ -5,7 +6,6 @@ public import Matrix
 import Numeric
 public import Threefry
 import Vector
-public import Angle
 
 extension Picture {
     /// A string set in a font at a size: lines of glyphs, each glyph an outline at a place.
