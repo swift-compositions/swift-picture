@@ -62,7 +62,11 @@ extension Picture.Renderer.CPU.Sheet {
         var sheet = Picture.Renderer.CPU.Canvas(boxes[0], repeating: .transparent)
         try sheet.draw(layer.content, Picture.Renderer.CPU.State(transform: state.transform, mask: nil, workers: state.workers))
         for (step, box) in zip(steps, boxes.dropFirst()) {
-            sheet = step.applied(to: sheet, over: box, state.workers)
+            if step.tones, sheet.box == box {
+                step.toned(&sheet, state.workers)
+            } else {
+                sheet = step.applied(to: sheet, over: box, state.workers)
+            }
         }
         return sheet
     }

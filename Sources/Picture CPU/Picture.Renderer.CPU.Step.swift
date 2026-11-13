@@ -24,8 +24,10 @@ extension Picture.Renderer.CPU {
         /// As `map`, with the map made afresh for each band of rows, so that it may keep a cache along the band.
         case field(() -> (_ x: Double, _ y: Double) -> (x: Double, y: Double), reach: Double?)
 
-        /// The sheet's own pixel at each point, changed by a function of the point.
-        case tone((_ x: Double, _ y: Double, _ pixel: Picture.Pixel) -> Picture.Pixel)
+        /// The sheet's own pixel at each pixel, changed by a function of the pixel's position. The function is
+        /// made afresh for each band of rows, given the band's columns, so that it may keep what it learns
+        /// along a band.
+        case tone((_ columns: Range<Int>) -> (_ x: Int, _ y: Int, _ pixel: Picture.Pixel) -> Picture.Pixel)
     }
 }
 
@@ -139,7 +141,26 @@ extension Picture.Renderer.CPU.Step {
 
         case .grain(let grain):
             guard grain.amount != 0, grain.size > 0 else { return nil }
-            self = .tone { x, y, pixel in grain.pixel(pixel, at: Picture.Renderer.CPU.point(inverse, x, y)) }
+            self = .tone { columns in
+                /// The cell and its share at each column of the band, as last seen. A cell's share is drawn from the
+                /// seed once: a pixel takes it from the pixel above it in the band, or from the one before it in
+                /// its row, when that one lies in the same cell.
+                var cells = [Picture.Effect.Grain.Cell?](repeating: nil, count: columns.count)
+                var shares = [Double](repeating: 0, count: columns.count)
+                return { x, y, pixel in
+                    let cell = grain.cell(at: Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5))
+                    let place = x - columns.lowerBound
+                    if cells[place] != cell {
+                        if place > 0, cells[place - 1] == cell {
+                            shares[place] = shares[place - 1]
+                        } else {
+                            shares[place] = cell.map(grain.share(of:)) ?? 0
+                        }
+                        cells[place] = cell
+                    }
+                    return grain.pixel(pixel, share: shares[place])
+                }
+            }
         }
     }
 
@@ -307,8 +328,26 @@ extension Picture.Renderer.CPU.Step {
                 }
             )
 
-        case .tone(let change):
-            return Picture.Renderer.CPU.Canvas(box, workers) { x, y in change(x, y, read(x, y)) }
+        case .tone:
+            var result = Picture.Renderer.CPU.Canvas(box, repeating: .transparent)
+            result.copy(sheet)
+            toned(&result, workers)
+            return result
         }
+    }
+}
+
+extension Picture.Renderer.CPU.Step {
+    /// Whether the step changes each pixel of the sheet from that pixel alone, so that it is applied in place.
+    var tones: Bool {
+        if case .tone = self { return true }
+        return false
+    }
+
+    /// A `tone` step applied to a sheet where it lies, every pixel of it; any other step leaves the sheet as it is.
+    func toned(_ sheet: inout Picture.Renderer.CPU.Canvas, _ workers: Picture.Renderer.CPU.Workers) {
+        guard case .tone(let make) = self else { return }
+        let columns = sheet.box.left..<sheet.box.right
+        sheet.update(sheet.box, workers, making: { make(columns) })
     }
 }

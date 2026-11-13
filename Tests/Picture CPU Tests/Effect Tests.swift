@@ -137,6 +137,39 @@ extension `Picture CPU Tests`.`A renderer applies a layer's effects to the sheet
     }
 
     @Test
+    func `Grain drawn once for a cell is the grain drawn for every pixel, bit for bit, under any transform and on any number of threads`() throws {
+        let (width, height): (UInt, UInt) = (230, 190)
+        let content: Picture = [
+            Tests.fill(Tests.rectangle(-400, -400, 900, 900), Picture.Color(red: 0.3, green: 0.5, blue: 0.7, alpha: 0.8)),
+            Tests.fill(Tests.polygon([Tests.at(-20, 10), Tests.at(140, 60), Tests.at(30, 170)]), Tests.translucent),
+        ]
+        let transforms: [Picture.Transform] = [
+            .identity,
+            Picture.Transform(rows: [[2, 0, 1], [0, 2, -3]]),
+            Picture.Transform(rows: [[0.96, -0.28, 40.5], [0.28, 0.96, -17.25]]),
+            Picture.Transform(rows: [[0, -3.5, 300], [3.5, 0, 2]]),
+        ]
+        for transform in transforms {
+            let inverse = try transform.inverted()
+            let plain = try Tests.drawn([.group(.init([.layer(.init(content))], transform: transform))], on: Tests.canvas(width, height))
+            for size in [2, 0.7, 13.5] {
+                let grain = Picture.Effect.Grain(seed: .init(5, 23), amount: 0.35, size: size)
+                let picture: Picture = [.group(.init([.layer(.init(content, effects: [.grain(grain)]))], transform: transform))]
+                let pixels = Tests.positions(width, height).map { x, y in
+                    let source = inverse.applied(to: Vector([Double(x) + 0.5, Double(y) + 0.5]))
+                    return grain.pixel(Tests.at(plain, x, y), at: Tests.at(source[0], source[1]))
+                }
+                let expected = try Tests.Canvas(width: Cardinal(width), height: Cardinal(height), pixels: pixels)
+                for threads: Cardinal in [1, 4] {
+                    var raster = Tests.canvas(width, height)
+                    try Picture.Renderer.cpu(threads: threads).render(picture, into: &raster)
+                    #expect(raster == expected, "size \(size) on \(threads) threads")
+                }
+            }
+        }
+    }
+
+    @Test
     func `Chromatic takes each channel from its own offset and the largest alpha`() throws {
         let sheet = try Self.sheet()
         let chromatic = Picture.Effect.Chromatic(red: .init([6.5, -1]), green: .init([0, 0.25]), blue: .init([-3, 9]))
