@@ -35,3 +35,12 @@ extension Picture.Glass.Shadow {
         return 1 / (1 + Double.exp(x))
     }
 }
+
+extension Picture.Glass.Shadow {
+    /// The shadow with its colour at another alpha, which is its strength.
+    public func with(alpha: Float) -> Self {
+        var shadow = self
+        shadow.color = color.with(alpha: alpha)
+        return shadow
+    }
+}

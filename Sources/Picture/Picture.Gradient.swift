@@ -10,6 +10,15 @@ extension Picture {
 }
 
 extension Picture.Gradient {
+    /// Colours evenly along the gradient: the i-th of n at offset i / (n − 1), so the first is at 0 and the last
+    /// at 1. One colour is one stop at 0, which paints that colour everywhere, and none give no stops.
+    public init(evenly colors: [Picture.Color]) {
+        let last = Swift.max(colors.count - 1, 1)
+        self.init(colors.enumerated().map { Stop(offset: Float($0.offset) / Float(last), color: $0.element) })
+    }
+}
+
+extension Picture.Gradient {
     /// The pixel at a parameter. A renderer that reads many pixels of one gradient reads them from its `ramp`,
     /// which takes the stops' colours out of sRGB once.
     public func pixel(at parameter: Float) -> Picture.Pixel {

@@ -75,6 +75,19 @@ extension Picture.Glass.Refraction {
         return sums
     }
 
+    /// How many times a ball of this glass of a `radius` enlarges the picture `distance` behind it near its
+    /// middle, both in units of the picture, as a thick lens does for an eye far in front: f / (f − radius −
+    /// distance) for the ball's focal length f = index · radius / (2 (index − 1)), measured from its centre.
+    /// At no distance it is index / (2 − index), three for window glass; it grows as the picture nears the
+    /// focus, about half a radius behind for window glass, and beyond it the picture is turned over, which the
+    /// sign says, and shrinks with distance. An index of 1 or below enlarges nothing, and a radius that is not
+    /// positive gives 1.
+    public func enlargement(radius: Double) -> Double {
+        guard index > 1, radius > 0 else { return 1 }
+        let focal = index * radius / (2 * (index - 1))
+        return focal / (focal - radius - distance)
+    }
+
     /// A unit direction after it crosses a surface, by Snell's law: `ratio` is the index of the side it comes
     /// from over the index of the side it goes into, and `normal` is the surface's unit normal on the side it
     /// comes from. It is nil where no light crosses: beyond the critical angle, on the way out of the denser side.

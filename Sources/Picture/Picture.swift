@@ -33,11 +33,21 @@ extension Picture {
 }
 
 extension Picture {
-    /// This picture, and on top a blurred copy of it that adds its light.
-    public func glow(deviation: Double, strength: Float = 1) -> Self {
-        appending([
-            .layer(Layer(self, effects: [.blur(Effect.Blur(deviation: deviation))], opacity: strength, operator: .lighter))
-        ])
+    /// This picture, and on top a blurred copy of it that adds its light, kept out of what a mask covers.
+    ///
+    /// Without a mask the light is one layer of this picture under the blur, with `strength` as opacity and
+    /// `lighter` as operator. With one, that layer holds the blurred picture and then the mask in a layer under
+    /// `destinationOut`, so each pixel of the light keeps one minus the mask's alpha there before it is added:
+    /// where the mask is opaque the picture is left as it is drawn, as a ring's glow that does not fill its
+    /// middle, and where the mask fades the light comes back. The mask is in this picture's space.
+    public func glow(deviation: Double, strength: Float = 1, sparing mask: Self = .empty) -> Self {
+        let blurred = Layer(self, effects: [.blur(Effect.Blur(deviation: deviation))], opacity: strength, operator: .lighter)
+        guard !mask.elements.isEmpty else { return appending([.layer(blurred)]) }
+        let light: Self = [
+            .layer(Layer(self, effects: [.blur(Effect.Blur(deviation: deviation))])),
+            .layer(Layer(mask, operator: .destinationOut)),
+        ]
+        return appending([.layer(Layer(light, opacity: strength, operator: .lighter))])
     }
 
     /// This picture, and on top, inside a clip, this picture again changed by effects and put in
@@ -103,12 +113,11 @@ extension Picture {
     /// The picture kept in a rectangle, and on top the mean of that image under each list of effects, kept
     /// again at a resolution and added with a strength.
     func lit(by passes: [[Effect]], in rectangle: Plane.Rectangle, strength: Float, scale: Double, resolution: Double) -> Self {
-        let area = Self.area(rectangle)
-        let kept = Element.fill(area, .image(Image(self, in: rectangle, scale: scale)))
+        let kept = Element.image(self, in: rectangle, scale: scale)
         guard !passes.isEmpty, strength != 0 else { return [kept] }
         let share = 1 / Float(passes.count)
         let light = Self(passes.map { .layer(Layer([kept], effects: $0, opacity: share, operator: .lighter)) })
-        let spread = Element.fill(area, .image(Image(light, in: rectangle, scale: scale * resolution)))
+        let spread = Element.image(light, in: rectangle, scale: scale * resolution)
         return [kept, .layer(Layer([spread], opacity: strength, operator: .lighter))]
     }
 

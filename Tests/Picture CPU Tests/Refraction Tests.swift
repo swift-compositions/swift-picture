@@ -224,3 +224,45 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         #expect(Tests.close(a, b, within: 1e-3))
     }
 }
+
+extension `Picture CPU Tests`.`A renderer draws glass with a body by the way light takes through it` {
+    @Test
+    func `A ball enlarges the picture behind its middle as the refraction's law says`() throws {
+        // A fine ball: on a coarse one the flat faces around the axis flatten what the middle reads.
+        // A ramp from red at x 0 to blue at x 40: a pixel's blue in linear light is a fortieth of where it was read.
+        let gradient = Picture.Paint.linear(
+            .init(from: Tests.at(0, 0), to: Tests.at(40, 0), .init([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.blue)]))
+        )
+        let background: [Picture.Element] = [.shape(.init(Tests.rectangle(-20, -20, 80, 80), fill: .init(gradient)))]
+        for distance in [0.0, 3, 40] {
+            let refraction = Glass.Refraction(index: 1.5, distance: distance, abbe: .infinity)
+            let fine = Picture.Scene.Model(.sphere(radius: 1.5, meridians: 192, parallels: 96), transform: Self.translation(0, 0, -5), material: .glass(.init(refraction: refraction)))
+            let raster = try Tests.drawn(Picture(background + [.scene(try Self.flat([fine]))]), on: Tests.canvas(40, 40))
+            func read(_ x: UInt) -> Double { 40 * Double(Tests.at(raster, x, 19).color.blue + Tests.at(raster, x, 20).color.blue) / 2 }
+            let seen = 5 / (read(22) - read(17))
+            let law = refraction.enlargement(radius: 15)
+            // The law is paraxial; a read 2.5 pixels off the axis of a ball 15 pixels in radius bends a few per cent more.
+            #expect(abs(seen - law) <= 0.1 * abs(law), "distance \(distance): drawn \(seen), law \(law)")
+        }
+    }
+}
+
+extension `Picture CPU Tests`.`Bloom and rays add the light of a picture's bright parts, and a gradient paints its colours` {
+    @Test
+    func `A glow that spares a mask leaves the picture as drawn where the mask is opaque, and glows elsewhere`() throws {
+        let ring = Picture.Plane.Path(subpaths: Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(12))).subpaths
+            + Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(8))).subpaths)
+        let picture: Picture = [Tests.fill(ring, .white, rule: .evenodd)]
+        let mask: Picture = [Tests.fill(Picture.Plane.Path(Picture.Plane.Circle(center: Tests.at(24, 16), radius: .init(6))), .black)]
+        let plain = try Self.drawn(picture)
+        let glow = try Self.drawn(picture.glow(deviation: 3, strength: 0.8))
+        let spared = try Self.drawn(picture.glow(deviation: 3, strength: 0.8, sparing: mask))
+        #expect(Tests.at(glow, 24, 16).color.red > Tests.at(plain, 24, 16).color.red + 0.01)
+        for (x, y): (UInt, UInt) in [(24, 16), (22, 14), (26, 18), (21, 16)] {
+            #expect(Tests.at(spared, x, y) == Tests.at(plain, x, y))
+        }
+        for (x, y): (UInt, UInt) in [(2, 2), (24, 2), (4, 16), (45, 28), (24, 29)] {
+            #expect(Tests.close(Tests.at(spared, x, y), Tests.at(glow, x, y), within: 1e-6))
+        }
+    }
+}

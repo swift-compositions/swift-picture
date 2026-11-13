@@ -55,3 +55,23 @@ extension `Picture Tests`.`A colour is written in sRGB with straight alpha` {
         #expect(Picture.Color(red: 1, green: 1, blue: 1, alpha: 0).pixel == Picture.Color.clear.pixel)
     }
 }
+
+extension `Picture Tests`.`A colour is written in sRGB with straight alpha` {
+    @Test
+    func `A colour's light scales in linear light, its alpha kept`() {
+        let colors: [Picture.Color] = [
+            Picture.Color(red: 0.2, green: 0.5, blue: 0.9, alpha: 0.6), .white, .black, Picture.Color(gray: 0.04, alpha: 1),
+        ]
+        for color in colors {
+            for factor: Float in [0, 0.5, 1, 1.3, 4] {
+                let scaled = color.scaled(by: factor)
+                #expect(scaled.alpha == color.alpha)
+                #expect(Tests.close(scaled.linear.color.red, color.linear.color.red * factor, within: 1e-5))
+                #expect(Tests.close(scaled.linear.color.green, color.linear.color.green * factor, within: 1e-5))
+                #expect(Tests.close(scaled.linear.color.blue, color.linear.color.blue * factor, within: 1e-5))
+            }
+            #expect(Tests.close(color.scaled(by: 1).red, color.red, within: 1e-6))
+        }
+        #expect(Picture.Color.white.scaled(by: 2).red > 1)
+    }
+}

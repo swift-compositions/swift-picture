@@ -121,6 +121,20 @@ extension Picture.Color {
         with(alpha: alpha * opacity)
     }
 
+    /// The colour with its light scaled: red, green and blue in linear light each multiplied by `factor` and
+    /// written back through `IEC_61966.SRGB.TransferFunction.encoded(_:)`, alpha left alone and nothing clamped.
+    /// Its `pixel` is this colour's with the colour, not the alpha, times the factor, so a factor above 1 is
+    /// light brighter than white, which a glow or a layer under `lighter` adds as such.
+    public func scaled(by factor: Float) -> Self {
+        let light = linear.color
+        return Self(
+            red: IEC_61966.SRGB.TransferFunction.encoded(light.red * factor),
+            green: IEC_61966.SRGB.TransferFunction.encoded(light.green * factor),
+            blue: IEC_61966.SRGB.TransferFunction.encoded(light.blue * factor),
+            alpha: alpha
+        )
+    }
+
     /// This colour part of the way to another along the straight line between them as written, red, green,
     /// blue and alpha alike: `self + (other − self) × share`, which is a mix in sRGB-encoded values, not in linear
     /// light or Oklab. `share` is not held to 0…1.

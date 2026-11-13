@@ -1,4 +1,5 @@
 public import Direction
+public import Raster
 
 extension Picture {
     /// One thing a picture draws.
@@ -66,5 +67,23 @@ extension Picture.Element {
         }
         let square = Picture.Plane.Path(subpaths: [.init(startPoint: corners[0], segments: sides, isClosed: true)])
         return .fill(square, .glow(color, center: center, radius: radius, core: core))
+    }
+}
+
+extension Picture.Element {
+    /// The part of a picture inside a rectangle kept as an image, standing where that part stood: the rectangle
+    /// filled with `Picture.Image(_:in:scale:samples:sampling:edge:)` of it. The renderer draws the part once, at
+    /// `scale` pixels to a unit, and paints it back as an image, so it can be shown again, moved and repeated for
+    /// the price of an image, and a part that does not change from frame to frame is drawn once for all of them.
+    public static func image(
+        _ picture: Picture,
+        in rectangle: Picture.Plane.Rectangle,
+        scale: Double,
+        samples: Cardinal = 1,
+        sampling: Raster<Picture.Pixel>.Sampling = .bilinear,
+        edge: Raster<Picture.Pixel>.Edge = .constant(.transparent)
+    ) -> Self {
+        let image = Picture.Image(picture, in: rectangle, scale: scale, samples: samples, sampling: sampling, edge: edge)
+        return .fill(Picture.area(rectangle), .image(image))
     }
 }

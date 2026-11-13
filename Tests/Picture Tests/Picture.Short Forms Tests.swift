@@ -74,3 +74,37 @@ extension `Picture Tests`.`Short forms are the long forms they stand for` {
         #expect(from.mixed(inSRGBTo: to, at: 2) == Picture.Color(red: 2, green: -1, blue: 0.5, alpha: -1))
     }
 }
+
+extension `Picture Tests`.`Short forms are the long forms they stand for` {
+    @Test
+    func `A kept picture is its rectangle filled with the image that keeps it`() {
+        let picture: Picture = [Tests.shape(4, .white)]
+        let rectangle = Picture.Plane.Rectangle(llx: 1, lly: 2, urx: 9, ury: 7)
+        let element = Picture.Element.image(picture, in: rectangle, scale: 0.5, samples: 2, sampling: .nearest, edge: .extend)
+        let image = Picture.Image(picture, in: rectangle, scale: 0.5, samples: 2, sampling: .nearest, edge: .extend)
+        guard case .shape(let shape) = element else {
+            Issue.record("a kept picture is a shape")
+            return
+        }
+        #expect(shape.fill == Picture.Shape.Fill(.image(image)))
+        #expect(shape.stroke == nil)
+        #expect(shape.path.boundingBox == rectangle)
+        #expect(shape.path.contains(Tests.at(5, 4), rule: .nonzero) && !shape.path.contains(Tests.at(10, 4), rule: .nonzero))
+    }
+
+    @Test
+    func `Even colours stand at equal steps from 0 to 1`() {
+        let colors: [Picture.Color] = [.black, .white, Picture.Color(red: 1, green: 0, blue: 0), .clear, Picture.Color(gray: 0.5)]
+        let gradient = Picture.Gradient(evenly: colors)
+        #expect(gradient.stops.map(\.color) == colors)
+        #expect(gradient.stops.map(\.offset) == [0, 0.25, 0.5, 0.75, 1])
+        #expect(Picture.Gradient(evenly: [.white]).stops == [.init(offset: 0, color: .white)])
+        #expect(Picture.Gradient(evenly: []).stops.isEmpty)
+    }
+
+    @Test
+    func `A shadow with another alpha keeps its colour, softness and offset`() {
+        let shadow = Picture.Glass.Shadow(color: Picture.Color(red: 0.1, green: 0.2, blue: 0.3, alpha: 0.4), softness: 3, x: 1, y: 2)
+        #expect(shadow.with(alpha: 0.9) == Picture.Glass.Shadow(color: Picture.Color(red: 0.1, green: 0.2, blue: 0.3, alpha: 0.9), softness: 3, x: 1, y: 2))
+    }
+}

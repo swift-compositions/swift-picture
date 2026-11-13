@@ -190,3 +190,27 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
         #expect(shaded == lit.pixel(over: reads, through: 1, leaving: normal, beyond: 0.3, mirroring: normal, by: 0.2, facing: normal))
     }
 }
+
+extension `Picture Tests`.`Glass with a body bends light going in and coming out` {
+    @Test
+    func `A ball enlarges what touches it index over two less index times, and turns it over past its focus`() {
+        for index in [1.3, 1.5, 1.7] {
+            let touching = Refraction(index: index, distance: 0).enlargement(radius: 15)
+            #expect(Tests.close(touching, index / (2 - index), within: 1e-12))
+        }
+        #expect(Tests.close(Refraction(index: 1.5, distance: 0).enlargement(radius: 2), 3, within: 1e-12))
+        let focus = 1.5 * 15 / (2 * 0.5) - 15
+        var previous = 0.0
+        for distance in stride(from: 0.0, to: focus, by: 0.5) {
+            let enlargement = Refraction(index: 1.5, distance: distance).enlargement(radius: 15)
+            #expect(enlargement > previous)
+            previous = enlargement
+        }
+        #expect(Refraction(index: 1.5, distance: focus + 1).enlargement(radius: 15) < 0)
+        #expect(Refraction(index: 1.5, distance: 40).enlargement(radius: 15) > -1)
+        // The law is in units of the picture: a ball twice the size at twice the distance enlarges alike.
+        #expect(Tests.close(Refraction(index: 1.5, distance: 6).enlargement(radius: 30), Refraction(index: 1.5, distance: 3).enlargement(radius: 15), within: 1e-12))
+        #expect(Refraction(index: 1, distance: 3).enlargement(radius: 15) == 1)
+        #expect(Refraction(index: 1.5, distance: 3).enlargement(radius: 0) == 1)
+    }
+}
