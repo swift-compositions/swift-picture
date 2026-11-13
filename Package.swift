@@ -19,7 +19,7 @@ let package = Package(
         .package(url: "https://github.com/swift-atoms/swift-direction.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-geometry.git", branch: "main", traits: ["Affine"]),
         .package(url: "https://github.com/swift-compositions/swift-kernel.git", branch: "main"),
-        .package(url: "https://github.com/swift-atoms/swift-matrix.git", branch: "main", traits: ["Projection", "Trigonometry"]),
+        .package(url: "https://github.com/swift-atoms/swift-matrix.git", branch: "main", traits: ["Projection", "Quaternion", "Trigonometry"]),
         .package(url: "https://github.com/swift-atoms/swift-mesh.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-noise.git", branch: "main"),
         .package(url: "https://github.com/swift-atoms/swift-numeric.git", branch: "main"),
