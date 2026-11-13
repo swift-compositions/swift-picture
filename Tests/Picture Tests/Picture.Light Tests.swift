@@ -18,12 +18,8 @@ extension `Picture Tests`.`Light falls off, is kept above a threshold, and a gra
         #expect(Picture.Gradient.falloff(at: 1, core: core) == 0)
         #expect(Picture.Gradient.falloff(at: 7.5, core: core) == 0)
         #expect(Picture.Gradient.falloff(at: .nan, core: core) == 0)
-        var previous = 1.0
-        for step in 1...1000 {
-            let light = Picture.Gradient.falloff(at: Double(step) / 1000, core: core)
-            #expect(light <= previous && light >= 0)
-            previous = light
-        }
+        let lights = (0...1000).map { Picture.Gradient.falloff(at: Double($0) / 1000, core: core) }
+        #expect(zip(lights, lights.dropFirst()).allSatisfy { $1 <= $0 && $1 >= 0 })
         #expect(Picture.Gradient.falloff(at: 0.99, core: core) < 1e-5)
     }
 
@@ -41,12 +37,8 @@ extension `Picture Tests`.`Light falls off, is kept above a threshold, and a gra
         #expect(paint.pixel(at: Tests.at(10, 20)) == Self.amber.pixel)
         #expect(paint.pixel(at: Tests.at(60, 20)).alpha == 0)
         #expect(paint.pixel(at: Tests.at(10, 95)).alpha == 0)
-        var previous = Self.amber.pixel
-        for step in 1...200 {
-            let pixel = paint.pixel(at: Tests.at(10 + Double(step) / 4, 20))
-            #expect(pixel.alpha <= previous.alpha && pixel.color.red <= previous.color.red)
-            previous = pixel
-        }
+        let pixels = (0...200).map { paint.pixel(at: Tests.at(10 + Double($0) / 4, 20)) }
+        #expect(zip(pixels, pixels.dropFirst()).allSatisfy { $1.alpha <= $0.alpha && $1.color.red <= $0.color.red })
         let gradient = Picture.Gradient.glow(Self.amber, core: 0.3, stops: 9)
         #expect(gradient.stops.count == 9)
         for (step, stop) in gradient.stops.enumerated() {
@@ -60,11 +52,12 @@ extension `Picture Tests`.`Light falls off, is kept above a threshold, and a gra
     @Test
     func `The glow's gradient paints the falloff closely between its stops`() {
         let gradient = Picture.Gradient.glow(.white)
-        for step in 0...999 {
-            let distance = Double(step) / 999
-            let painted = gradient.pixel(at: Float(distance)).alpha
-            #expect(Tests.close(painted, Float(Picture.Gradient.falloff(at: distance, core: 0.25)), within: 0.0015))
-        }
+        let distances = (0...999).map { Double($0) / 999 }
+        #expect(
+            distances.allSatisfy { distance in
+                Tests.close(gradient.pixel(at: Float(distance)).alpha, Float(Picture.Gradient.falloff(at: distance, core: 0.25)), within: 0.0015)
+            }
+        )
     }
 
     @Test
@@ -87,13 +80,8 @@ extension `Picture Tests`.`Light falls off, is kept above a threshold, and a gra
         #expect(Tests.close(threshold.kept(0.9), 0.2))
         #expect(Tests.close(threshold.kept(0.7), 0.05))
         #expect(Tests.close(threshold.kept(2), 1.3))
-        var previous: Float = 0
-        for step in 0...3000 {
-            let kept = threshold.kept(Float(step) / 1000)
-            #expect(kept >= previous)
-            #expect(abs(kept - previous) <= 0.0011)
-            previous = kept
-        }
+        let kept = (0...3000).map { threshold.kept(Float($0) / 1000) }
+        #expect(zip(kept, kept.dropFirst()).allSatisfy { $1 >= $0 && $1 - $0 <= 0.0011 })
         let cut = Picture.Effect.Threshold(level: 0.25, knee: 0)
         #expect(cut.kept(0.25) == 0 && Tests.close(cut.kept(0.75), 0.5))
     }
