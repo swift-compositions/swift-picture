@@ -105,3 +105,99 @@ extension Picture.Scene.Camera {
         self.init(projection: projection, view: view)
     }
 }
+
+extension Picture.Scene.Camera {
+    /// How far ahead of the eye a point of a model lies: minus the z of view times model applied to (x, y, z, 1),
+    /// since the eye looks along −z. It is negative behind the eye.
+    public func distance(of point: Point::Point<3, Double>, in model: Matrix<4, 4, Double> = .identity) -> Double {
+        Self.distance(of: point, through: eye(of: model))
+    }
+
+    /// How far ahead of the eye a point lies after a matrix into eye space, `eye(of:)` of a model, so that
+    /// `distance(of:in:)` is this with the product made once per model instead of per point.
+    @inlinable
+    public static func distance(of point: Point::Point<3, Double>, through eye: Matrix<4, 4, Double>) -> Double {
+        -(eye[2, 0] * point[0] + eye[2, 1] * point[1] + eye[2, 2] * point[2] + eye[2, 3])
+    }
+
+    /// How far ahead of the eye lies what the camera draws at a normalised depth: minus the z of the eye-space
+    /// point `Projection.eye(_:)` gives for it, nil where the projection has none.
+    public func distance(at depth: Double) -> Double? {
+        projection.eye(Point::Point<3, Double>([0, 0, depth])).map { -$0[2] }
+    }
+
+    /// A point of a model as this camera sees it in a viewport: the position `Picture.Scene` gives it, the
+    /// distance `distance(of:in:)` gives it, and whether its normalised depth is at least the lower end of the
+    /// projection's depth range, which is when it lies at or beyond the near plane. It is nil, as the position
+    /// is, for a point in the plane of the eye or behind it.
+    public func sight(
+        of point: Point::Point<3, Double>,
+        in model: Matrix<4, 4, Double> = .identity,
+        viewport: Picture.Plane.Rectangle
+    ) -> Sight? {
+        guard let normalized = normalized(point, in: model) else { return nil }
+        return Sight(
+            position: Picture.Scene.Position(normalized, in: viewport),
+            distance: distance(of: point, in: model),
+            ahead: normalized[2] >= projection.depth.range.lowerBound
+        )
+    }
+}
+
+extension Picture.Scene.Camera {
+    /// The camera a share of the way to another, as an eye that moves and turns between them at an even pace:
+    /// the eye's place goes straight, and its turn goes the shorter way about one axis at an even angular
+    /// rate, so the view is rigid all the way. The lens's bounds go straight when both lenses are of one kind
+    /// and depth, and otherwise it is this lens below a share of 1 and the other from 1 on. A view whose upper
+    /// left 3 × 3 is not a rotation, or whose last row is not (0, 0, 0, 1), is mixed entry by entry. A share of
+    /// 0 gives this camera, a share of 1 the other, and equal cameras give the camera.
+    public func mixed(to other: Self, at share: Double) -> Self {
+        if share == 0 || self == other { return self }
+        if share == 1 { return other }
+        return Self(projection: Self.mixed(projection, other.projection, at: share), view: Self.mixed(view, other.view, at: share))
+    }
+
+    /// Two lenses mixed by their bounds.
+    static func mixed(_ first: Projection<Double>, _ second: Projection<Double>, at share: Double) -> Projection<Double> {
+        guard first != second else { return first }
+        func along(_ a: Double, _ b: Double) -> Double { a == b ? a : a + (b - a) * share }
+        guard first.kind == second.kind, first.depth == second.depth else { return share < 1 ? first : second }
+        do throws(Projection<Double>.Error) {
+            return try Projection<Double>(
+                first.kind,
+                left: along(first.left, second.left),
+                right: along(first.right, second.right),
+                bottom: along(first.bottom, second.bottom),
+                top: along(first.top, second.top),
+                near: along(first.near, second.near),
+                far: along(first.far, second.far),
+                depth: first.depth
+            )
+        } catch {
+            return share < 1 ? first : second
+        }
+    }
+
+    /// Two views mixed as rigid motions where both are, and entry by entry where either is not.
+    static func mixed(_ first: Matrix<4, 4, Double>, _ second: Matrix<4, 4, Double>, at share: Double) -> Matrix<4, 4, Double> {
+        guard let start = Picture.Scene.Camera.Turn(first), let end = Picture.Scene.Camera.Turn(second) else {
+            return Matrix<4, 4, Double>(rows: InlineArray { row in
+                InlineArray { column in first[row, column] + (second[row, column] - first[row, column]) * share }
+            })
+        }
+        let relative = start.rotation.transposed.multiplied(by: end.rotation)
+        let rotation = start.rotation.multiplied(by: Picture.Scene.Camera.Turn.part(of: relative, share))
+        let place = Vector<3, Double>([
+            start.place[0] + (end.place[0] - start.place[0]) * share,
+            start.place[1] + (end.place[1] - start.place[1]) * share,
+            start.place[2] + (end.place[2] - start.place[2]) * share,
+        ])
+        let moved = rotation.applied(to: place)
+        return Matrix<4, 4, Double>(rows: [
+            [rotation[0, 0], rotation[0, 1], rotation[0, 2], -moved[0]],
+            [rotation[1, 0], rotation[1, 1], rotation[1, 2], -moved[1]],
+            [rotation[2, 0], rotation[2, 1], rotation[2, 2], -moved[2]],
+            [0, 0, 0, 1],
+        ])
+    }
+}

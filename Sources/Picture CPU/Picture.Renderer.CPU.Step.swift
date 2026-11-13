@@ -18,6 +18,11 @@ extension Picture.Renderer.CPU {
         /// that point lies from the point itself along each axis.
         case map((_ x: Double, _ y: Double) -> (x: Double, y: Double), reach: Double?)
 
+        /// As `map`, for a fold onto a region the sheet is read from: where a bilinear read's taps of weight
+        /// fall outside the region (`holds` false at their centres), the read leaves them out and spreads their
+        /// weight over the rest, so that what lies across the fold never bleeds into it.
+        case fold((_ x: Double, _ y: Double) -> (x: Double, y: Double), holds: (_ x: Double, _ y: Double) -> Bool)
+
         /// The weighted mean of the sheet read at several points for each point, mixed in the order given.
         case blend([(_ x: Double, _ y: Double) -> (x: Double, y: Double)], weights: [Float])
 
@@ -45,6 +50,21 @@ extension Picture.Renderer.CPU.Step {
     /// r^j moves those onto [r^(j+1), r^j]. Weighting each read by its segment's width, r^j, makes the reads
     /// even over the whole range again, with about a `segments`-th of the reads of one pass.
     static func steps(_ effect: Picture.Effect, _ transform: Picture.Transform, _ inverse: Picture.Transform) throws(Picture.Renderer.Error) -> [Self] {
+        if case .kaleidoscope(let kaleidoscope) = effect {
+            guard let fold = try Self(effect, transform, inverse) else { return [] }
+            guard kaleidoscope.spokes != nil || kaleidoscope.seam != nil else { return [fold] }
+            let determinant = transform[0, 0] * transform[1, 1] - transform[0, 1] * transform[1, 0]
+            let footprint = 1 / abs(determinant).squareRoot()
+            let spokes = kaleidoscope.spokes?.pixel
+            let seam = kaleidoscope.seam?.color.pixel
+            let tone = Self.tone { _ in
+                { x, y, pixel in
+                    let point = Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5)
+                    return kaleidoscope.pixel(pixel, at: point, footprint: footprint, spokes: spokes, seam: seam)
+                }
+            }
+            return [fold, tone]
+        }
         guard case .zoom(let zoom) = effect else {
             return try Self(effect, transform, inverse).map { [$0] } ?? []
         }
@@ -122,7 +142,9 @@ extension Picture.Renderer.CPU.Step {
 
         case .kaleidoscope(let kaleidoscope):
             guard kaleidoscope.segments > .zero else { return nil }
-            self = .map(conjugated(kaleidoscope.source(of:)), reach: nil)
+            self = .fold(conjugated(kaleidoscope.source(of:))) { x, y in
+                kaleidoscope.holds(Picture.Renderer.CPU.point(inverse, x, y))
+            }
 
         case .displacement(let displacement):
             let reach = 2.0.squareRoot() * abs(displacement.amplitude) * Picture.Renderer.CPU.stretch(transform)
@@ -189,6 +211,9 @@ extension Picture.Renderer.CPU.Step {
             let pixels = Int(Swift.min(reach.rounded(.up), Picture.Renderer.CPU.Box.reach)) + 1
             return box.expanded(pixels, pixels)
 
+        case .fold(let source, _):
+            return Self.around(box, source)
+
         case .blend(let reads, _):
             var total = Picture.Renderer.CPU.Box.empty
             for read in reads { total = total.union(Self.corners(box, read)) }
@@ -251,7 +276,7 @@ extension Picture.Renderer.CPU.Step {
         switch self {
         case .blur(let across, let down): return box?.expanded(across.reach, down.reach)
         case .tone: return box
-        case .zoom, .chromatic, .map, .blend, .field: return nil
+        case .zoom, .chromatic, .map, .fold, .blend, .field: return nil
         }
     }
 
@@ -305,6 +330,12 @@ extension Picture.Renderer.CPU.Step {
                 return read(point.x, point.y)
             }
 
+        case .fold(let source, let holds):
+            return Picture.Renderer.CPU.Canvas(box, workers) { x, y in
+                let point = source(x, y)
+                return Self.folded(sheet, point.x, point.y, holds) ?? read(point.x, point.y)
+            }
+
         case .blend(let reads, let weights):
             return Picture.Renderer.CPU.Canvas(box, workers) { x, y in
                 var mean = Picture.Pixel.transparent
@@ -352,5 +383,39 @@ extension Picture.Renderer.CPU.Step {
         guard case .tone(let make) = self else { return }
         let columns = sheet.box.left..<sheet.box.right
         sheet.update(sheet.box, workers, making: { make(columns) })
+    }
+}
+
+extension Picture.Renderer.CPU.Step {
+    /// A bilinear read of a sheet at a point with only the taps whose centres a region holds, their weights
+    /// spread over themselves; nil when every tap of weight is held, or none is, where a plain read is right.
+    static func folded(
+        _ sheet: Picture.Renderer.CPU.Canvas,
+        _ x: Double,
+        _ y: Double,
+        _ holds: (_ x: Double, _ y: Double) -> Bool
+    ) -> Picture.Pixel? {
+        let left = (x - 0.5).rounded(.down)
+        let top = (y - 0.5).rounded(.down)
+        guard abs(left) < 0x1p40, abs(top) < 0x1p40 else { return nil }
+        let across = x - 0.5 - left
+        let down = y - 0.5 - top
+        let taps: [(x: Double, y: Double, weight: Double)] = [
+            (left, top, (1 - across) * (1 - down)),
+            (left + 1, top, across * (1 - down)),
+            (left, top + 1, (1 - across) * down),
+            (left + 1, top + 1, across * down),
+        ]
+        let weighty = taps.filter { $0.weight > 0 }
+        let held = weighty.filter { holds($0.x + 0.5, $0.y + 0.5) }
+        guard !held.isEmpty, held.count < weighty.count else { return nil }
+        var mean = Picture.Pixel.transparent
+        var total = 0.0
+        for tap in held {
+            let pixel = sheet[Int(tap.x), Int(tap.y)]
+            total += tap.weight
+            mean = total == tap.weight ? pixel : mean.interpolated(to: pixel, at: Float(tap.weight / total))
+        }
+        return mean
     }
 }

@@ -213,6 +213,25 @@ extension Picture.Renderer.CPU.Stage {
     }
 }
 
+extension Picture.Renderer.CPU.Stage {
+    /// How far ahead of the eye lies what a lens draws at a normalised depth, as `Camera.distance(at:)` gives it
+    /// bit for bit, with the lens's coefficients taken once: minus the z of `Projection.eye(_:)`.
+    static func distance(_ projection: Projection<Double>) -> (_ depth: Double) -> Double {
+        let rows = projection.coefficients
+        let (scale, offset) = (rows[2][2], rows[2][3])
+        switch projection.kind {
+        case .perspective:
+            return { depth in
+                let denominator = depth + scale
+                guard denominator != 0 else { return .infinity }
+                return -(-offset / denominator)
+            }
+        case .orthographic:
+            return { depth in -((depth - offset) / scale) }
+        }
+    }
+}
+
 extension Picture.Renderer.CPU {
     /// The sample points of a scene along each side of a pixel: a pixel takes the mean of `samples` × `samples`.
     static let samples: Int = 4
@@ -345,6 +364,7 @@ extension Picture.Renderer.CPU.Canvas {
         let area = stage.bounds.intersection(state.reach(in: box))
         guard area.area > 0 else { return }
         let upper = scene.camera.projection.depth.range.upperBound
+        let haze = scene.haze.map { haze in (haze: haze, pixel: haze.color.pixel, distance: Picture.Renderer.CPU.Stage.distance(scene.camera.projection)) }
         let opaque = Picture.Renderer.CPU.Stage.tiles(stage.opaque, over: area)
         unsafe tiles(opaque.count, state.workers) { shared, box, part in
             let (tile, numbers) = opaque[part]
@@ -354,7 +374,12 @@ extension Picture.Renderer.CPU.Canvas {
                 let hit = hits[row * tile.width * samples + column]
                 return hit.triangle >= 0 && hit.depth <= upper
             } value: { _, _, row, column, old in
-                stage.colors[hits[row * tile.width * samples + column].triangle].composited(over: old)
+                let hit = hits[row * tile.width * samples + column]
+                let color = stage.colors[hit.triangle]
+                guard let haze else { return color.composited(over: old) }
+                let share = haze.haze.share(at: haze.distance(hit.depth))
+                guard share > 0 else { return color.composited(over: old) }
+                return color.interpolated(to: haze.pixel, at: Float(share)).composited(over: old)
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }
