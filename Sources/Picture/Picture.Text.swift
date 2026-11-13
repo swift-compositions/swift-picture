@@ -152,3 +152,13 @@ extension Picture.Text {
         Picture.Shape(path, fill: fill)
     }
 }
+
+extension Picture.Text {
+    /// The whole text filled and put at a point: the first baseline passes through the point, and the point
+    /// is the left end, the middle or the right end of the measure as `anchor` says. It is the shape of
+    /// `shape(_:)` in a group moved by `anchor.indent(of: 0, in: measure)` to the left of the point.
+    public func placed(_ fill: Picture.Shape.Fill, at point: Picture.Plane.Point<2>, anchor: Alignment = .left) -> Picture.Element {
+        let move = Picture.Transform.translation(x: point[0] - anchor.indent(of: 0, in: measure), y: point[1])
+        return .group(Picture.Group([.shape(shape(fill))], transform: move))
+    }
+}

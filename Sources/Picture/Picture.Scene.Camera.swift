@@ -1,3 +1,4 @@
+public import Angle
 public import Matrix
 public import Point
 public import Projection
@@ -67,5 +68,40 @@ extension Picture.Scene.Camera {
         let length = (moved[0] * moved[0] + moved[1] * moved[1] + moved[2] * moved[2]).squareRoot()
         guard length > 0, length.isFinite else { return .zero }
         return Vector([moved[0] / length, moved[1] / length, moved[2] / length])
+    }
+}
+
+extension Picture.Scene.Camera {
+    /// A camera through a symmetric perspective lens: `Projection.perspective(fieldOfView:aspect:near:far:depth:)`
+    /// of swift-projection, with its failure, and a view.
+    public init(
+        fieldOfView: Radian<Double>,
+        aspect: Double,
+        near: Double,
+        far: Double,
+        depth: Projection<Double>.Depth,
+        view: Matrix<4, 4, Double> = .identity
+    ) throws(Projection<Double>.Error) {
+        let projection = try Projection<Double>.perspective(fieldOfView: fieldOfView, aspect: aspect, near: near, far: far, depth: depth)
+        self.init(projection: projection, view: view)
+    }
+
+    /// A camera standing at a place of the world and turned by three angles: first `yaw` about the world's y
+    /// axis, then `pitch` about the eye's own x axis, then `roll` about its own line of sight. The eye looks
+    /// along −z with y up, as eye space has it, before it is turned; positive angles turn by the right-hand
+    /// rule, so a positive yaw looks to the left, a positive pitch looks up, and a positive roll banks the eye
+    /// to the left. The view is the inverse of that placing: roll, pitch and yaw undone, then the place.
+    public init(
+        projection: Projection<Double>,
+        at place: Point::Point<3, Double>,
+        yaw: Radian<Double> = .zero,
+        pitch: Radian<Double> = .zero,
+        roll: Radian<Double> = .zero
+    ) {
+        let view = Matrix<4, 4, Double>.rotation(aboutZ: -roll.underlying)
+            .multiplied(by: .rotation(aboutX: -pitch.underlying))
+            .multiplied(by: .rotation(aboutY: -yaw.underlying))
+            .multiplied(by: .translation(Vector([-place[0], -place[1], -place[2]])))
+        self.init(projection: projection, view: view)
     }
 }

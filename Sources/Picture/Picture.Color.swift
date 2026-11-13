@@ -74,3 +74,47 @@ extension Picture.Color {
         return Self(place, alpha: alpha + (other.alpha - alpha) * Float(share))
     }
 }
+
+extension Picture.Color {
+    /// The colour written as six hexadecimal digits of sRGB, `0xRRGGBB`, with an alpha: each byte through
+    /// `IEC_61966.SRGB(r255:g255:b255:)`, so each component is its byte over 255. Bits above the six digits are
+    /// not read.
+    public init(hex value: UInt32, alpha: Float = 1) {
+        let written = IEC_61966.`2`.`1`.SRGB(
+            r255: Int((value >> 16) & 0xFF),
+            g255: Int((value >> 8) & 0xFF),
+            b255: Int(value & 0xFF)
+        )
+        self.init(red: Float(written.r), green: Float(written.g), blue: Float(written.b), alpha: alpha)
+    }
+
+    /// The colour a CSS hexadecimal string writes, `#RGB` or `#RRGGBB` with or without the `#`, with an alpha,
+    /// as `IEC_61966.SRGB(hex:)` reads it; nil for anything else.
+    public init?(hex string: String, alpha: Float = 1) {
+        guard let written = IEC_61966.`2`.`1`.SRGB(hex: string) else { return nil }
+        self.init(red: Float(written.r), green: Float(written.g), blue: Float(written.b), alpha: alpha)
+    }
+
+    /// The colour with another alpha.
+    public func with(alpha: Float) -> Self {
+        Self(red: red, green: green, blue: blue, alpha: alpha)
+    }
+
+    /// The colour seen through an opacity: its alpha multiplied by it. Nothing is clamped.
+    public func faded(by opacity: Float) -> Self {
+        with(alpha: alpha * opacity)
+    }
+
+    /// This colour part of the way to another along the straight line between them as written, red, green,
+    /// blue and alpha alike: `self + (other − self) × share`, which is a mix in sRGB-encoded values, not in linear
+    /// light or Oklab. `share` is not held to 0…1.
+    public func mixed(inSRGBTo other: Self, at share: Double) -> Self {
+        let share = Float(share)
+        return Self(
+            red: red + (other.red - red) * share,
+            green: green + (other.green - green) * share,
+            blue: blue + (other.blue - blue) * share,
+            alpha: alpha + (other.alpha - alpha) * share
+        )
+    }
+}
