@@ -26,10 +26,25 @@ extension Picture.Renderer.CPU.Stage {
         let lens = Picture.Renderer.CPU.Lens(scene, transform)
         for (number, model) in zip(scene.models.indices, scene.models) {
             let mesh = model.mesh
-            let normals: [Vector<3, Double>] = mesh.normals(per: .vertex)
+            var glassy = false
+            if case .glass = model.material { glassy = true }
+            let normals: [Vector<3, Double>] = glassy ? mesh.normals(per: .vertex) : [Vector<3, Double>](repeating: .zero, count: mesh.vertices.count)
             let eye = scene.camera.eye(of: model.transform)
+            let whole = Matrix(scene.camera.projection).multiplied(by: scene.camera.view).multiplied(by: model.transform)
+            let view = (left: scene.viewport.llx.underlying, top: scene.viewport.lly.underlying)
+            let size = (width: scene.viewport.urx.underlying - view.left, height: scene.viewport.ury.underlying - view.top)
+            /// What `Picture.Scene.position(of:in:)` gives for a point of this model, through the camera's whole
+            /// map worked out once for the model. Normals are worked out for glass alone, which alone reads them.
+            func place(_ point: Point<3, Double>) -> Picture.Scene.Position? {
+                let clip = whole.applied(to: Vector([point[0], point[1], point[2], 1]))
+                guard clip[3] > 0 else { return nil }
+                return Picture.Scene.Position(
+                    point: Picture.Plane.Point<2>([view.left + (clip[0] / clip[3] + 1) / 2 * size.width, view.top + (1 - clip[1] / clip[3]) / 2 * size.height]),
+                    depth: clip[2] / clip[3]
+                )
+            }
             let corners = zip(mesh.vertices, normals).map { point, normal in
-                let clip = scene.camera.clip(point, in: model.transform)
+                let clip = whole.applied(to: Vector([point[0], point[1], point[2], 1]))
                 let place = eye.applied(to: Vector([point[0], point[1], point[2], 1]))
                 return Corner(
                     point: point,
@@ -40,7 +55,7 @@ extension Picture.Renderer.CPU.Stage {
                 )
             }
             func project(_ corner: Corner) -> Point<3, Double>? {
-                guard let position = scene.position(of: corner.point, in: model) else { return nil }
+                guard let position = place(corner.point) else { return nil }
                 let moved = transform.applied(to: Vector([position.point[0], position.point[1]]))
                 return Point<3, Double>([moved[0], moved[1], position.depth])
             }
@@ -93,8 +108,8 @@ extension Picture.Renderer.CPU.Stage {
                         let key = [Swift.min(first, second), Swift.max(first, second)]
                         guard first != second, seen.insert(key).inserted else { continue }
                         guard let (start, end) = Self.clipped(corners[first], corners[second]),
-                            let a = scene.position(of: start.point, in: model),
-                            let b = scene.position(of: end.point, in: model)
+                            let a = place(start.point),
+                            let b = place(end.point)
                         else { continue }
                         for quad in Self.line(a, b, width: width) {
                             add(quad.map { Self.moved($0, transform) }, pixel)
@@ -107,7 +122,7 @@ extension Picture.Renderer.CPU.Stage {
                 let reach = radius * Picture.Renderer.CPU.stretch(transform) * Double(samples)
                 let sides = reach.isFinite && reach > 0 ? Int(Swift.min(Swift.max((Double.pi * (reach / 0.2).squareRoot()).rounded(.up), 8), 256)) : 8
                 for corner in corners where corner.distance >= 0 {
-                    guard radius > 0, let centre = scene.position(of: corner.point, in: model) else { continue }
+                    guard radius > 0, let centre = place(corner.point) else { continue }
                     for triangle in Self.disc(centre, radius: radius, sides: sides) {
                         add(triangle.map { Self.moved($0, transform) }, pixel)
                     }

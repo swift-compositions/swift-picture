@@ -251,4 +251,50 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         #expect(Set(winners.pixels).count > 30)
         #expect(untouched > 500)
     }
+
+    @Test
+    func `A turned model under a perspective camera is drawn where the scene says each of its points lies`() throws {
+        // The stage works the camera's map out once for a model; `Picture.Scene.position(of:in:)` works it out
+        // for every point. One tile at the raster's corner, so that moving to its sample points changes nothing.
+        let projection = try Projection<Double>(.perspective, left: -1, right: 1, bottom: -1, top: 1, near: 1, far: 20, depth: .symmetric)
+        let turn = Matrix<4, 4, Double>(rows: [
+            [0.8, -0.6, 0, 0.13],
+            [0.6, 0.8, 0, -0.21],
+            [0, 0, 1, -0.37],
+            [0, 0, 0, 1],
+        ])
+        let meshes = [
+            try Mesh(vertices: [Vertex([-9, -9, -6.3]), Vertex([9.1, -9, -7.1]), Vertex([0.3, 9.7, -5.9])], faces: [Polygon(0, 1, 2)]),
+            try Mesh(vertices: [Vertex([-0.71, -0.33, -2.9]), Vertex([0.83, -0.47, -3.3]), Vertex([0.11, 0.69, -1.7])], faces: [Polygon(0, 1, 2)]),
+            try Mesh(vertices: [Vertex([-1.3, 0.9, -4.1]), Vertex([1.7, 1.1, -2.3]), Vertex([1.6, 1.3, -2.2])], faces: [Polygon(0, 1, 2)]),
+        ]
+        let colors = [Tests.blue, Tests.red, Tests.translucent]
+        let models = zip(meshes, colors).map { mesh, color in Picture.Scene.Model(mesh, transform: turn, material: .flat(color)) }
+        let scene = Picture.Scene(camera: .init(projection: projection), viewport: .init(llx: 0, lly: 0, urx: 32, ury: 32), models: models)
+        let drawn = try Tests.drawn([.scene(scene)], on: Tests.canvas(32, 32, Self.backdrop))
+
+        let fine: [InlineArray<3, Point<3, Double>>] = try zip(meshes, models).map { mesh, model in
+            let places = try mesh.vertices.map { corner in try #require(scene.position(of: corner, in: model)) }
+            return [
+                Point<3, Double>([places[0].point[0] * 4, places[0].point[1] * 4, places[0].depth]),
+                Point<3, Double>([places[1].point[0] * 4, places[1].point[1] * 4, places[1].depth]),
+                Point<3, Double>([places[2].point[0] * 4, places[2].point[1] * 4, places[2].depth]),
+            ]
+        }
+        let winners = Raster<Int>.fragments(of: fine, width: 128, height: 128, empty: -1) { triangle, depth in
+            depth <= 1 ? Int(bitPattern: triangle) : -1
+        }
+        let pixels = colors.map { $0.pixel }
+        let expected = Tests.Canvas(width: 32, height: 32) { x, y in
+            var mean = Self.backdrop
+            (0..<16).forEach { point in
+                let winner = winners[x: Ordinal(UInt(Int(bitPattern: x) * 4 + point % 4)), y: Ordinal(UInt(Int(bitPattern: y) * 4 + point / 4))]
+                let sample = winner >= 0 ? pixels[winner].composited(over: Self.backdrop) : Self.backdrop
+                mean = point == 0 ? sample : mean.interpolated(to: sample, at: 1 / Float(point + 1))
+            }
+            return mean
+        }
+        #expect(drawn == expected)
+        #expect(Set(winners.pixels).isSuperset(of: [0, 1, 2]))
+    }
 }
