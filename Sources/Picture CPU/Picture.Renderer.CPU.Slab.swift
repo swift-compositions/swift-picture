@@ -38,7 +38,9 @@ extension Picture.Renderer.CPU.Canvas {
         guard scale > 0, scale.isFinite, let rectangle = pane.region.boundingBox else { return }
         let reach = state.reach(in: box)
         let inside = Picture.Renderer.CPU.Box(rectangle, transform).expanded(1, 1).intersection(reach)
-        let before = self
+        let margin = Int((Picture.Renderer.CPU.Slab.reach(of: pane, scale: scale) * scale).rounded(.up)) + 2
+        let spread = margin + Int(Swift.min(4 * Swift.max(pane.glass.frost, 0) * scale, 4096).rounded(.up))
+        let before = inside.area > 0 ? seen(over: inside.expanded(spread, spread), state) : self
         let region = pane.region
         let outer = Picture.Renderer.CPU.Slab.bounds(of: pane, transform).intersection(reach)
         let coarse = Picture.Renderer.CPU.Slab.Coarse(region, over: outer, inverse, scale: scale)
@@ -66,7 +68,6 @@ extension Picture.Renderer.CPU.Canvas {
         guard inside.area > 0 else { return }
 
         let deviation = pane.glass.frost * scale
-        let margin = Int((Picture.Renderer.CPU.Slab.reach(of: pane, scale: scale) * scale).rounded(.up)) + 2
         let frost = Picture.Renderer.CPU.Frost(before, over: inside.expanded(margin, margin).intersection(before.box), deviation: deviation, state.workers)
         let shading = pane.glass.shading
         let linear = (transform[0, 0], transform[0, 1], transform[1, 0], transform[1, 1])

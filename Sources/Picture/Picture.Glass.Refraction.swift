@@ -2,14 +2,19 @@ public import Vector
 
 extension Picture.Glass {
     /// Glass with a body: light bends where it goes into the surface and again where it comes out of the far
-    /// side, so what is seen through a round body is turned over and squeezed toward its edges; the edges
-    /// mirror their surroundings more than they pass; and the colours part a little where the bend is strong.
+    /// side, so what is seen through a round body is enlarged when the picture is near behind it and turned
+    /// over when it is far, and squeezed toward its edges; the edges mirror their surroundings more than they
+    /// pass; and the colours part a little where the bend is strong.
     public struct Refraction: Sendable, Hashable {
         /// The index of refraction of the body against what is around it: 1 bends nothing, 1.5 is window glass.
         public var index: Double
 
-        /// How far behind the place light leaves the body the picture behind stands, in the scene's units
-        /// along the eye's line of sight.
+        /// How far behind the glass's back the picture behind stands, in units of the picture the glass is
+        /// drawn in, as every length of a glass is: below a pane's flat bottom, and behind the plane across the
+        /// line of sight through a body's farthest point from the eye. So one value lays the picture as far
+        /// behind a pane as behind a sphere or a torus of the same size in the picture. A ball whose picture is
+        /// nearer than about half its radius shows it upright and enlarged, as a glass ball held over a page
+        /// does, and one farther than that turns it over.
         public var distance: Double
 
         /// How little the index differs between wavelengths: the Abbe number V = (n_d − 1) / (n_F − n_C), about

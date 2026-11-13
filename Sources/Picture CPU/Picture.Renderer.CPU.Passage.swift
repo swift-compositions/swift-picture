@@ -16,7 +16,9 @@ extension Picture.Renderer.CPU {
 
         /// How squarely the line of sight meets the surface: the cosine between them.
         let cosine: Double
-        let distance: Double
+
+        /// The depth in eye space of the plane the picture behind stands on.
+        let plane: Double
 
         /// Where light of the glass's own index reads the picture.
         var read: Read
@@ -38,8 +40,8 @@ extension Picture.Renderer.CPU.Passage {
     /// normal `normal`. Where it leaves is found on the far side as drawn: the path's length starts as the
     /// body's thickness along the line of sight and is corrected three times to end at the far side's depth
     /// where the path's end is drawn. There the light is bent out again by the far side's normal, or mirrored
-    /// back in where none can leave, and reads the picture where it meets a plane the refraction's distance
-    /// behind. Light of the glass's own index finds the way; light of any other index, `read(for:lens:)`, follows
+    /// back in where none can leave, and reads the picture where it meets the plane of the picture behind, at the
+    /// depth `plane` in eye space. Light of the glass's own index finds the way; light of any other index, `read(for:lens:)`, follows
     /// a path of the same length under its own. Where no far side is found the light goes straight on, and a
     /// place that cannot be drawn reads at `point`. Places are drawn relative to where `place` itself is drawn,
     /// so that light going straight on reads at `point` exactly.
@@ -48,6 +50,7 @@ extension Picture.Renderer.CPU.Passage {
         normal: Vector<3, Double>,
         at point: Read,
         through refraction: Picture.Glass.Refraction,
+        plane: Double,
         lens: Picture.Renderer.CPU.Lens,
         far: Picture.Renderer.CPU.Far
     ) {
@@ -78,7 +81,7 @@ extension Picture.Renderer.CPU.Passage {
         }
         var passage = Self(
             place: place, sight: sight, toward: toward, exit: exit, point: point, own: own, cosine: cosine,
-            distance: refraction.distance, read: point, length: length, leaving: sight, beyond: 0,
+            plane: plane, read: point, length: length, leaving: sight, beyond: 0,
             mirrored: Picture.Glass.Refraction.mirrored(sight, at: toward),
             share: refraction.surroundings == nil ? 0 : refraction.reflectance(cosine: cosine)
         )
@@ -115,8 +118,9 @@ extension Picture.Renderer.CPU.Passage {
                 Picture.Glass.Refraction.bent(within, at: against, ratio: n)
                 ?? Picture.Glass.Refraction.mirrored(within, at: against)
         }
-        let reach = distance / Swift.max(-out[2], 0.05)
-        let end = Self.along(Self.along(place, within, length), out, reach)
+        let leaving = Self.along(place, within, length)
+        let reach = Swift.max(leaving[2] - plane, 0) / Swift.max(-out[2], 0.05)
+        let end = Self.along(leaving, out, reach)
         return (Self.drawn(end, own, point, lens), out)
     }
 

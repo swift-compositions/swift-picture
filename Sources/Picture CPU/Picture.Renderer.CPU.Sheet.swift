@@ -7,12 +7,20 @@ extension Picture.Renderer.CPU {
         let layer: Picture.Layer
         let state: State
         let target: Box
+
+        /// The canvases beneath the sheet, nearest first, for glass on it to read through.
+        let beneath: [Canvas]
     }
 }
 
 extension Picture.Renderer.CPU.Sheet {
-    init(_ layer: Picture.Layer, _ state: Picture.Renderer.CPU.State, _ target: Picture.Renderer.CPU.Box) {
-        self.init(layer: layer, state: state, target: target)
+    init(
+        _ layer: Picture.Layer,
+        _ state: Picture.Renderer.CPU.State,
+        _ target: Picture.Renderer.CPU.Box,
+        beneath: [Picture.Renderer.CPU.Canvas] = []
+    ) {
+        self.init(layer: layer, state: state, target: target, beneath: beneath)
     }
 
     /// Whether the layer's operator leaves the backdrop as it is where the sheet is transparent, so that
@@ -60,7 +68,7 @@ extension Picture.Renderer.CPU.Sheet {
             stage -= 1
         }
         var sheet = Picture.Renderer.CPU.Canvas(boxes[0], repeating: .transparent)
-        try sheet.draw(layer.content, Picture.Renderer.CPU.State(transform: state.transform, mask: nil, workers: state.workers))
+        try sheet.draw(layer.content, Picture.Renderer.CPU.State(transform: state.transform, mask: nil, workers: state.workers, beneath: beneath))
         for (step, box) in zip(steps, boxes.dropFirst()) {
             if step.tones, sheet.box == box {
                 step.toned(&sheet, state.workers)

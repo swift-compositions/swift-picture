@@ -6,6 +6,10 @@ extension Picture.Renderer.CPU {
         var transform: Picture.Transform
         var mask: Mask?
         var workers: Workers = .one
+
+        /// The canvases beneath the one being drawn on, nearest first: for each layer the element stands in, the
+        /// canvas that layer's sheet goes onto, as it stood when the layer began. Empty on the raster itself.
+        var beneath: [Canvas] = []
     }
 }
 

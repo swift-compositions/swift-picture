@@ -233,7 +233,12 @@ extension Picture.Renderer.CPU.Canvas {
 
     /// Draws a group's content under its transform, limited to its clip.
     mutating func draw(_ group: Picture.Group, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
-        var inner = Picture.Renderer.CPU.State(transform: state.transform.multiplied(by: group.transform), mask: state.mask, workers: state.workers)
+        var inner = Picture.Renderer.CPU.State(
+            transform: state.transform.multiplied(by: group.transform),
+            mask: state.mask,
+            workers: state.workers,
+            beneath: state.beneath
+        )
         if let clip = group.clip {
             let path = clip.path.transformed(by: inner.transform)
             let area = Self.bounds(of: path).intersection(state.reach(in: box))
@@ -258,10 +263,34 @@ extension Picture.Renderer.CPU.Canvas {
     mutating func draw(_ layer: Picture.Layer, _ state: Picture.Renderer.CPU.State) throws(Picture.Renderer.Error) {
         let target = state.reach(in: box)
         guard target.area > 0 else { return }
-        let sheet = try Picture.Renderer.CPU.Sheet(layer, state, target).drawn()
+        let sheet = try Picture.Renderer.CPU.Sheet(layer, state, target, beneath: [self] + state.beneath).drawn()
         let visit = Picture.Renderer.CPU.Sheet.keeps(layer) ? target.intersection(sheet.box) : target
         update(visit, state.workers) { x, y, old in
             Picture.Renderer.CPU.limited(old, layer.composited(sheet[x, y], over: old), state.share(x, y))
+        }
+    }
+}
+
+extension Picture.Renderer.CPU.Canvas {
+    /// The picture as it stands under what is drawn next, over a box: this canvas put with `sourceOver` onto the
+    /// canvases beneath it, each onto the next, as if every layer it stands in ended here at full strength and
+    /// without its effects. On the raster itself that is the canvas; glass reads it, so that glass in a layer
+    /// shows what lies beneath the layer and the layer's opacity fades the glass's result, not its backdrop.
+    /// The box is cut to the outermost canvas's.
+    func seen(over area: Picture.Renderer.CPU.Box, _ state: Picture.Renderer.CPU.State) -> Self {
+        guard let outermost = state.beneath.last else { return self }
+        let area = area.intersection(outermost.box)
+        let beneath = state.beneath
+        let top = self
+        return Self(area, state.workers) { x, y in
+            let (column, row) = (Int(x.rounded(.down)), Int(y.rounded(.down)))
+            var pixel = outermost[column, row]
+            var index = beneath.count - 2
+            while index >= 0 {
+                pixel = beneath[index][column, row].composited(over: pixel)
+                index -= 1
+            }
+            return top[column, row].composited(over: pixel)
         }
     }
 }

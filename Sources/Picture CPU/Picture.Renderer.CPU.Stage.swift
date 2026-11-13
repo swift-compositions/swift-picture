@@ -386,11 +386,13 @@ extension Picture.Renderer.CPU.Canvas {
             }
         }
         guard !stage.glass.isEmpty else { return }
-        let before = self
         let scale = abs(state.transform[0, 0] * state.transform[1, 1] - state.transform[0, 1] * state.transform[1, 0]).squareRoot()
         var frosts: [Double: Picture.Renderer.CPU.Frost] = [:]
         // The picture behind is read around the scene, as far again as the scene is wide or tall; past that a
         // read finds the nearest pixel kept.
+        let frosted = Int(Swift.min(4 * (stage.surfaces.map { Swift.max($0.glass.frost, 0) }.max() ?? 0) * scale, 4096).rounded(.up))
+        let reach = Swift.max(area.width, area.height) / 2 + frosted
+        let before = seen(over: area.expanded(reach, reach), state)
         let around = area.expanded(Swift.max(area.width, area.height) / 2, Swift.max(area.width, area.height) / 2).intersection(before.box)
         for surface in stage.surfaces where frosts[surface.glass.frost] == nil {
             frosts[surface.glass.frost] = Picture.Renderer.CPU.Frost(before, over: around, deviation: surface.glass.frost * scale, state.workers)
@@ -425,6 +427,7 @@ extension Picture.Renderer.CPU.Canvas {
         let tilts = stage.surfaces.map { $0.glass.refraction?.tilts ?? [1, 1, 1] }
         let lens = Picture.Renderer.CPU.Lens(scene, state.transform)
         let far = Picture.Renderer.CPU.Far(stage, eyes: eyes, over: area)
+        let bodies = zip(scene.models, eyes).map { model, eye in Picture.Renderer.CPU.Body(model, eye: eye, lens: lens, scale: scale) }
         unsafe tiles(glass.count, state.workers) { shared, box, part in
             let (tile, numbers) = glass[part]
             let covers = opaque[part].triangles
@@ -467,6 +470,7 @@ extension Picture.Renderer.CPU.Canvas {
                         normal: normal,
                         at: .init(x: sampleX, y: sampleY),
                         through: refraction,
+                        plane: bodies[surface.model]?.plane ?? -.infinity,
                         lens: lens,
                         far: far
                     )
@@ -476,7 +480,7 @@ extension Picture.Renderer.CPU.Canvas {
                     }) { read($0, $1) }
                     return shading.pixel(
                         over: [behind, behind, behind],
-                        through: passage.length,
+                        through: passage.length / (bodies[surface.model]?.thickness ?? 1),
                         leaving: passage.leaving,
                         beyond: passage.beyond,
                         mirroring: passage.mirrored,

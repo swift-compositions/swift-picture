@@ -17,7 +17,8 @@ extension Picture {
 
         /// The glass's body, or none: then the glass is a skin that reads the picture behind at `offset(for:)`
         /// under a coat of `tint`. With a body `bend` is not used, and the tint is taken on along the way
-        /// through it: its alpha is the share after one unit of length.
+        /// through it: its alpha is the share taken on across the glass's own thickness, so a pane's level
+        /// middle and the thickest path through a ball take the same coat.
         public var refraction: Refraction?
 
         /// How much the glass blurs what is behind it: the deviation of a Gaussian over the picture behind, in

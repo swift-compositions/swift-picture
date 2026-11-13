@@ -42,7 +42,8 @@ extension Picture.Glass.Shading {
 
     /// The pixel of glass with a body. Red, green and blue each come from the pixel that colour's light reads,
     /// with the mean of their alphas. The tint is taken on along the way: over them by the share
-    /// 1 - (1 - a)^length, for a tint of alpha a and a path of `length` scene units inside the body. Where there
+    /// 1 - (1 - a)^length, for a tint of alpha a and a path inside the body `length` times as long as the glass
+    /// is thick, 1 for a pane. Where there
     /// are surroundings, those in the direction `leaving` are mixed in by `beyond`, the share of the light that
     /// misses the picture behind, and then those in the direction `mirrored` by `share`, what the surface
     /// mirrors. On top comes the light the glass reflects where its unit normal in eye space is `normal`, added.
