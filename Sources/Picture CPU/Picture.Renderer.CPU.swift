@@ -31,8 +31,17 @@ extension Picture.Renderer.CPU {
 
     /// A point of raster space taken through a transform.
     static func point(_ transform: Picture.Transform, _ x: Double, _ y: Double) -> Picture.Plane.Point<2> {
-        let moved = transform.applied(to: Vector([x, y]))
-        return Picture.Plane.Point<2>([moved[0], moved[1]])
+        Affine(transform).point(x, y)
+    }
+
+    /// One over each count up to 4097, worked out once: a mean made as a chain of `interpolated(to:at:)` mixes
+    /// its k-th value in at 1 / k.
+    static let shares: [Float] = (0...4097).map { 1 / Float($0) }
+
+    /// One over a count, `1 / Float(count)`, from the table where it holds it.
+    @inline(__always)
+    static func share(of count: Int) -> Float {
+        count >= 0 && count < shares.count ? shares[count] : 1 / Float(count)
     }
 
     /// The pixel that ends a change limited to a share `c` of a pixel: what was there plus `c` times the change.

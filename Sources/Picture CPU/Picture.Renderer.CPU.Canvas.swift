@@ -100,6 +100,33 @@ extension Picture.Renderer.CPU.Canvas {
         }
     }
 
+    /// Calls `body` for each row of an area of the canvas, in the same bands of rows as `update`, with the row,
+    /// its columns in the area, the canvas's pixels and the index of the row's first pixel there. The area is
+    /// cut to the canvas.
+    mutating func rows(
+        _ area: Picture.Renderer.CPU.Box,
+        _ workers: Picture.Renderer.CPU.Workers,
+        _ body: (_ y: Int, _ columns: Range<Int>, _ pixels: Picture.Renderer.CPU.Workers.Pixels, _ start: Int) -> Void
+    ) {
+        let area = area.intersection(box)
+        guard area.area > 0 else { return }
+        let box = self.box
+        let band = Picture.Renderer.CPU.Workers.rows(across: area.width)
+        let bands = (area.height + band - 1) / band
+        pixels.withUnsafeMutableBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            let shared = unsafe Picture.Renderer.CPU.Workers.Pixels(base: base)
+            workers.run(bands) { part in
+                var y = area.top + part * band
+                let end = Swift.min(y + band, area.bottom)
+                while y < end {
+                    unsafe body(y, area.left..<area.right, shared, box.index(area.left, y))
+                    y += 1
+                }
+            }
+        }
+    }
+
     /// Copies another canvas's pixels where the two boxes overlap.
     mutating func copy(_ other: Self) {
         let common = box.intersection(other.box)
@@ -202,32 +229,79 @@ extension Picture.Renderer.CPU.Canvas {
         let area = Self.bounds(of: path).intersection(state.reach(in: box))
         guard area.area > 0 else { return }
         let coverage = try Self.coverage(of: path, rule: rule, in: area)
-        var solid: Picture.Pixel?
-        if case .solid = paint { solid = paint.pixel(at: .zero) }
-        let ramp: Picture.Gradient.Ramp =
-            switch paint {
-            case .linear(let linear): linear.gradient.ramp
-            case .radial(let radial): radial.gradient.ramp
-            case .solid, .image: Picture.Gradient([]).ramp
-            }
-        var image: Picture.Image.Sampler?
-        if case .image(let painted) = paint { image = painted.sampler }
-        let picture = image
-        update(area, state.workers) { x, y, old in
-            let share = coverage[area.index(x, y)]
-            guard share > 0 else { return old }
-            let source: Picture.Pixel
-            if let solid {
-                source = solid
-            } else {
-                let point = Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5)
+        let map = Picture.Renderer.CPU.Affine(inverse)
+        let clip = state.mask
+        let width = area.width
+        // The paint is read the way its kind reads it, the kind chosen once for the whole area and not per
+        // pixel; each reads exactly as `Picture.Paint.pixel(at:)` does at the pixel's centre.
+        coverage.withUnsafeBufferPointer { coverage in
+            unsafe Picture.Renderer.CPU.Mask.reading(clip) { clip in
+                @inline(__always)
+                func painted(_ source: (_ x: Double, _ y: Double) -> Picture.Pixel) {
+                    unsafe rows(area, state.workers) { y, columns, pixels, start in
+                        let shares = unsafe clip.row(y)
+                        let centre = Double(y) + 0.5
+                        var place = (y - area.top) * width + (columns.lowerBound - area.left)
+                        var index = start
+                        var x = columns.lowerBound
+                        while x < columns.upperBound {
+                            let share = unsafe coverage[place]
+                            if share > 0 {
+                                let old = unsafe pixels[index]
+                                let pixel = source(Double(x) + 0.5, centre).composited(over: old, coverage: share)
+                                unsafe pixels[index] = Picture.Renderer.CPU.limited(old, pixel, unsafe shares.share(x))
+                            }
+                            x += 1
+                            place += 1
+                            index += 1
+                        }
+                    }
+                }
                 switch paint {
-                case .linear(let linear): source = ramp.pixel(at: Float(linear.parameter(at: point)))
-                case .radial(let radial): source = ramp.pixel(at: Float(radial.parameter(at: point)))
-                case .solid, .image: source = picture?.pixel(at: point) ?? paint.pixel(at: point)
+                case .solid(let color):
+                    let pixel = color.pixel
+                    painted { _, _ in pixel }
+
+                case .linear(let linear):
+                    let ramp = linear.gradient.ramp
+                    let start = (linear.start[0], linear.start[1])
+                    let across = linear.end[0] - linear.start[0]
+                    let down = linear.end[1] - linear.start[1]
+                    let length = across * across + down * down
+                    guard length > 0 else {
+                        let pixel = ramp.pixel(at: Float(0.0))
+                        painted { _, _ in pixel }
+                        return
+                    }
+                    unsafe Picture.Renderer.CPU.Stops.reading(ramp) { stops in
+                        painted { x, y in
+                            let point = (map.x(x, y), map.y(x, y))
+                            return unsafe stops.pixel(at: Float(((point.0 - start.0) * across + (point.1 - start.1) * down) / length))
+                        }
+                    }
+
+                case .radial(let radial):
+                    let ramp = radial.gradient.ramp
+                    let radius = radial.radius
+                    guard radius > 0 else {
+                        let pixel = ramp.pixel(at: Float(0.0))
+                        painted { _, _ in pixel }
+                        return
+                    }
+                    let centre = (radial.center[0], radial.center[1])
+                    unsafe Picture.Renderer.CPU.Stops.reading(ramp) { stops in
+                        painted { x, y in
+                            let across = map.x(x, y) - centre.0
+                            let down = map.y(x, y) - centre.1
+                            return unsafe stops.pixel(at: Float((across * across + down * down).squareRoot() / radius))
+                        }
+                    }
+
+                case .image(let image):
+                    let sampler = image.sampler
+                    painted { x, y in sampler.pixel(at: map.point(x, y)) }
                 }
             }
-            return Picture.Renderer.CPU.limited(old, source.composited(over: old, coverage: share), state.share(x, y))
         }
     }
 
@@ -266,8 +340,38 @@ extension Picture.Renderer.CPU.Canvas {
         guard target.area > 0 else { return }
         let sheet = try Picture.Renderer.CPU.Sheet(layer, state, target, beneath: [self] + state.beneath).drawn()
         let visit = Picture.Renderer.CPU.Sheet.keeps(layer) ? target.intersection(sheet.box) : target
-        update(visit, state.workers) { x, y, old in
-            Picture.Renderer.CPU.limited(old, layer.composited(sheet[x, y], over: old), state.share(x, y))
+        let opacity = layer.opacity
+        let common = layer.blend == .normal && (layer.operator == .sourceOver || layer.operator == .lighter)
+        let lighter = layer.operator == .lighter
+        sheet.pixels.withUnsafeBufferPointer { above in
+            unsafe Picture.Renderer.CPU.Mask.reading(state.mask) { clip in
+                unsafe rows(visit, state.workers) { y, columns, pixels, start in
+                    let shares = unsafe clip.row(y)
+                    let held = y >= sheet.box.top && y < sheet.box.bottom
+                    let first = held ? sheet.box.index(sheet.box.left, y) : 0
+                    var index = start
+                    var x = columns.lowerBound
+                    while x < columns.upperBound {
+                        let old = unsafe pixels[index]
+                        let pixel = held && x >= sheet.box.left && x < sheet.box.right ? unsafe above[first + x - sheet.box.left] : .transparent
+                        let put: Picture.Pixel
+                        if common {
+                            // `Picture.Layer.composited(_:over:)` with its operator and blend mode known.
+                            if lighter {
+                                let added = pixel.composited(over: old, operator: .lighter, blend: .normal, coverage: opacity)
+                                put = added.alpha > 1 ? Picture.Pixel(color: added.color, alpha: 1) : added
+                            } else {
+                                put = pixel.composited(over: old, operator: .sourceOver, blend: .normal, coverage: opacity)
+                            }
+                        } else {
+                            put = layer.composited(pixel, over: old)
+                        }
+                        unsafe pixels[index] = Picture.Renderer.CPU.limited(old, put, unsafe shares.share(x))
+                        x += 1
+                        index += 1
+                    }
+                }
+            }
         }
     }
 }
