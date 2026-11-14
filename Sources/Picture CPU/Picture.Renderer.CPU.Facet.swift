@@ -5,7 +5,7 @@ extension Picture.Renderer.CPU {
     /// taken out of sRGB once, the matrix into eye space, and at each corner the mesh's normal and the fourth
     /// clip coordinate, by which the normals are mixed so that they follow perspective. It holds plain numbers
     /// only, so a sample point reads it without copying a ramp.
-    struct Shaded {
+    struct Facet {
         let shade: Picture.Scene.Material.Shade.Prepared
         let ramp: Int
         let eye: Matrix<4, 4, Double>
@@ -14,7 +14,7 @@ extension Picture.Renderer.CPU {
     }
 }
 
-extension Picture.Renderer.CPU.Shaded {
+extension Picture.Renderer.CPU.Facet {
     /// The pixel at a point given by its weights on the corners in the raster's plane: the shade's pixel at
     /// the normal there, each corner's normal weighted by its weight over its own divisor, taken into eye space
     /// by `Camera.direction(_:through:)`.

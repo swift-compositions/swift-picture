@@ -158,7 +158,7 @@ extension Picture.Renderer.CPU.Step {
             )
 
         case .swirl(let swirl):
-            guard swirl.angle != 0, swirl.radius > 0 else { return nil }
+            guard swirl.angle.underlying != 0, swirl.radius > 0 else { return nil }
             let reach = 2 * swirl.radius * Picture.Renderer.CPU.stretch(transform)
             self = .map(conjugated(swirl.source(of:)), reach: reach.isFinite ? reach : nil)
 

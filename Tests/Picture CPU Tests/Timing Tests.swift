@@ -156,7 +156,7 @@ extension `Picture CPU Tests`.`Timing` {
             let turned = Picture.Image(tile, placement: Picture.Transform(rows: [[28, 6, 40], [-6, 16, 20]]), edge: .wrap)
             let frame = Tests.rectangle(0, 0, 1920, 1080)
             print("Timing: image full frame \(try Self.time([.shape(.init(frame, fill: .init(.image(turned))))]))")
-            let light = Picture.Glass.Light(direction: Vector([-0.4, -0.6, 1]), rim: 0.6, width: 2, sheen: 0.4)
+            let light = Picture.Glass.Light(direction: Vector([-0.4, -0.6, 1]), line: 0.6, width: 2, sheen: 0.4)
             let body = Picture.Glass(.body(.init(index: 1.5, abbe: 20)), tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1), light: light)
             let torus = try Self.torus(.glass(body, distance: 2), surroundings: .init(above: .white, below: .black), shadows: [.init()])
             print("Timing: glass torus with a body over the flat frame \(try Self.time(Self.flat.appending([.scene(torus)])))")

@@ -8,7 +8,7 @@ extension Picture.Renderer.CPU {
     struct Stage {
         var opaque: [InlineArray<3, Point<3, Double>>] = []
         var colors: [Picture.Pixel] = []
-        var lights: [Picture.Renderer.CPU.Shaded?] = []
+        var lights: [Picture.Renderer.CPU.Facet?] = []
         var ramps: [Picture.Gradient.Ramp] = []
         var glass: [InlineArray<3, Point<3, Double>>] = []
         var surfaces: [Surface] = []
@@ -75,7 +75,7 @@ extension Picture.Renderer.CPU.Stage {
                     let polygon = Self.clipped(face.vertices.map { corners[Int(bitPattern: $0)] })
                     for triangle in Self.fan(polygon) {
                         guard let a = project(triangle.0), let b = project(triangle.1), let c = project(triangle.2) else { continue }
-                        let shaded = Picture.Renderer.CPU.Shaded(
+                        let shaded = Picture.Renderer.CPU.Facet(
                             shade: prepared,
                             ramp: ramp,
                             eye: eye,
@@ -148,7 +148,7 @@ extension Picture.Renderer.CPU.Stage {
     }
 
     /// An opaque triangle in raster space and its colour, or how it is shaded.
-    mutating func add(_ triangle: [Point<3, Double>], _ pixel: Picture.Pixel, _ shaded: Picture.Renderer.CPU.Shaded? = nil) {
+    mutating func add(_ triangle: [Point<3, Double>], _ pixel: Picture.Pixel, _ shaded: Picture.Renderer.CPU.Facet? = nil) {
         opaque.append([triangle[0], triangle[1], triangle[2]])
         colors.append(pixel)
         lights.append(shaded)
@@ -423,7 +423,7 @@ extension Picture.Renderer.CPU.Canvas {
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
         let eyes = scene.models.map { scene.camera.eye(of: $0.transform) }
         let shadows = scene.shadows
-        let lined = stage.surfaces.contains { ($0.glass.light?.rim ?? 0) > 0 && ($0.glass.light?.width ?? 0) > 0 }
+        let lined = stage.surfaces.contains { ($0.glass.light?.line ?? 0) > 0 && ($0.glass.light?.width ?? 0) > 0 }
         var reachOfShadows = 0.0
         for shadow in shadows {
             reachOfShadows = Swift.max(reachOfShadows, (abs(shadow.offset[0]) + abs(shadow.offset[1]) + 4 * Swift.max(shadow.softness, 0)) * scale)
@@ -505,7 +505,7 @@ extension Picture.Renderer.CPU.Canvas {
                     level >= 0 ? frosts[level].read(x, y, frosting: frosting) : .transparent
                 }
                 if let body = bodies[model], let spectra = indices[model] {
-                    let passage = Picture.Renderer.CPU.Passage(
+                    let passage = Picture.Renderer.CPU.Traversal(
                         from: surface.place(hit.weights),
                         normal: normal,
                         at: .init(x: sampleX, y: sampleY),

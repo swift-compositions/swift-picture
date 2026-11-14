@@ -80,7 +80,7 @@ extension Picture.Color {
 
     /// This colour part of the way to another along the straight line between their places in Oklab, with
     /// alpha going the same part of the way. `share` is not held to 0…1.
-    public func mixed(inOklabTo other: Self, at share: Double) -> Self {
+    public func interpolated(inOklabTo other: Self, at share: Double) -> Self {
         let (from, to) = (oklab, other.oklab)
         let place = Color_Standard::Color.Oklab(
             l: from.l + (to.l - from.l) * share,
@@ -138,7 +138,7 @@ extension Picture.Color {
     /// This colour part of the way to another along the straight line between them as written, red, green,
     /// blue and alpha alike: `self + (other − self) × share`, which is a mix in sRGB-encoded values, not in linear
     /// light or Oklab. `share` is not held to 0…1.
-    public func mixed(inSRGBTo other: Self, at share: Double) -> Self {
+    public func interpolated(inSRGBTo other: Self, at share: Double) -> Self {
         let share = Float(share)
         return Self(
             red: red + (other.red - red) * share,

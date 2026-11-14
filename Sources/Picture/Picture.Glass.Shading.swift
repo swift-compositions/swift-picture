@@ -112,7 +112,7 @@ extension Picture.Glass.Shading {
         let neutral = tilts[0] == 1 && tilts[1] == 1 && tilts[2] == 1
         func share(_ tilt: Double) -> Float {
             var total = tilt == 1 ? light.reflection(for: normal) : light.reflection(for: normal, tilt: tilt)
-            if let outline { total += light.line(at: outline.inward * tilt, across: (outline.outward[0], outline.outward[1])) }
+            if let outline { total += light.line(at: outline.inward * tilt, across: outline.outward) }
             return Float(Swift.min(Swift.max(total, 0), 1))
         }
         if neutral {

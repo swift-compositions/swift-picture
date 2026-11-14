@@ -20,7 +20,7 @@ extension `Picture CPU Tests`.`Glass in a layer reads the picture beneath the la
     static let glass = Picture.Glass(
         .body(.init(index: 1.5, abbe: 20)),
         tint: Picture.Color(red: 0.2, green: 0.4, blue: 1, alpha: 0.2),
-        light: .init(direction: Vector([-0.3, 0.9, 0.4]), rim: 0.8, width: 1.5),
+        light: .init(direction: Vector([-0.3, 0.9, 0.4]), line: 0.8, width: 1.5),
         frost: 2
     )
 

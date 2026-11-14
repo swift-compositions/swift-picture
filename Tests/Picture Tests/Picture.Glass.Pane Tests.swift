@@ -186,8 +186,8 @@ extension `Picture Tests`.`A glass adapts to its backdrop and lights its rim` {
 
     @Test
     func `The line along the outline is full to one width in, gone from two and a half, and none outside`() {
-        let light = Picture.Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, rim: 0.8, width: 2, counter: 1, focus: 2)
-        let up = (x: 0.0, y: 1.0)
+        let light = Picture.Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, line: 0.8, width: 2, counter: 1, focus: 2)
+        let up = Vector<2, Double>([0, 1])
         #expect(light.line(at: -0.1, across: up) == 0)
         #expect(Tests.close(light.line(at: 0, across: up), 0.8))
         #expect(Tests.close(light.line(at: 2, across: up), 0.8))
@@ -199,10 +199,10 @@ extension `Picture Tests`.`A glass adapts to its backdrop and lights its rim` {
             #expect(value <= previous)
             previous = value
         }
-        #expect(Picture.Glass.Light(direction: Vector([0, 1, 1]), rim: 1, width: 0).line(at: 0, across: up) == 0)
-        let focused = Picture.Glass.Light(direction: Vector([0, 1, 1]), rim: 1, width: 2, counter: 1, focus: 6)
+        #expect(Picture.Glass.Light(direction: Vector([0, 1, 1]), line: 1, width: 0).line(at: 0, across: up) == 0)
+        let focused = Picture.Glass.Light(direction: Vector([0, 1, 1]), line: 1, width: 2, counter: 1, focus: 6)
         #expect(Tests.close(focused.line(at: 1, across: up), 1))
-        #expect(Tests.close(focused.line(at: 1, across: (x: 1, y: 0)), 2.0 / 64))
+        #expect(Tests.close(focused.line(at: 1, across: Vector([1, 0])), 2.0 / 64))
     }
 
     @Test

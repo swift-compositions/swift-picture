@@ -23,7 +23,7 @@ extension `Picture Tests`.`A pose and a model move between two placements, and a
         #expect((0..<3).allSatisfy { abs(quarter.place[$0] - expected.place[$0]) < 1e-12 })
         // The camera's view mix is the pose's.
         let lens = try Projection<Double>.perspective(fieldOfView: Radian(0.9), aspect: 1, near: 0.5, far: 100, depth: .unit)
-        let mixed = Picture.Scene.Camera(projection: lens, pose: start).mixed(to: Picture.Scene.Camera(projection: lens, pose: end), at: 0.25)
+        let mixed = Picture.Scene.Camera(projection: lens, pose: start).interpolated(to: Picture.Scene.Camera(projection: lens, pose: end), at: 0.25)
         #expect((0..<16).allSatisfy { abs(mixed.view[$0 / 4, $0 % 4] - quarter.view[$0 / 4, $0 % 4]) < 1e-12 })
         // A pose whose rotation is not one mixes entry by entry.
         let stretched = Picture.Scene.Camera.Pose(rotation: Matrix<3, 3, Double>(rows: [[2, 0, 0], [0, 1, 0], [0, 0, 1]]), place: Point([0, 0, 0]))
@@ -76,7 +76,7 @@ extension `Picture Tests`.`A pose and a model move between two placements, and a
     func `A scene's exposure since an earlier placement of a model blurs along the model's way`() throws {
         let now = try Self.scene(.translation(Vector([0, 0, -10])))
         let then = try Self.scene(.translation(Vector([0, 0, -12])))
-        for exposure: Picture.Scene.Exposure in [.samples(4), .bands(2)] {
+        for exposure: Picture.Exposure in [.samples(4), .bands(2)] {
             #expect(now.exposure(since: now, exposure) == Picture([.scene(now)]))
             #expect(now.exposure(since: then, shutter: 0, exposure) == Picture([.scene(now)]))
         }
@@ -98,11 +98,5 @@ extension `Picture Tests`.`A pose and a model move between two placements, and a
             #expect(Tests.close(zoom.source(of: seen, at: 1), was, within: 1e-6))
         }
         #expect(now.smear(since: now) == nil)
-        // A camera's smear is the scene's with that camera.
-        let earlier = try Sight.camera(at: Point([0, 0, 2]))
-        var seen = now
-        seen.camera = earlier
-        #expect(now.smear(since: earlier) == now.smear(since: seen))
-        #expect(now.exposure(since: earlier, .bands(2)) == now.exposure(since: seen, .bands(2)))
     }
 }

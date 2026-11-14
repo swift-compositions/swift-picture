@@ -5,7 +5,7 @@ extension Picture.Renderer.CPU {
     /// The rasters a renderer has drawn for images that name their picture, kept from one picture to the next
     /// and shared by every thread that draws through the renderer. It holds at most `bound` pixels; past that
     /// the rasters asked for longest ago go first, and a raster larger than the bound is not kept at all.
-    final class Store: Sendable {
+    final class Cache: Sendable {
         let bound: Int
         let kept: Mutex<(rasters: [Key: (raster: Raster<Picture.Pixel>, used: UInt64)], pixels: Int, clock: UInt64)>
 
@@ -16,7 +16,7 @@ extension Picture.Renderer.CPU {
     }
 }
 
-extension Picture.Renderer.CPU.Store {
+extension Picture.Renderer.CPU.Cache {
     /// The raster kept for a source, which is thereby the one asked for last.
     func raster(for key: Key) -> Raster<Picture.Pixel>? {
         kept.withLock { kept in
@@ -117,7 +117,7 @@ extension Picture.Renderer.CPU.Store {
     }
 }
 
-extension Picture.Renderer.CPU.Store {
+extension Picture.Renderer.CPU.Cache {
     /// Adds the source of every image a picture paints with to a set, and the sources their drawings' pictures
     /// name, as deep as they go.
     static func sources(of picture: Picture, into named: inout Set<Key>) {

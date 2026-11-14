@@ -58,21 +58,21 @@ extension `Picture Tests`.`A camera sees a point at a place with its distance, t
     func `A camera mixed toward another keeps both ends and a rigid view, moving and turning evenly`() throws {
         let start = try Self.camera(at: Point([0, 1, 0]), yaw: 0.1)
         let end = try Self.camera(at: Point([2, 1, -6]), yaw: 0.7, pitch: 0.2)
-        #expect(start.mixed(to: end, at: 0) == start)
-        #expect(start.mixed(to: end, at: 1) == end)
-        #expect(start.mixed(to: start, at: 0.37) == start)
-        let half = start.mixed(to: end, at: 0.5)
+        #expect(start.interpolated(to: end, at: 0) == start)
+        #expect(start.interpolated(to: end, at: 1) == end)
+        #expect(start.interpolated(to: start, at: 0.37) == start)
+        let half = start.interpolated(to: end, at: 0.5)
         let rotation = Matrix<3, 3, Double>(rows: InlineArray { row in InlineArray { column in half.view[row, column] } })
         let product = rotation.multiplied(by: rotation.transposed)
         #expect([0, 1, 2].allSatisfy { row in [0, 1, 2].allSatisfy { column in abs(product[row, column] - (row == column ? 1 : 0)) < 1e-12 } })
         let place = rotation.transposed.applied(to: Vector([half.view[0, 3], half.view[1, 3], half.view[2, 3]]))
         #expect(Tests.close(-place[0], 1, within: 1e-12) && Tests.close(-place[1], 1, within: 1e-12) && Tests.close(-place[2], -3, within: 1e-12))
-        let quarter = start.mixed(to: end, at: 0.25)
-        let back = quarter.mixed(to: half, at: 1)
+        let quarter = start.interpolated(to: end, at: 0.25)
+        let back = quarter.interpolated(to: half, at: 1)
         #expect(back == half)
         let yawing = try Self.camera(at: Point([0, 0, 0]), yaw: 0.2)
         let yawed = try Self.camera(at: Point([0, 0, 0]), yaw: 0.8)
-        let between = yawing.mixed(to: yawed, at: 0.25)
+        let between = yawing.interpolated(to: yawed, at: 0.25)
         let expected = try Self.camera(at: Point([0, 0, 0]), yaw: 0.35)
         #expect((0..<16).allSatisfy { abs(between.view[$0 / 4, $0 % 4] - expected.view[$0 / 4, $0 % 4]) < 1e-12 })
     }
@@ -82,12 +82,13 @@ extension `Picture Tests`.`A camera sees a point at a place with its distance, t
         let camera = try Self.camera(at: Point([0, 0, 0]))
         let mesh = try Mesh(vertices: [Point::Point<3, Double>([0, 0, -5]), Point([1, 0, -5]), Point([0, 1, -5])], faces: [Polygon(0, 1, 2)])
         let scene = Picture.Scene(camera: camera, viewport: Self.viewport, models: [.init(mesh, material: .flat(.init(red: 1, green: 0, blue: 0)))])
-        let moved = try Self.camera(at: Point([0, 0, 1]))
-        for exposure: Picture.Scene.Exposure in [.samples(6), .bands(4), .samples(0), .bands(0)] {
-            #expect(scene.exposure(since: camera, exposure) == Picture([.scene(scene)]))
-            #expect(scene.exposure(since: moved, shutter: 0, exposure) == Picture([.scene(scene)]))
+        var earlier = scene
+        earlier.camera = try Self.camera(at: Point([0, 0, 1]))
+        for exposure: Picture.Exposure in [.samples(6), .bands(4), .samples(0), .bands(0)] {
+            #expect(scene.exposure(since: scene, exposure) == Picture([.scene(scene)]))
+            #expect(scene.exposure(since: earlier, shutter: 0, exposure) == Picture([.scene(scene)]))
         }
-        #expect(scene.exposure(since: moved, .samples(3)) != Picture([.scene(scene)]))
+        #expect(scene.exposure(since: earlier, .samples(3)) != Picture([.scene(scene)]))
     }
 
     @Test
@@ -97,14 +98,16 @@ extension `Picture Tests`.`A camera sees a point at a place with its distance, t
         let vertices: [Point::Point<3, Double>] = [Point([-2, -1, -10]), Point([3, 1, -10]), Point([1, 2, -10]), Point([-1, -2, -10])]
         let mesh = try Mesh(vertices: vertices, faces: [])
         let scene = Picture.Scene(camera: now, viewport: Self.viewport, models: [.init(mesh, material: .flat(.init(red: 1, green: 1, blue: 1)))])
-        let zoom = try #require(scene.smear(since: then))
+        var opened = scene
+        opened.camera = then
+        let zoom = try #require(scene.smear(since: opened))
         for vertex in vertices {
             let seen = try #require(scene.position(of: vertex, in: scene.models[0])).point
             let was = try #require(then.sight(of: vertex, viewport: Self.viewport)).position.point
             #expect(Tests.close(zoom.source(of: seen, at: 1), was, within: 1e-6))
         }
         #expect(Tests.close(zoom.center, Tests.at(960, 540), within: 1e-6))
-        #expect(scene.smear(since: now) == nil)
+        #expect(scene.smear(since: scene) == nil)
     }
 }
 
@@ -118,13 +121,13 @@ extension `Picture Tests`.`A camera sees a point at a place with its distance, t
         let moved = Matrix<4, 4, Double>.translation(Vector([1, -2, 3]))
         let start = Picture.Scene.Camera(projection: lens, view: stretched)
         let end = Picture.Scene.Camera(projection: lens, view: moved)
-        let quarter = start.mixed(to: end, at: 0.25)
+        let quarter = start.interpolated(to: end, at: 0.25)
         #expect((0..<16).allSatisfy { quarter.view[$0 / 4, $0 % 4] == stretched[$0 / 4, $0 % 4] + (moved[$0 / 4, $0 % 4] - stretched[$0 / 4, $0 % 4]) * 0.25 })
         for other in [flat, symmetric] {
             let away = Picture.Scene.Camera(projection: other, view: moved)
-            #expect(start.mixed(to: away, at: 0.5).projection == lens)
-            #expect(start.mixed(to: away, at: 0.999).projection == lens)
-            #expect(start.mixed(to: away, at: 1).projection == other)
+            #expect(start.interpolated(to: away, at: 0.5).projection == lens)
+            #expect(start.interpolated(to: away, at: 0.999).projection == lens)
+            #expect(start.interpolated(to: away, at: 1).projection == other)
         }
     }
 }

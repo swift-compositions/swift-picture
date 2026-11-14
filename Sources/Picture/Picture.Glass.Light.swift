@@ -14,11 +14,11 @@ extension Picture.Glass {
         /// How tight the highlight is: the power the cosine to the halfway direction is raised to.
         public var gloss: Double
 
-        /// How strong the highlight is, 0 to 1; the rim's sheen does not depend on it.
+        /// How strong the highlight is, 0 to 1; the sheen does not depend on it.
         public var highlight: Double
 
         /// How bright the line along the outline is, 0 to 1.
-        public var rim: Double
+        public var line: Double
 
         /// How wide the line is at full brightness, in picture units; it fades out over one and a half times
         /// that further in.
@@ -42,7 +42,7 @@ extension Picture.Glass {
             color: Picture.Color = .white,
             gloss: Double = 40,
             highlight: Double = 1,
-            rim: Double = 0,
+            line: Double = 0,
             width: Double = 2,
             sheen: Double = 0,
             sharpness: Double = 3,
@@ -53,7 +53,7 @@ extension Picture.Glass {
             self.color = color
             self.gloss = gloss
             self.highlight = highlight
-            self.rim = rim
+            self.line = line
             self.width = width
             self.sheen = sheen
             self.sharpness = sharpness
@@ -88,10 +88,10 @@ extension Picture.Glass.Light {
 
     /// The share of the light the line along the outline sends to the eye at a point `inward` in from the outline,
     /// in picture units, where the outline's outward direction across the view, x right and y up, is `across`:
-    /// `rim` times the line's profile at inward / `width` times the side's share (as for the sheen). The profile is
+    /// `line` times the line's profile at inward / `width` times the side's share (as for the sheen). The profile is
     /// 1 from the outline to one width in, then falls to 0 at two and a half widths with no slope at either end,
     /// and is 0 outside the glass; a width that is not positive draws no line.
-    public func line(at inward: Double, across: (x: Double, y: Double)) -> Double {
+    public func line(at inward: Double, across: Vector<2, Double>) -> Double {
         Prepared(self).line(at: inward, across: across)
     }
 }

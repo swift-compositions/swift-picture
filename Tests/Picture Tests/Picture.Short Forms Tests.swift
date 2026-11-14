@@ -68,10 +68,10 @@ extension `Picture Tests`.`Short forms are the long forms they stand for` {
     func `A mix as written goes straight between the components, alpha too`() {
         let from = Picture.Color(red: 0, green: 1, blue: 0.5, alpha: 1)
         let to = Picture.Color(red: 1, green: 0, blue: 0.5, alpha: 0)
-        #expect(from.mixed(inSRGBTo: to, at: 0) == from)
-        #expect(from.mixed(inSRGBTo: to, at: 1) == to)
-        #expect(from.mixed(inSRGBTo: to, at: 0.25) == Picture.Color(red: 0.25, green: 0.75, blue: 0.5, alpha: 0.75))
-        #expect(from.mixed(inSRGBTo: to, at: 2) == Picture.Color(red: 2, green: -1, blue: 0.5, alpha: -1))
+        #expect(from.interpolated(inSRGBTo: to, at: 0) == from)
+        #expect(from.interpolated(inSRGBTo: to, at: 1) == to)
+        #expect(from.interpolated(inSRGBTo: to, at: 0.25) == Picture.Color(red: 0.25, green: 0.75, blue: 0.5, alpha: 0.75))
+        #expect(from.interpolated(inSRGBTo: to, at: 2) == Picture.Color(red: 2, green: -1, blue: 0.5, alpha: -1))
     }
 }
 

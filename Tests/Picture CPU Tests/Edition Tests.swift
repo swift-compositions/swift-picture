@@ -79,7 +79,7 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
         }
         var image = Picture.Image(tile, placement: Picture.Transform(rows: [[6.5, 1.2, 4], [-0.8, 6.5, 8]]))
         image.sampling = .bilinear
-        let shade = Picture.Scene.Material.Shade(ramp: Picture.Gradient(evenly: [.black, .white]), toward: Vector([0.3, 0.5, 1]))
+        let shade = Picture.Scene.Material.Shade(ramp: Picture.Gradient(evenly: [.black, .white]), direction: Vector([0.3, 0.5, 1]))
         let shaded = Picture.Scene.Model(.sphere(radius: 1.5, meridians: 12, parallels: 6), transform: Refraction.translation(0, 0, -5), material: .shaded(shade))
         let pane = Picture.Glass.Pane(
             .rectangle(.init(llx: 4, lly: 5, urx: 20, ury: 19), radius: 4),
@@ -129,7 +129,7 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
         let torus = Mesh<Point<3, Double>>.torus(major: 1.2, minor: 0.5, segments: 12, sides: 6)
         let turn = Matrix<4, 4, Double>(rows: [[1, 0, 0, 0], [0, 0.6, -0.8, 0], [0, 0.8, 0.6, -5], [0, 0, 0, 1]])
         let color = Picture.Color(red: 0.9, green: 0.5, blue: 0.3)
-        let light = Picture.Glass.Light(direction: Vector([-0.4, -0.6, 1]), rim: 0.6, width: 1, sheen: 0.4)
+        let light = Picture.Glass.Light(direction: Vector([-0.4, -0.6, 1]), line: 0.6, width: 1, sheen: 0.4)
         let shadow = Picture.Glass.Shadow(softness: 2, offset: Vector([1, 2]))
         let around = Picture.Glass.Surroundings(above: .white, below: .black, width: 0.5)
         let lit = Picture.Glass(
@@ -210,7 +210,7 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
                 .kaleidoscope(.init(center: centre, segments: 3, seam: .init(.white, width: 0.5), spokes: Picture.Color(red: 0, green: 0, blue: 0, alpha: 0.5)))
             ),
             "displacement": under(.displacement(.init(seed: .init(1, 2), frequency: 0.2, amplitude: 2))),
-            "swirl": under(.swirl(.init(center: centre, radius: 10, angle: 1.2))),
+            "swirl": under(.swirl(.init(center: centre, radius: 10, angle: Radian(1.2)))),
             "grain": under(.grain(.init(seed: .init(3, 4), amount: 0.3, size: 1.5))),
             "threshold": under(.threshold(.init(level: 0.3, knee: 0.2))),
             "blur wide": under(.blur(.init(deviation: 3))),

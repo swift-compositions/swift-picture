@@ -70,7 +70,7 @@ extension `Picture Tests`.`A gradient's ramp reads as the gradient does` {
     @Test
     func `The ramp is made once, with the stops, and the colours read through it are the colours a fresh ramp gives`() {
         let parameters: [Float] = (-8...40).map { Float($0) / 32 } + [0.1, 0.4, 0.5, 0.9, .nan, .infinity, -.infinity]
-        for gradient in Self.gradients + [Picture.Gradient.glow(.init(red: 1, green: 0.8, blue: 0.4))] {
+        for gradient in Self.gradients + [Picture.Gradient.falloff(.init(red: 1, green: 0.8, blue: 0.4))] {
             for parameter in parameters {
                 let kept = gradient.color(at: parameter)
                 let fresh = Self.color(gradient, at: parameter)

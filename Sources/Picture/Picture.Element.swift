@@ -50,10 +50,10 @@ extension Picture.Element {
 }
 
 extension Picture.Element {
-    /// A glow of a colour around a centre: the square around the circle of the radius, filled with
-    /// `Picture.Paint.glow(_:center:radius:core:)`, which is clear outside the circle. Over what is behind it
+    /// A colour falling off around a centre: the square around the circle of the radius, filled with
+    /// `Picture.Paint.falloff(_:center:radius:core:)`, which is clear outside the circle. Over what is behind it
     /// puts its colour as far as the falloff lets it; in a layer under `lighter` it adds its light.
-    public static func glow(
+    public static func falloff(
         _ color: Picture.Color,
         center: Picture.Plane.Point<2>,
         radius: Double,
@@ -63,7 +63,7 @@ extension Picture.Element {
         let (left, top, right, bottom): (Double, Double, Double, Double) = (x - radius, y - radius, x + radius, y + radius)
         let rectangle = Picture.Plane.Rectangle(llx: .init(left), lly: .init(top), urx: .init(right), ury: .init(bottom))
         let square = Picture.Plane.Path(rectangle)
-        return .fill(square, .glow(color, center: center, radius: radius, core: core))
+        return .fill(square, .falloff(color, center: center, radius: radius, core: core))
     }
 }
 

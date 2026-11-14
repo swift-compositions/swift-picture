@@ -23,14 +23,14 @@ extension Picture.Renderer {
     /// draws for images that name their picture, from one picture to the next, for as long as this value or
     /// a copy of it lives. A pixel is 16 bytes. With no pixels to keep, every picture draws its images afresh.
     public static func cpu(threads: Cardinal, keeping pixels: Cardinal) -> Self {
-        cpu(CPU.Workers(count: Swift.max(Int(bitPattern: threads), 1)), CPU.Store(bound: Int(clamping: pixels)))
+        cpu(CPU.Workers(count: Swift.max(Int(bitPattern: threads), 1)), CPU.Cache(bound: Int(clamping: pixels)))
     }
 
     /// The renderer on some workers that keeps what it draws for images in a store.
-    static func cpu(_ workers: CPU.Workers, _ store: CPU.Store) -> Self {
+    static func cpu(_ workers: CPU.Workers, _ cache: CPU.Cache) -> Self {
         Self(render: { (picture: borrowing Picture, raster: inout Raster<Picture.Pixel>) throws(Picture.Renderer.Error) in
             var canvas = CPU.Canvas(raster)
-            try canvas.draw(try store.resolved(copy picture, workers), CPU.State(transform: .identity, mask: nil, workers: workers))
+            try canvas.draw(try cache.resolved(copy picture, workers), CPU.State(transform: .identity, mask: nil, workers: workers))
             raster = canvas.raster
         })
     }

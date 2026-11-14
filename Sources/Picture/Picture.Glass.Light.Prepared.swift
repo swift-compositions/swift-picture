@@ -95,7 +95,7 @@ extension Picture.Glass.Light.Prepared {
     }
 
     /// `Picture.Glass.Light.line(at:across:)`.
-    func line(at inward: Double, across: (x: Double, y: Double)) -> Double {
+    func line(at inward: Double, across: Vector<2, Double>) -> Double {
         let width = light.width
         guard width > 0, inward >= 0, inward.isFinite else { return 0 }
         let u = inward / width
@@ -108,6 +108,6 @@ extension Picture.Glass.Light.Prepared {
             profile = 1 - Double.math.smoothstep(u, from: 1, to: 2.5)
         }
         guard profile > 0 else { return 0 }
-        return Swift.min(Swift.max(light.rim, 0), 1) * profile * side(of: (across.x, across.y, 0))
+        return Swift.min(Swift.max(light.line, 0), 1) * profile * side(of: (across[0], across[1], 0))
     }
 }

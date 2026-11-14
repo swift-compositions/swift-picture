@@ -127,7 +127,7 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
         #expect(Tests.close(pixel(glass, beyond: 1, by: 0.5), Tests.pixel(0.5, 0.5, 0.5, 1)))
         #expect(pixel(glass, around: nil, beyond: 1, by: 1) == grey)
         #expect(pixel(Glass(.skin(bend: 0)), beyond: 1, by: 1) == grey)
-        let light = Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, rim: 0)
+        let light = Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, line: 0)
         let lit = Glass(.body(.init(abbe: .infinity)), light: light)
         let added = Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: grey, operator: .lighter, coverage: 1)
         let alpha = Swift.min(Swift.max(added.alpha, 0), 1)

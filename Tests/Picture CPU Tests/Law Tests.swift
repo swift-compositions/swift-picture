@@ -29,12 +29,12 @@ extension `Picture CPU Tests`.`The CPU renderer keeps, refuses and draws back as
     @Test
     func `The store lets the rasters asked for longest ago go first`() throws {
         let count = Deferred.Count()
-        func key(_ level: Float) throws -> Picture.Renderer.CPU.Store.Key {
+        func key(_ level: Float) throws -> Picture.Renderer.CPU.Cache.Key {
             let image = Picture.Image(Deferred.Counted(level: level, count: count), placement: Picture.Transform.identity)
-            return Picture.Renderer.CPU.Store.Key(try #require(Tests.source(of: image)))
+            return Picture.Renderer.CPU.Cache.Key(try #require(Tests.source(of: image)))
         }
         let raster = Raster(width: 6, height: 5, repeating: Picture.Pixel.transparent)
-        let store = Picture.Renderer.CPU.Store(bound: 70)
+        let store = Picture.Renderer.CPU.Cache(bound: 70)
         let (a, b, c) = (try key(0.1), try key(0.2), try key(0.3))
         store.keep(raster, for: a)
         store.keep(raster, for: b)
@@ -67,9 +67,9 @@ extension `Picture CPU Tests`.`The CPU renderer keeps, refuses and draws back as
         let lens = Picture.Renderer.CPU.Lens(scene, .identity)
         let far = Picture.Renderer.CPU.Far(Picture.Renderer.CPU.Stage(), eyes: [], over: .empty)
         let body = Picture.Glass.Body(index: 1.5)
-        func passage(_ cosine: Double) -> Picture.Renderer.CPU.Passage {
+        func passage(_ cosine: Double) -> Picture.Renderer.CPU.Traversal {
             let sine = (1 - cosine * cosine).squareRoot()
-            return Picture.Renderer.CPU.Passage(
+            return Picture.Renderer.CPU.Traversal(
                 from: Vector([0, 0, -5]),
                 normal: Vector([sine, 0, cosine]),
                 at: .init(x: 12, y: 12),
@@ -80,8 +80,8 @@ extension `Picture CPU Tests`.`The CPU renderer keeps, refuses and draws back as
                 far: far
             )
         }
-        let point = Picture.Renderer.CPU.Passage.Read(x: 12, y: 12)
-        func same(_ a: Picture.Renderer.CPU.Passage.Read, _ b: Picture.Renderer.CPU.Passage.Read?) -> Bool {
+        let point = Picture.Renderer.CPU.Traversal.Read(x: 12, y: 12)
+        func same(_ a: Picture.Renderer.CPU.Traversal.Read, _ b: Picture.Renderer.CPU.Traversal.Read?) -> Bool {
             guard let b else { return false }
             return a.x == b.x && a.y == b.y
         }
@@ -92,9 +92,9 @@ extension `Picture CPU Tests`.`The CPU renderer keeps, refuses and draws back as
         let edgeOn = passage(0)
         let back = edgeOn.read(for: edgeOn.index, lens: lens)
         #expect(back.x == point.x && back.y == point.y)
-        let at = passage(Picture.Renderer.CPU.Passage.grazing)
+        let at = passage(Picture.Renderer.CPU.Traversal.grazing)
         #expect(same(at.read(for: at.index, lens: lens), at.way(within: at.inner, lens: lens).read ?? point))
-        let half = passage(Picture.Renderer.CPU.Passage.grazing / 2)
+        let half = passage(Picture.Renderer.CPU.Traversal.grazing / 2)
         let unbent = half.way(within: half.inner, lens: lens).read ?? point
         let drawn = half.read(for: half.index, lens: lens)
         #expect(abs((drawn.x - point.x) - (unbent.x - point.x) / 2) < 1e-12)

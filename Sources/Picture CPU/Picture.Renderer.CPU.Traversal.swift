@@ -5,7 +5,7 @@ extension Picture.Renderer.CPU {
     /// What light does at one point of glass with a body: the way light of the glass's own index takes in at the
     /// point and out of the far side, from which `read(for:)` finds where light of any index reads the picture
     /// behind; the direction the surface mirrors there, and the share of light it mirrors.
-    struct Passage {
+    struct Traversal {
         let place: Vector<3, Double>
         let sight: Vector<3, Double>
         let toward: Vector<3, Double>
@@ -40,7 +40,7 @@ extension Picture.Renderer.CPU {
     }
 }
 
-extension Picture.Renderer.CPU.Passage {
+extension Picture.Renderer.CPU.Traversal {
     /// The line of sight is bent into the body at `place`, a point of the near side in eye space with the unit
     /// normal `normal`. Where it leaves is found on the far side as drawn: the path's length starts as the
     /// body's thickness along the line of sight and is corrected three times to end at the far side's depth

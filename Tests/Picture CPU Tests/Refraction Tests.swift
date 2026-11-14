@@ -111,7 +111,7 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         let black: [Picture.Element] = [Tests.fill(Tests.rectangle(-40, -40, 120, 120), Picture.Color(gray: 0.5))]
         var glass = Glass(.body(.init(index: 1)))
         let plain = try Tests.drawn(Picture(black + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
-        glass.light = .init(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, rim: 1, width: 1, counter: 1, focus: 2)
+        glass.light = .init(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, line: 1, width: 1, counter: 1, focus: 2)
         let shadows: [Glass.Shadow] = [.init(color: .init(red: 0, green: 0, blue: 0, alpha: 0.8), softness: 2, offset: Vector([0, 0]))]
         let lit = try Tests.drawn(Picture(black + [.scene(try Self.flat([Self.ball(glass)], shadows: shadows))]), on: Tests.canvas(40, 40))
         // The ball's top is at y 5 and its bottom at y 35; its middle is untouched by line or shadow.

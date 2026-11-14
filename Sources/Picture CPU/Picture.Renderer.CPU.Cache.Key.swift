@@ -1,6 +1,6 @@
 import Picture
 
-extension Picture.Renderer.CPU.Store {
+extension Picture.Renderer.CPU.Cache {
     /// What a kept raster is found by: the source it was drawn from, hashed once however often it is looked up.
     struct Key: Sendable {
         let source: Picture.Image.Source
@@ -13,7 +13,7 @@ extension Picture.Renderer.CPU.Store {
     }
 }
 
-extension Picture.Renderer.CPU.Store.Key: Hashable {
+extension Picture.Renderer.CPU.Cache.Key: Hashable {
     static func == (first: Self, second: Self) -> Bool {
         first.hash == second.hash && first.source == second.source
     }

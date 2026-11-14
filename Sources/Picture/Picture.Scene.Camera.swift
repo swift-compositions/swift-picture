@@ -291,21 +291,21 @@ extension Picture.Scene.Camera {
     /// and depth, and otherwise it is this lens below a share of 1 and the other from 1 on. A view whose upper
     /// left 3 × 3 is not a rotation, or whose last row is not (0, 0, 0, 1), is mixed entry by entry. A share of
     /// 0 gives this camera, a share of 1 the other, and equal cameras give the camera.
-    public func mixed(to other: Self, at share: Double) -> Self {
+    public func interpolated(to other: Self, at share: Double) -> Self {
         if share == 0 || self == other { return self }
         if share == 1 { return other }
-        return Self(projection: Self.mixed(projection, other.projection, at: share), view: Self.mixed(view, other.view, at: share))
+        return Self(projection: Self.interpolated(projection, other.projection, at: share), view: Self.interpolated(view, other.view, at: share))
     }
 
     /// Two lenses mixed by their bounds: `Projection.interpolated(to:at:)`.
-    static func mixed(_ first: Projection<Double>, _ second: Projection<Double>, at share: Double) -> Projection<Double> {
+    static func interpolated(_ first: Projection<Double>, _ second: Projection<Double>, at share: Double) -> Projection<Double> {
         first.interpolated(to: second, at: share)
     }
 
     /// Two views mixed as rigid motions where both are, and entry by entry where either is not. Rigid views are
     /// mixed as the eyes they stand for: the inverses, the poses, go by `Matrix.Rigid.interpolated(to:at:)`, so
     /// the eye's place goes straight, and the result is inverted back into a view.
-    static func mixed(_ first: Matrix<4, 4, Double>, _ second: Matrix<4, 4, Double>, at share: Double) -> Matrix<4, 4, Double> {
+    static func interpolated(_ first: Matrix<4, 4, Double>, _ second: Matrix<4, 4, Double>, at share: Double) -> Matrix<4, 4, Double> {
         guard let start = Matrix<4, 4, Double>.Rigid(first, within: 1e-6), let end = Matrix<4, 4, Double>.Rigid(second, within: 1e-6) else {
             return Matrix<4, 4, Double>(
                 rows: InlineArray { row in

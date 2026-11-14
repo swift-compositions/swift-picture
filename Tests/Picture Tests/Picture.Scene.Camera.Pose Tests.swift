@@ -65,15 +65,15 @@ extension `Picture Tests`.`A scene places points of a model in the picture` {
     @Test
     func `A shade's light is its lamp's cosine and its rim apart, and the ramp read at their sum`() {
         let toward = Vector<3, Double>([0.4, 0.55, 0.73])
-        let shade = Picture.Scene.Material.Shade(ramp: Self.ramp, toward: toward, rim: 0.5, sharpness: 2)
+        let shade = Picture.Scene.Material.Shade(ramp: Self.ramp, direction: toward, sheen: 0.5, sharpness: 2)
         for normal in [Vector<3, Double>([0, 0, 1]), Vector([-1, 0, 0.1]), Vector([0.3, -0.2, -0.9]), Vector([0.4, 0.55, 0.73])] {
-            #expect(shade.light(facing: normal) == shade.cosine(facing: normal) + shade.rim(facing: normal))
+            #expect(shade.light(facing: normal) == shade.cosine(facing: normal) + shade.sheen(facing: normal))
             #expect(shade.pixel(facing: normal) == shade.pixel(at: shade.light(facing: normal)))
         }
-        #expect(shade.rim(facing: Vector([0, 0, 1])) == 0)
-        #expect(abs(shade.rim(facing: Vector([-1, 0, 0])) - 0.5) < 1e-12)
+        #expect(shade.sheen(facing: Vector([0, 0, 1])) == 0)
+        #expect(abs(shade.sheen(facing: Vector([-1, 0, 0])) - 0.5) < 1e-12)
         #expect(shade.cosine(facing: Vector([-1, 0, 0])) == 0)
         #expect(abs(shade.cosine(facing: toward) - 1) < 1e-12)
-        #expect(shade.cosine(facing: .zero) == 0 && shade.rim(facing: .zero) == 0)
+        #expect(shade.cosine(facing: .zero) == 0 && shade.sheen(facing: .zero) == 0)
     }
 }

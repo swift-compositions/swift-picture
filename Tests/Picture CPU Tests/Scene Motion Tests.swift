@@ -60,8 +60,8 @@ extension `Picture CPU Tests`.`A scene is blurred by its camera's travel, hazed 
     func `A still camera's blur draws the unblurred scene, bit for bit`() throws {
         let scene = try Self.street(Self.camera(at: Vertex([0, 0, 0])), width: 160, height: 90)
         let plain = try Self.drawn([.scene(scene)])
-        for exposure: Picture.Scene.Exposure in [.samples(5), .bands(4)] {
-            #expect(try Self.drawn(scene.exposure(since: scene.camera, exposure)) == plain)
+        for exposure: Picture.Exposure in [.samples(5), .bands(4)] {
+            #expect(try Self.drawn(scene.exposure(since: scene, exposure)) == plain)
         }
     }
 
@@ -71,8 +71,10 @@ extension `Picture CPU Tests`.`A scene is blurred by its camera's travel, hazed 
         let scene = try Self.street(now, width: 160, height: 90)
         let plain = try Self.drawn([.scene(scene)])
         let limit = Self.brightest(plain) + 1e-5
-        for earlier in [try Self.camera(at: Vertex([0, 0, 1.5]), yaw: 0.05), try Self.camera(at: Vertex([0, 0, 0]), yaw: -0.1)] {
-            for exposure: Picture.Scene.Exposure in [.samples(6), .bands(4)] {
+        for camera in [try Self.camera(at: Vertex([0, 0, 1.5]), yaw: 0.05), try Self.camera(at: Vertex([0, 0, 0]), yaw: -0.1)] {
+            var earlier = scene
+            earlier.camera = camera
+            for exposure: Picture.Exposure in [.samples(6), .bands(4)] {
                 let blurred = try Self.drawn(scene.exposure(since: earlier, exposure))
                 #expect(blurred != plain)
                 #expect(Self.brightest(blurred) <= limit, "\(exposure)")
@@ -130,7 +132,8 @@ extension `Picture CPU Tests`.`A scene is blurred by its camera's travel, hazed 
         let now = try Self.camera(at: Vertex([0, 0, 0]), yaw: 0.05)
         let haze = Picture.Scene.Haze(.init(red: 0.3, green: 0.35, blue: 0.5), density: 0.04)
         let scene = try Self.street(now, width: 160, height: 90, haze: haze)
-        let earlier = try Self.camera(at: Vertex([0.2, 0, 1]), yaw: 0.0)
+        var earlier = scene
+        earlier.camera = try Self.camera(at: Vertex([0.2, 0, 1]), yaw: 0.0)
         let kaleidoscope = Picture.Effect.Kaleidoscope(
             center: Tests.at(80, 45),
             segments: 6,

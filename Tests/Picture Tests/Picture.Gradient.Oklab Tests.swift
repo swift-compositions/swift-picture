@@ -50,7 +50,7 @@ extension `Picture Tests`.`A colour has a place in Oklab and a gradient can go t
 
     @Test
     func `Halfway from black to white in Oklab is the gray of half the lightness, darker than halfway in linear light`() {
-        let middle = Picture.Color.black.mixed(inOklabTo: .white, at: 0.5)
+        let middle = Picture.Color.black.interpolated(inOklabTo: .white, at: 0.5)
         #expect(Tests.close(middle.oklab.l, 0.5, within: 1e-4))
         #expect(Tests.close(middle.red, middle.green, within: 1e-4))
         #expect(Tests.close(middle.green, middle.blue, within: 1e-4))
@@ -61,10 +61,10 @@ extension `Picture Tests`.`A colour has a place in Oklab and a gradient can go t
     @Test
     func `A mix starts at the one colour and ends at the other, and alpha goes along`() {
         let clear = Picture.Color(red: Self.violet.red, green: Self.violet.green, blue: Self.violet.blue, alpha: 0)
-        #expect(Self.close(Self.orange.mixed(inOklabTo: clear, at: 0), Self.orange))
-        #expect(Self.close(Self.orange.mixed(inOklabTo: clear, at: 1), clear))
-        #expect(Tests.close(Self.orange.mixed(inOklabTo: clear, at: 0.25).alpha, 0.75))
-        let middle = Self.orange.mixed(inOklabTo: Self.violet, at: 0.5).oklab
+        #expect(Self.close(Self.orange.interpolated(inOklabTo: clear, at: 0), Self.orange))
+        #expect(Self.close(Self.orange.interpolated(inOklabTo: clear, at: 1), clear))
+        #expect(Tests.close(Self.orange.interpolated(inOklabTo: clear, at: 0.25).alpha, 0.75))
+        let middle = Self.orange.interpolated(inOklabTo: Self.violet, at: 0.5).oklab
         let (from, to) = (Self.orange.oklab, Self.violet.oklab)
         #expect(Tests.close(middle.l, (from.l + to.l) / 2, within: 1e-4))
         #expect(Tests.close(middle.a, (from.a + to.a) / 2, within: 1e-4))
@@ -82,11 +82,11 @@ extension `Picture Tests`.`A colour has a place in Oklab and a gradient can go t
         #expect(through.stops[0] == gradient.stops[0])
         #expect(through.stops[4] == gradient.stops[1])
         #expect(through.stops[8] == gradient.stops[2])
-        #expect(through.stops[1].color == Self.orange.mixed(inOklabTo: Self.violet, at: 0.25))
-        #expect(through.stops[6].color == Self.violet.mixed(inOklabTo: .white, at: 0.5))
+        #expect(through.stops[1].color == Self.orange.interpolated(inOklabTo: Self.violet, at: 0.25))
+        #expect(through.stops[6].color == Self.violet.interpolated(inOklabTo: .white, at: 0.5))
         // At a stop the gradient is the stop, and halfway it is the mix and not the mean in linear light.
         #expect(through.pixel(at: 0.5) == Self.violet.pixel)
-        #expect(Tests.close(through.pixel(at: 0.25), Self.orange.mixed(inOklabTo: Self.violet, at: 0.5).pixel))
+        #expect(Tests.close(through.pixel(at: 0.25), Self.orange.interpolated(inOklabTo: Self.violet, at: 0.5).pixel))
         #expect(!Tests.close(through.pixel(at: 0.25), gradient.pixel(at: 0.25), within: 1e-3))
     }
 

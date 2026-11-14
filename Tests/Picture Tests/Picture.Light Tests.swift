@@ -33,25 +33,25 @@ extension `Picture Tests`.`Light falls off, is kept above a threshold, and a gra
 
     @Test
     func `A glow paints the colour at the centre and nothing from the radius on, falling all the way`() {
-        let paint = Picture.Paint.glow(Self.amber, center: Tests.at(10, 20), radius: 50)
+        let paint = Picture.Paint.falloff(Self.amber, center: Tests.at(10, 20), radius: 50)
         #expect(paint.pixel(at: Tests.at(10, 20)) == Self.amber.pixel)
         #expect(paint.pixel(at: Tests.at(60, 20)).alpha == 0)
         #expect(paint.pixel(at: Tests.at(10, 95)).alpha == 0)
         let pixels = (0...200).map { paint.pixel(at: Tests.at(10 + Double($0) / 4, 20)) }
         #expect(zip(pixels, pixels.dropFirst()).allSatisfy { $1.alpha <= $0.alpha && $1.color.red <= $0.color.red })
-        let gradient = Picture.Gradient.glow(Self.amber, core: 0.3, stops: 9)
+        let gradient = Picture.Gradient.falloff(Self.amber, core: 0.3, stops: 9)
         #expect(gradient.stops.count == 9)
         for (step, stop) in gradient.stops.enumerated() {
             let along = Double(step) / 8
             #expect(stop.offset == Float(along * along))
             #expect(stop.color == Self.amber.faded(by: Float(Picture.Gradient.falloff(at: along * along, core: 0.3))))
         }
-        #expect(Picture.Gradient.glow(.white, stops: 0).stops.count == 2)
+        #expect(Picture.Gradient.falloff(.white, stops: 0).stops.count == 2)
     }
 
     @Test
     func `The glow's gradient paints the falloff closely between its stops`() {
-        let gradient = Picture.Gradient.glow(.white)
+        let gradient = Picture.Gradient.falloff(.white)
         let distances = (0...999).map { Double($0) / 999 }
         #expect(
             distances.allSatisfy { distance in
@@ -62,12 +62,12 @@ extension `Picture Tests`.`Light falls off, is kept above a threshold, and a gra
 
     @Test
     func `A glow element is the square around its circle filled with the glow`() {
-        let element = Picture.Element.glow(.white, center: Tests.at(5, 5), radius: 2)
+        let element = Picture.Element.falloff(.white, center: Tests.at(5, 5), radius: 2)
         guard case .shape(let shape) = element else {
             Issue.record("not a shape")
             return
         }
-        #expect(shape.fill?.paint == .glow(.white, center: Tests.at(5, 5), radius: 2))
+        #expect(shape.fill?.paint == .falloff(.white, center: Tests.at(5, 5), radius: 2))
         #expect(shape.stroke == nil)
         let box = shape.path.boundingBox
         #expect(box?.llx.underlying == 3 && box?.lly.underlying == 3 && box?.urx.underlying == 7 && box?.ury.underlying == 7)

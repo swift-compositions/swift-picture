@@ -1,10 +1,11 @@
 import Numeric
 
 extension Picture {
-    /// A flat eye on a picture: the point of the picture, `focus`, seen at a point of the frame, `center`, and
-    /// how many times larger than drawn the picture is seen, `scale`. A point p of the picture is seen at
-    /// `center + scale × (p − focus)`.
-    public struct Camera: Sendable, Hashable {
+    /// What part of a picture the frame shows and how large: the point of the picture, `focus`, put at a point
+    /// of the frame, `center`, and how many times larger than drawn the picture is shown, `scale`. A point p of
+    /// the picture is shown at `center + scale × (p − focus)`, a similarity of the plane that pans and zooms;
+    /// an eye that looks into a scene is a `Picture.Scene.Camera`.
+    public struct Framing: Sendable, Hashable {
         public var focus: Picture.Plane.Point<2>
         public var center: Picture.Plane.Point<2>
         public var scale: Double
@@ -17,8 +18,8 @@ extension Picture {
     }
 }
 
-extension Picture.Camera {
-    /// The camera that shows a picture as drawn, with the frame's point `center` as its focus.
+extension Picture.Framing {
+    /// The framing that shows a picture as drawn, with the frame's point `center` as its focus.
     public init(center: Picture.Plane.Point<2>) {
         self.init(focus: center, center: center)
     }
@@ -36,30 +37,40 @@ extension Picture.Camera {
         Picture.Plane.Point<2>([center[0] + scale * (point[0] - focus[0]), center[1] + scale * (point[1] - focus[1])])
     }
 
-    /// A picture as this camera sees it: a group under `transform`.
+    /// A picture as this framing shows it: a group under `transform`.
     public func callAsFunction(_ picture: Picture) -> Picture.Element {
         .group(Picture.Group(picture, transform: transform))
     }
 
-    /// A picture as this camera sees it, smeared along the way it came since an earlier camera saw it, as an
-    /// open shutter would: drawn as the earlier camera saw it, in a layer under `smear(since:)`. Where the
-    /// scale did not change, it is the picture as this camera sees it.
-    public func callAsFunction(_ picture: Picture, since earlier: Self) -> Picture.Element {
-        guard let smear = smear(since: earlier) else { return self(picture) }
-        return .layer(Picture.Layer([earlier(picture)], effects: [.zoom(smear)]))
+    /// A picture as this framing shows it through a shutter that was open for the last `shutter` of the way from
+    /// an earlier framing, blurred by the framing's travel as the exposure says. The shutter opened at
+    /// `earlier.interpolated(to: self, at: 1 − shutter)`. `samples(n)` is `Picture.exposure(samples:_:)` of the
+    /// picture under the framing interpolated from the opening to this one at each fraction: exact for every
+    /// travel, at n times the picture. `bands(n)` is the picture shown as at the opening in a layer under
+    /// `smear(since:)` of the opening: a framing's picture is flat, so it is one band whatever n, and the zoom is
+    /// exact for a change of scale and leaves no smear for a framing that only moves sideways. A shutter that is
+    /// not positive, a framing that did not move, no samples, no bands and a travel the zoom cannot show give
+    /// the picture as this framing shows it.
+    public func exposure(_ picture: Picture, since earlier: Self, shutter: Double = 1, _ exposure: Picture.Exposure) -> Picture {
+        guard shutter > 0 else { return [self(picture)] }
+        let opened = earlier.interpolated(to: self, at: 1 - shutter)
+        guard opened != self else { return [self(picture)] }
+        switch exposure {
+        case .samples(let samples):
+            guard samples > .zero else { return [self(picture)] }
+            return Picture.exposure(samples: samples) { fraction in
+                [opened.interpolated(to: self, at: fraction)(picture)]
+            }
+
+        case .bands(let bands):
+            guard bands > .zero, let smear = smear(since: opened) else { return [self(picture)] }
+            return [.layer(Picture.Layer([opened(picture)], effects: [.zoom(smear)]))]
+        }
     }
 
-    /// A picture as this camera sees it through a shutter that was open for the last `shutter` of the way
-    /// from an earlier camera: the picture `since:` the camera `earlier.mixed(to: self, at: 1 − shutter)`,
-    /// where the shutter opened. A shutter of 1 is open all the way, and one of 0 or less is the plain view.
-    public func callAsFunction(_ picture: Picture, since earlier: Self, shutter: Double) -> Picture.Element {
-        guard shutter > 0 else { return self(picture) }
-        return self(picture, since: earlier.mixed(to: self, at: 1 - shutter))
-    }
-
-    /// The camera scaled by a factor about a point of the picture, which it still sees at the same place on the
+    /// The framing scaled by a factor about a point of the picture, which it still sees at the same place on the
     /// frame: its scale times the factor, its focus moved toward the point by one over the factor. A factor that
-    /// is not positive gives this camera.
+    /// is not positive gives this framing.
     public func scaled(by factor: Double, about point: Picture.Plane.Point<2>) -> Self {
         guard factor > 0 else { return self }
         let focus = Picture.Plane.Point<2>([
@@ -69,13 +80,13 @@ extension Picture.Camera {
         return Self(focus: focus, center: center, scale: scale * factor)
     }
 
-    /// The camera a share of the way to another. With L the logarithm of the ratio of the other scale to this
+    /// The framing a share of the way to another. With L the logarithm of the ratio of the other scale to this
     /// one, the scale is `scale × exp(share × L)`, by equal ratios, and the focus goes
     /// `expm1(−share × L) / expm1(−L)` of the way, the share itself when L is 0: so between cameras of one
-    /// centre the one point of the picture both see at the same place on the frame stays there all the way, a
-    /// push toward a point. The centre goes straight. When either scale is not positive it is this camera
+    /// centre the one point of the picture both show at the same place on the frame stays there all the way, a
+    /// push toward a point. The centre goes straight. When either scale is not positive it is this framing
     /// below a share of 1 and the other from 1 on.
-    public func mixed(to other: Self, at share: Double) -> Self {
+    public func interpolated(to other: Self, at share: Double) -> Self {
         guard scale > 0, other.scale > 0 else { return share < 1 ? self : other }
         let logarithm = Double.log(other.scale / scale)
         let travelled = logarithm == 0 ? share : Double.expm1(-share * logarithm) / Double.expm1(-logarithm)
@@ -92,8 +103,8 @@ extension Picture.Camera {
         )
     }
 
-    /// The radial blur that smears a picture seen by this camera along the way it came since an earlier camera
-    /// saw it: centred on the one point of the frame that both cameras put the same point of the picture at,
+    /// The radial blur that smears a picture shown by this framing along the way it came since an earlier framing
+    /// showed it: centred on the one point of the frame that both framings put the same point of the picture at,
     /// with `1 − 1 / ratio` as amount for the ratio of this scale to the earlier one. It is nil when either
     /// scale is not positive or the two are equal, where no point stands still.
     public func smear(since earlier: Self) -> Picture.Effect.Zoom? {

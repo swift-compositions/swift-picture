@@ -77,7 +77,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
         let glass = Picture.Glass(
             .body(.init(index: 1.5, abbe: 25)),
             tint: Picture.Color(red: 0.9, green: 0.95, blue: 1, alpha: 0.1),
-            light: .init(direction: Vector([-0.3, 0.9, 0.4]), rim: 0.8),
+            light: .init(direction: Vector([-0.3, 0.9, 0.4]), line: 0.8),
             frost: 7,
             adaptation: .init(toward: .white, strength: 0.4)
         )
@@ -157,7 +157,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
         let black = [Tests.fill(Tests.rectangle(-100, -100, 300, 300), .black)]
         let plain = Picture.Glass(.body(.init(index: 1)))
         var lit = plain
-        lit.light = Picture.Glass.Light(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, rim: 1, width: 1.5, counter: 0.5, focus: 2)
+        lit.light = Picture.Glass.Light(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, line: 1, width: 1.5, counter: 0.5, focus: 2)
         let dark = try Tests.drawn(Picture(black + [Self.pane(plain)]), on: Tests.canvas(80, 60))
         let bright = try Tests.drawn(Picture(black + [Self.pane(lit)]), on: Tests.canvas(80, 60))
         // The top edge is at y 10, the bottom at y 50; picture space's y runs down, so up on the screen is the top.
