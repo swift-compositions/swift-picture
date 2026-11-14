@@ -141,5 +141,30 @@ extension `Picture CPU Tests`.`Timing` {
             let glass = Picture.Scene.Material.glass(.init(bend: 40, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1)))
             print("Timing: glass torus over the flat frame \(try Self.time(Self.flat.appending([.scene(try Self.torus(glass))])))")
         }
+
+        @Test
+        func `Images and glass bodies`() throws {
+            let tile = Raster<Picture.Pixel>(width: 64, height: 64) { x, y in
+                Tests.pixel(Float(Int(bitPattern: x)) / 64, Float(Int(bitPattern: y)) / 64, 0.5, 1)
+            }
+            let turned = Picture.Image(tile, placement: Picture.Transform(rows: [[28, 6, 40], [-6, 16, 20]]), edge: .wrap)
+            let frame = Tests.rectangle(0, 0, 1920, 1080)
+            print("Timing: image full frame \(try Self.time([.shape(.init(frame, fill: .init(.image(turned))))]))")
+            let light = Picture.Glass.Light(direction: Vector([-0.4, -0.6, 1]), rim: 0.6, width: 2, sheen: 0.4)
+            let body = Picture.Glass(
+                tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1),
+                light: light,
+                refraction: .init(index: 1.5, distance: 2, abbe: 20, surroundings: .init(above: .white, below: .black)),
+                shadows: [.init()]
+            )
+            print("Timing: glass torus with a body over the flat frame \(try Self.time(Self.flat.appending([.scene(try Self.torus(.glass(body)))])))")
+            let pane = Picture.Glass.Pane(
+                .rectangle(.init(llx: 460, lly: 290, urx: 1460, ury: 790), radius: 80),
+                glass: Picture.Glass(light: light, refraction: .init(index: 1.5, distance: 8, abbe: 20), frost: 4, shadows: [.init()]),
+                thickness: 24,
+                rim: 30
+            )
+            print("Timing: frosted pane over the flat frame \(try Self.time(Self.flat.appending([.pane(pane)])))")
+        }
     #endif
 }
