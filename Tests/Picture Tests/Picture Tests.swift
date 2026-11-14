@@ -110,7 +110,7 @@ extension `Picture Tests`.`A picture is a list of elements drawn in order` {
         #expect(Tests.sendable(Picture.Effect.self))
         #expect(Tests.sendable(Picture.Sprites.self))
         #expect(Tests.sendable(Picture.Scene.self))
-        #expect(Tests.sendable(Picture.Text.self))
+        #expect(Tests.sendable(Typesetting.Text.self))
         #expect(Tests.sendable(Picture.Color.self))
         #expect(Tests.sendable(Picture.Gradient.self))
         #expect(Tests.sendable(Picture.Clip.self))

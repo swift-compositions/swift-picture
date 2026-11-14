@@ -73,7 +73,7 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
         let gradient = Picture.Gradient(evenly: [.white, Picture.Color(red: 0.2, green: 0.4, blue: 0.9), .black])
         let linear = Picture.Paint.linear(.init(from: Tests.at(2, 3), to: Tests.at(37, 31), gradient))
         let pen = Picture.Plane.Path.Stroke(width: 2.5, join: .round, cap: .round)
-        let text = try Picture.Text("AV B", font: Texts.font(), size: 14)
+        let text = try Typesetting.Text("AV B", font: Texts.font(), size: 14)
         let tile = Raster<Picture.Pixel>(width: 4, height: 4) { x, y in
             Tests.pixel(Float(Int(bitPattern: x)) / 4, Float(Int(bitPattern: y)) / 4, 0.5, 1)
         }

@@ -1,10 +1,10 @@
-public import ISO_14496_22
 import Numeric
+public import Typesetting
 
 extension Picture {
     /// The words a picture shows, read from its value rather than its pixels: every shape whose contours are a
     /// glyph of one of a few fonts, at any size and place, turned or not, taken as that glyph's character, and the
-    /// characters gathered into lines along their baselines. It reads what `Picture.Text` sets, so a test can ask
+    /// characters gathered into lines along their baselines. It reads what `Typesetting.Text` sets and swift-picture draws, so a test can ask
     /// what a frame says without drawing it.
     public struct Reading: Sendable {
         /// The letters of the fonts, by the kinds of segments of their first contour, the letters of more contours first.
@@ -29,12 +29,13 @@ extension Picture.Reading {
             var seen: Set<UInt16> = []
             for scalar in scalars {
                 guard
-                    let glyph = (try? Picture.Text(String(Character(scalar)), font: font, size: 1))?.glyphs.first,
+                    let glyph = (try? Typesetting.Text(String(Character(scalar)), font: font, size: 1))?.glyphs.first,
                     glyph.index != 0,
                     seen.insert(glyph.index).inserted
                 else { continue }
-                let contours = glyph.outline.subpaths.compactMap { Contour($0) }
-                guard let first = contours.first, contours.count == glyph.outline.subpaths.count else { continue }
+                let outline = Picture.Plane.Path(glyph.outline)
+                let contours = outline.subpaths.compactMap { Contour($0) }
+                guard let first = contours.first, contours.count == outline.subpaths.count else { continue }
                 letters[first.kinds, default: []].append(Letter(scalar: scalar, contours: contours, advance: glyph.advance))
             }
         }

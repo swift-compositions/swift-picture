@@ -2,7 +2,7 @@ import Picture
 import Picture_Test_Support
 import Testing
 
-extension `Picture Tests`.`A text is glyph outlines at places` {
+extension `Picture Tests`.`A set text is drawn as its glyphs' paths, y turned down` {
     static func reading() -> Picture.Reading {
         Picture.Reading(fonts: [font()])
     }
@@ -11,11 +11,11 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
     func `A reading reads back the words a placed text shows, at any size, place and turn`() throws {
         let reading = Self.reading()
         let fill = Picture.Shape.Fill(.solid(.white))
-        let text = try Picture.Text("AV BA", font: Self.font(), size: 24)
+        let text = try Typesetting.Text("AV BA", font: Self.font(), size: 24)
         #expect(reading.lines(in: [text.placed(fill, at: Tests.at(100, 50))]) == ["AV BA"])
         let turned = Picture.Transform.rotation(Radian(0.7), about: Tests.at(10, 10)).multiplied(by: .scale(3, about: Tests.at(0, 0)))
         #expect(reading.lines(in: [.group(Picture.Group([text.placed(fill, at: Tests.at(100, 50))], transform: turned))]) == ["AV BA"])
-        let below = try Picture.Text("BAV", font: Self.font(), size: 12)
+        let below = try Typesetting.Text("BAV", font: Self.font(), size: 12)
         let both: Picture = [text.placed(fill, at: Tests.at(0, 0)), below.placed(fill, at: Tests.at(40, 80))]
         #expect(Set(reading.lines(in: both)) == ["AV BA", "BAV"])
         #expect(reading.reads("BA", in: both) && reading.reads("BAV", in: both) && !reading.reads("VB", in: both))
@@ -24,7 +24,7 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
     @Test
     func `A reading sees through layers and kept images, and not through what is invisible`() throws {
         let reading = Self.reading()
-        let text = try Picture.Text("AB", font: Self.font(), size: 20)
+        let text = try Typesetting.Text("AB", font: Self.font(), size: 20)
         let shown: Picture = [text.placed(.init(.solid(.white)), at: Tests.at(10, 40))]
         #expect(reading.lines(in: [.layer(Picture.Layer(shown, opacity: 0.5))]) == ["AB"])
         #expect(reading.lines(in: [.layer(Picture.Layer(shown, opacity: 0))]).isEmpty)

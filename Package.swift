@@ -36,6 +36,7 @@ let package = Package(
         .package(url: "https://github.com/swift-compositions/swift-witnesses.git", branch: "main"),
         .package(url: "https://github.com/swift-iec/swift-iec-61966.git", branch: "main"),
         .package(url: "https://github.com/swift-iso/swift-iso-14496-22.git", branch: "main"),
+        .package(url: "https://github.com/swift-compositions/swift-typesetting.git", branch: "main"),
         .package(url: "https://github.com/swift-molecules/swift-raster.git", branch: "main", traits: ["Geometry"]),
         .package(url: "https://github.com/swift-standards/swift-color-standard.git", branch: "main"),
         .package(url: "https://github.com/swift-w3c/swift-w3c-css.git", branch: "main"),
@@ -55,7 +56,6 @@ let package = Package(
                 .product(name: "Direction", package: "swift-direction"),
                 .product(name: "Geometry", package: "swift-geometry"),
                 .product(name: "IEC 61966", package: "swift-iec-61966"),
-                .product(name: "ISO 14496-22", package: "swift-iso-14496-22"),
                 .product(name: "Matrix", package: "swift-matrix"),
                 .product(name: "Mesh", package: "swift-mesh"),
                 .product(name: "Noise", package: "swift-noise"),
@@ -67,6 +67,7 @@ let package = Package(
                 .product(name: "Refraction", package: "swift-refraction"),
                 .product(name: "Renderer", package: "swift-renderer"),
                 .product(name: "Threefry", package: "swift-threefry"),
+                .product(name: "Typesetting", package: "swift-typesetting"),
                 .product(name: "Vector", package: "swift-vector"),
                 .product(name: "W3C CSS Compositing", package: "swift-w3c-css"),
                 .product(name: "Witnesses", package: "swift-witnesses"),
@@ -121,6 +122,7 @@ let package = Package(
                 .product(name: "Standard Library Extensions", package: "swift-standard-library-extensions"),
                 .target(name: "Picture Test Support"),
                 .product(name: "Color Standard", package: "swift-color-standard"),
+                .product(name: "ISO 14496-22 Test Support", package: "swift-iso-14496-22"),
                 .product(name: "Numeric", package: "swift-numeric"),
             ]
         ),
@@ -128,6 +130,7 @@ let package = Package(
             name: "Picture CPU Tests",
             dependencies: [
                 .target(name: "Picture CPU"),
+                .product(name: "ISO 14496-22 Test Support", package: "swift-iso-14496-22"),
                 .product(name: "Numeric", package: "swift-numeric"),
             ]
         ),
