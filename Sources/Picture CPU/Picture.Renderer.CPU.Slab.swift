@@ -144,7 +144,9 @@ extension Picture.Renderer.CPU.Canvas {
                     guard depth > -1.5 else { return old }
                     let samples = depth < Swift.max(1.5, lineBand + 0.5) ? 3 : (depth < rimPixels * 0.4 ? 2 : 1)
                     guard samples > 1 else { return Picture.Renderer.CPU.limited(old, glass(pane, cx, cy, centre), state.share(x, y)) }
-                    var mean = Picture.Pixel.transparent
+                    var sum = SIMD4<Float>.zero
+                    var first = old
+                    var uniform = true
                     var count = 0
                     var row = 0
                     while row < samples {
@@ -154,13 +156,14 @@ extension Picture.Renderer.CPU.Canvas {
                             let sy = Double(y) + (Double(row) + 0.5) / Double(samples)
                             let sample = region.sample(at: Picture.Renderer.CPU.point(inverse, sx, sy))
                             let value = sample.distance > 0 ? old : glass(pane, sx, sy, sample)
-                            mean = count == 0 ? value : mean.interpolated(to: value, at: Picture.Renderer.CPU.share(of: count + 1))
+                            sum += Picture.Renderer.CPU.components(value)
+                            if count == 0 { first = value } else { uniform = uniform && value == first }
                             count += 1
                             column += 1
                         }
                         row += 1
                     }
-                    let pixel = mean
+                    let pixel = uniform ? first : Picture.Renderer.CPU.mean(sum, of: count)
                     return Picture.Renderer.CPU.limited(old, pixel, state.share(x, y))
                 }
             }

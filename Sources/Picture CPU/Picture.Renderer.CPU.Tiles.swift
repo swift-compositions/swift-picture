@@ -22,7 +22,7 @@ extension Picture.Renderer.CPU.Tiles {
         let rows = (box.height + Self.side - 1) / Self.side
         var lists = [[Lit]](repeating: [], count: columns * rows)
         for sprite in sprites.sprites where sprite.radius > 0 {
-            let lit = Lit(x: sprite.center[0], y: sprite.center[1], radius: sprite.radius, pixel: sprite.color.pixel)
+            let lit = Lit(x: sprite.center[0], y: sprite.center[1], radius: sprite.radius, reach: sprite.radius > 0 ? sprite.radius * sprite.radius : 0, pixel: sprite.color.pixel)
             let square = Picture.Plane.Rectangle(
                 llx: .init(sprite.center[0] - sprite.radius),
                 lly: .init(sprite.center[1] - sprite.radius),
@@ -51,9 +51,9 @@ extension Picture.Renderer.CPU.Tiles {
         for unsafe sprite in unsafe list {
             let across = x - sprite.x
             let down = y - sprite.y
-            let distance = (across * across + down * down).squareRoot()
-            guard distance < sprite.radius else { continue }
-            let coverage = profile.coverage(at: Float(distance / sprite.radius))
+            let squared = across * across + down * down
+            guard squared < sprite.reach else { continue }
+            let coverage = profile.coverage(at: Float(squared.squareRoot() / sprite.radius))
             total = sprite.pixel.composited(over: total, operator: .lighter, coverage: coverage)
         }
         return total

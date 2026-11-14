@@ -599,7 +599,9 @@ extension Picture.Renderer.CPU.Canvas {
                 }
                 let index = box.index(x, y)
                 let old = unsafe pixels[index]
-                var mean = old
+                var sum = SIMD4<Float>.zero
+                var first = old
+                var uniform = true
                 var changed = false
                 var count = 0
                 var row = (y - tile.top) * samples
@@ -612,13 +614,14 @@ extension Picture.Renderer.CPU.Canvas {
                         }
                         let sample = taken(row, column) ? value(x, y, row, column, old) : old
                         changed = changed || sample != old
-                        mean = count == 0 ? sample : mean.interpolated(to: sample, at: Picture.Renderer.CPU.share(of: count + 1))
+                        sum += Picture.Renderer.CPU.components(sample)
+                        if count == 0 { first = sample } else { uniform = uniform && sample == first }
                         count += 1
                         column += 1
                     }
                     row += 1
                 }
-                if changed { unsafe pixels[index] = finish(x, y, old, mean) }
+                if changed { unsafe pixels[index] = finish(x, y, old, uniform ? first : Picture.Renderer.CPU.mean(sum, of: count)) }
                 x += 1
             }
             y += 1

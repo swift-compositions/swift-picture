@@ -20,7 +20,8 @@ extension Picture.Gradient.Ramp {
     /// Where a parameter falls among the stops: the stop it goes from, the stop it goes to and how far it is
     /// between them, read as `pixel(at:)` reads them. Before the first offset, and for a parameter that is not
     /// a number, it is the first stop alone; from the last offset on, the last stop alone; a stop alone has
-    /// itself as both ends and no way to go. Nil when there are no stops.
+    /// itself as both ends and no way to go. The fraction is the way from the stop times one over the gap, so a
+    /// renderer may work out the reciprocals once. Nil when there are no stops.
     @inlinable
     public func place(of parameter: Float) -> (from: Int, to: Int, fraction: Float)? {
         guard !pixels.isEmpty else { return nil }
@@ -31,7 +32,7 @@ extension Picture.Gradient.Ramp {
         while stop < pixels.count {
             let offset = Swift.max(offsets[stop], floor)
             if parameter < offset {
-                return (previous, stop, (parameter - floor) / (offset - floor))
+                return (previous, stop, (parameter - floor) * (1 / (offset - floor)))
             }
             previous = stop
             floor = offset

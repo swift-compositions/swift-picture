@@ -8,7 +8,7 @@ extension Picture.Renderer {
 extension Picture.Renderer.CPU {
     /// The edition of this renderer's drawing, raised by every change that can change a pixel it draws, so that
     /// a raster kept from an earlier edition is never taken for this one's.
-    package static let edition = 3
+    package static let edition = 4
 
     /// How far a flattened curve may stray from the true one, in pixels of the raster.
     static let tolerance: Double = 0.1
@@ -34,14 +34,27 @@ extension Picture.Renderer.CPU {
         Affine(transform).point(x, y)
     }
 
-    /// One over each count up to 4097, worked out once: a mean made as a chain of `interpolated(to:at:)` mixes
-    /// its k-th value in at 1 / k.
+    /// One over each count up to 4097, worked out once: a mean is a sum times one over the count.
     static let shares: [Float] = (0...4097).map { 1 / Float($0) }
 
     /// One over a count, `1 / Float(count)`, from the table where it holds it.
     @inline(__always)
     static func share(of count: Int) -> Float {
         count >= 0 && count < shares.count ? shares[count] : 1 / Float(count)
+    }
+
+    /// A pixel's red, green, blue and alpha as four numbers, to be summed.
+    @inline(__always)
+    static func components(_ pixel: Picture.Pixel) -> SIMD4<Float> {
+        SIMD4(pixel.color.red, pixel.color.green, pixel.color.blue, pixel.alpha)
+    }
+
+    /// The mean of `count` pixels whose `components` add up to `sum`: the sum times one over the count. A caller
+    /// whose pixels were all one pixel takes that pixel itself, which the sum gives only up to rounding.
+    @inline(__always)
+    static func mean(_ sum: SIMD4<Float>, of count: Int) -> Picture.Pixel {
+        let mean = sum * share(of: count)
+        return Picture.Pixel(color: .init(red: mean[0], green: mean[1], blue: mean[2]), alpha: mean[3])
     }
 
     /// The pixel that ends a change limited to a share `c` of a pixel: what was there plus `c` times the change.

@@ -12,15 +12,17 @@ extension Picture {
 }
 
 extension Picture.Sprites {
-    /// The light all sprites together add at a point: the sum of each sprite's pixel times its coverage there.
+    /// The light all sprites together add at a point: the sum of each sprite's pixel times its coverage there. A
+    /// sprite reaches a point whose squared distance from its centre is below its radius squared, and only there
+    /// is the distance itself taken.
     public func light(at point: Picture.Plane.Point<2>) -> Picture.Pixel {
         var total = Picture.Pixel.transparent
         for sprite in sprites {
             let across = point[0] - sprite.center[0]
             let down = point[1] - sprite.center[1]
-            let distance = (across * across + down * down).squareRoot()
-            guard distance < sprite.radius else { continue }
-            let coverage = profile.coverage(at: Float(distance / sprite.radius))
+            let squared = across * across + down * down
+            guard sprite.radius > 0, squared < sprite.radius * sprite.radius else { continue }
+            let coverage = profile.coverage(at: Float(squared.squareRoot() / sprite.radius))
             total = sprite.color.pixel.composited(over: total, operator: .lighter, coverage: coverage)
         }
         return total

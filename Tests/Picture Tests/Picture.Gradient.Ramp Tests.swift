@@ -18,7 +18,7 @@ extension `Picture Tests`.`A gradient's ramp reads as the gradient does` {
         for stop in gradient.stops.dropFirst() {
             let offset = Swift.max(stop.offset, floor)
             if parameter < offset {
-                return previous.color.pixel.interpolated(to: stop.color.pixel, at: (parameter - floor) / (offset - floor))
+                return previous.color.pixel.interpolated(to: stop.color.pixel, at: (parameter - floor) * (1 / (offset - floor)))
             }
             previous = stop
             floor = offset

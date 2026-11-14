@@ -221,7 +221,7 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         let drawn = try Tests.drawn([.scene(scene)], on: Tests.canvas(96, 80, Self.backdrop))
 
         // The plain way: every triangle at four sample points a side over the whole raster in one scan, no
-        // tiles and no pixel passed over, and each pixel the running mean of its sixteen points.
+        // tiles and no pixel passed over, and each pixel the mean of its sixteen points.
         let fine: [InlineArray<3, Point<3, Double>>] = try zip(corners, models).map { triangle, model in
             let places = try triangle.map { corner in try #require(scene.position(of: corner, in: model)) }
             return [
@@ -236,16 +236,16 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         let pixels = colors.map { $0.pixel }
         var untouched = 0
         let expected = Tests.Canvas(width: 96, height: 80) { x, y in
-            var mean = Self.backdrop
+            var samples: [Tests.Pixel] = []
             var changed = false
             (0..<16).forEach { point in
                 let winner = winners[x: Ordinal(UInt(Int(bitPattern: x) * 4 + point % 4)), y: Ordinal(UInt(Int(bitPattern: y) * 4 + point / 4))]
                 let sample = winner >= 0 ? pixels[winner].composited(over: Self.backdrop) : Self.backdrop
                 changed = changed || sample != Self.backdrop
-                mean = point == 0 ? sample : mean.interpolated(to: sample, at: 1 / Float(point + 1))
+                samples.append(sample)
             }
             if !changed { untouched += 1 }
-            return changed ? mean : Self.backdrop
+            return changed ? Self.mean(samples) : Self.backdrop
         }
         #expect(drawn == expected)
         #expect(Set(winners.pixels).count > 30)
@@ -286,13 +286,12 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         }
         let pixels = colors.map { $0.pixel }
         let expected = Tests.Canvas(width: 32, height: 32) { x, y in
-            var mean = Self.backdrop
-            (0..<16).forEach { point in
-                let winner = winners[x: Ordinal(UInt(Int(bitPattern: x) * 4 + point % 4)), y: Ordinal(UInt(Int(bitPattern: y) * 4 + point / 4))]
-                let sample = winner >= 0 ? pixels[winner].composited(over: Self.backdrop) : Self.backdrop
-                mean = point == 0 ? sample : mean.interpolated(to: sample, at: 1 / Float(point + 1))
-            }
-            return mean
+            Self.mean(
+                (0..<16).map { point in
+                    let winner = winners[x: Ordinal(UInt(Int(bitPattern: x) * 4 + point % 4)), y: Ordinal(UInt(Int(bitPattern: y) * 4 + point / 4))]
+                    return winner >= 0 ? pixels[winner].composited(over: Self.backdrop) : Self.backdrop
+                }
+            )
         }
         #expect(drawn == expected)
         #expect(Set(winners.pixels).isSuperset(of: [0, 1, 2]))
@@ -329,5 +328,16 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
             let off = ((Double(brightest.x) + 0.5 - facing.x) * (Double(brightest.x) + 0.5 - facing.x) + (Double(brightest.y) + 0.5 - facing.y) * (Double(brightest.y) + 0.5 - facing.y)).squareRoot()
             #expect(off <= 2, "toward \(toward): brightest at \(brightest), facing at \(facing)")
         }
+    }
+
+    /// The mean of a pixel's samples as the renderer takes it: the sample itself when all are one, otherwise the
+    /// sum of their components times one over their count.
+    static func mean(_ samples: [Tests.Pixel]) -> Tests.Pixel {
+        guard let first = samples.first else { return .transparent }
+        guard samples.contains(where: { $0 != first }) else { return first }
+        var sum = SIMD4<Float>.zero
+        for sample in samples { sum += SIMD4(sample.color.red, sample.color.green, sample.color.blue, sample.alpha) }
+        let mean = sum * (1 / Float(samples.count))
+        return Tests.Pixel(color: .init(red: mean[0], green: mean[1], blue: mean[2]), alpha: mean[3])
     }
 }

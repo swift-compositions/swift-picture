@@ -305,15 +305,20 @@ extension Picture.Renderer.CPU.Step {
                 let down = end.y - y
                 let length = (across * across + down * down).squareRoot()
                 let count = length.isFinite ? Int(Swift.min(Swift.max(length.rounded(.up), 1), 4096)) : 1
-                var mean = Picture.Pixel.transparent
+                var sum = SIMD4<Double>.zero
+                var first = Picture.Pixel.transparent
+                var uniform = true
                 var step = 0
                 while step < count {
                     let point = source(x, y, (Double(step) + 0.5) / Double(count))
                     let pixel = read(point.x, point.y)
-                    mean = step == 0 ? pixel : mean.interpolated(to: pixel, at: Picture.Renderer.CPU.share(of: step + 1))
+                    sum += SIMD4(Double(pixel.color.red), Double(pixel.color.green), Double(pixel.color.blue), Double(pixel.alpha))
+                    if step == 0 { first = pixel } else { uniform = uniform && pixel == first }
                     step += 1
                 }
-                return mean
+                guard !uniform else { return first }
+                let mean = sum / Double(count)
+                return Picture.Pixel(color: .init(red: Float(mean[0]), green: Float(mean[1]), blue: Float(mean[2])), alpha: Float(mean[3]))
             }
 
         case .chromatic(let chromatic, let red, let green, let blue):
