@@ -240,10 +240,23 @@ extension Picture.Renderer.CPU.Stage {
 }
 
 extension Picture.Renderer.CPU.Stage {
-    /// How far ahead of the eye lies what a lens draws at a normalised depth, as `Camera.distance(at:)` gives it:
-    /// minus the z of `Projection.eye(_:)`, and infinitely far where that has none.
+    /// How far ahead of the eye lies what a lens draws at a normalised depth, as `Camera.distance(at:)` gives it
+    /// bit for bit, minus the z of `Projection.eye(_:)`, with the lens's coefficients taken once: written out here,
+    /// as swift-projection marks nothing inlinable and a generic call at each hazed sample would cost it dearly.
     static func distance(_ projection: Projection<Double>) -> (_ depth: Double) -> Double {
-        { depth in projection.eye(Point<3, Double>(x: 0, y: 0, z: depth)).map { -$0.z } ?? .infinity }
+        let rows = projection.coefficients
+        let (scale, offset) = (rows[2][2], rows[2][3])
+        switch projection.kind {
+        case .perspective:
+            return { depth in
+                let denominator = depth + scale
+                guard denominator != 0 else { return .infinity }
+                return -(-offset / denominator)
+            }
+
+        case .orthographic:
+            return { depth in -((depth - offset) / scale) }
+        }
     }
 }
 

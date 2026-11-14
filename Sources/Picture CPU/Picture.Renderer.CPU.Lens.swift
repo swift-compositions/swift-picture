@@ -40,8 +40,10 @@ extension Picture.Renderer.CPU.Lens {
     }
 
     /// Where in the raster a place in eye space is drawn: its normalised x and y through the scene's viewport, as
-    /// `Projection.Viewport.point(_:)` puts them, and the group's transform; nil for a place in the plane of the eye
-    /// or behind it, and for a viewport with no area.
+    /// `Projection.Viewport.point(_:)` of a viewport whose y grows downward puts them, bit for bit, and the group's
+    /// transform; nil for a place in the plane of the eye or behind it, and for a viewport with no area. The
+    /// viewport's map is written out from its fields: swift-projection marks nothing inlinable, and a generic call
+    /// at each of the body pass's reads costs it more than twice its time.
     @inline(__always)
     func raster(of place: Vector<3, Double>) -> (x: Double, y: Double)? {
         func clip(_ row: Int) -> Double {
@@ -49,8 +51,9 @@ extension Picture.Renderer.CPU.Lens {
         }
         let divisor = clip(3)
         guard divisor > 0, let viewport else { return nil }
-        let drawn = viewport.point(Point<2, Double>(x: clip(0) / divisor, y: clip(1) / divisor))
-        let moved = (map.x(drawn.x, drawn.y), map.y(drawn.x, drawn.y))
+        let across = viewport.x + (clip(0) / divisor + 1) / 2 * viewport.width
+        let down = viewport.y + (1 - clip(1) / divisor) / 2 * viewport.height
+        let moved = (map.x(across, down), map.y(across, down))
         guard moved.0.isFinite, moved.1.isFinite else { return nil }
         return moved
     }
