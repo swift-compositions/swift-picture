@@ -82,10 +82,11 @@ extension Picture.Renderer.CPU.Step {
         var segment = 0
         while segment < segments {
             let shrink = Picture.Effect.Zoom(center: zoom.center, amount: 1 - scale)
+            let back = Picture.Renderer.CPU.Affine(inverse)
+            let forth = Picture.Renderer.CPU.Affine(transform)
             reads.append { x, y in
-                let source = shrink.source(of: Picture.Renderer.CPU.point(inverse, x, y), at: 1)
-                let moved = transform.applied(to: Vector([source[0], source[1]]))
-                return (moved[0], moved[1])
+                let source = shrink.source(of: back.point(x, y), at: 1)
+                return (forth.x(source[0], source[1]), forth.y(source[0], source[1]))
             }
             weights.append(Float(scale))
             scale *= ratio
@@ -96,11 +97,12 @@ extension Picture.Renderer.CPU.Step {
 
     /// The step for an effect in a layer under a transform, or nil when the effect changes nothing.
     init?(_ effect: Picture.Effect, _ transform: Picture.Transform, _ inverse: Picture.Transform) throws(Picture.Renderer.Error) {
+        let back = Picture.Renderer.CPU.Affine(inverse)
+        let forth = Picture.Renderer.CPU.Affine(transform)
         func conjugated(_ map: @escaping (Picture.Plane.Point<2>) -> Picture.Plane.Point<2>) -> (Double, Double) -> (x: Double, y: Double) {
             { x, y in
-                let source = map(Picture.Renderer.CPU.point(inverse, x, y))
-                let moved = transform.applied(to: Vector([source[0], source[1]]))
-                return (moved[0], moved[1])
+                let source = map(back.point(x, y))
+                return (forth.x(source[0], source[1]), forth.y(source[0], source[1]))
             }
         }
         func linear(_ offset: Vector<2, Double>) -> (x: Double, y: Double) {
@@ -128,9 +130,8 @@ extension Picture.Renderer.CPU.Step {
         case .zoom(let zoom):
             guard zoom.amount != 0 else { return nil }
             self = .zoom { x, y, fraction in
-                let source = zoom.source(of: Picture.Renderer.CPU.point(inverse, x, y), at: fraction)
-                let moved = transform.applied(to: Vector([source[0], source[1]]))
-                return (moved[0], moved[1])
+                let source = zoom.source(of: back.point(x, y), at: fraction)
+                return (forth.x(source[0], source[1]), forth.y(source[0], source[1]))
             }
 
         case .chromatic(let chromatic):
@@ -309,7 +310,7 @@ extension Picture.Renderer.CPU.Step {
                 while step < count {
                     let point = source(x, y, (Double(step) + 0.5) / Double(count))
                     let pixel = read(point.x, point.y)
-                    mean = step == 0 ? pixel : mean.interpolated(to: pixel, at: 1 / Float(step + 1))
+                    mean = step == 0 ? pixel : mean.interpolated(to: pixel, at: Picture.Renderer.CPU.share(of: step + 1))
                     step += 1
                 }
                 return mean
@@ -400,18 +401,28 @@ extension Picture.Renderer.CPU.Step {
         guard abs(left) < 0x1p40, abs(top) < 0x1p40 else { return nil }
         let across = x - 0.5 - left
         let down = y - 0.5 - top
-        let taps: [(x: Double, y: Double, weight: Double)] = [
+        // The four taps in order, kept in fixed storage: those of weight, and of them those the region holds.
+        let taps: InlineArray<4, (x: Double, y: Double, weight: Double)> = [
             (left, top, (1 - across) * (1 - down)),
             (left + 1, top, across * (1 - down)),
             (left, top + 1, (1 - across) * down),
             (left + 1, top + 1, across * down),
         ]
-        let weighty = taps.filter { $0.weight > 0 }
-        let held = weighty.filter { holds($0.x + 0.5, $0.y + 0.5) }
-        guard !held.isEmpty, held.count < weighty.count else { return nil }
+        var held = InlineArray<4, Int>(repeating: 0)
+        var weighty = 0
+        var count = 0
+        for tap in 0..<4 where taps[tap].weight > 0 {
+            weighty += 1
+            if holds(taps[tap].x + 0.5, taps[tap].y + 0.5) {
+                held[count] = tap
+                count += 1
+            }
+        }
+        guard count > 0, count < weighty else { return nil }
         var mean = Picture.Pixel.transparent
         var total = 0.0
-        for tap in held {
+        for number in 0..<count {
+            let tap = taps[held[number]]
             let pixel = sheet[Int(tap.x), Int(tap.y)]
             total += tap.weight
             mean = total == tap.weight ? pixel : mean.interpolated(to: pixel, at: Float(tap.weight / total))
