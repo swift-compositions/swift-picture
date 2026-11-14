@@ -6,8 +6,9 @@ extension Picture.Renderer.CPU {
     /// eye, where light leaves the body. A depth that is not finite marks a point with no such surface.
     struct Far {
         let box: Box
-        let depths: [Double]
-        let normals: [Vector<3, Double>]
+
+        /// For each point in row order, its depth and its normal's three components, one after another.
+        let values: [Double]
     }
 }
 
@@ -18,12 +19,16 @@ extension Picture.Renderer.CPU.Far {
     init(_ stage: Picture.Renderer.CPU.Stage, eyes: [Matrix<4, 4, Double>], over area: Picture.Renderer.CPU.Box) {
         let fine = Self.fine
         guard !stage.far.isEmpty, area.area > 0 else {
-            self.init(box: .empty, depths: [], normals: [])
+            self.init(box: .empty, values: [])
             return
         }
         let width = area.width * fine
-        var depths = [Double](repeating: .infinity, count: width * area.height * fine)
-        var normals = [Vector<3, Double>](repeating: .zero, count: depths.count)
+        var values = [Double](repeating: 0, count: 4 * width * area.height * fine)
+        var point = 0
+        while point < values.count {
+            values[point] = .infinity
+            point += 4
+        }
         for (tile, numbers) in Picture.Renderer.CPU.Stage.tiles(stage.far, over: area) where !numbers.isEmpty {
             let hits = Picture.Renderer.CPU.Stage.hits(stage.far, numbers, in: tile, samples: fine)
             let span = tile.width * fine
@@ -32,11 +37,13 @@ extension Picture.Renderer.CPU.Far {
                 let place = surface.place(hit.weights)
                 let normal = Picture.Scene.Camera.direction(surface.normal(hit.weights), through: eyes[surface.model])
                 let index = ((tile.top - area.top) * fine + position / span) * width + (tile.left - area.left) * fine + position % span
-                depths[index] = place[2]
-                normals[index] = normal
+                values[4 * index] = place[2]
+                values[4 * index + 1] = normal[0]
+                values[4 * index + 2] = normal[1]
+                values[4 * index + 3] = normal[2]
             }
         }
-        self.init(box: area, depths: depths, normals: normals)
+        self.init(box: area, values: values)
     }
 
     /// The depth and the normal, both in eye space, of the far side at a point of the raster: the mean of
@@ -60,13 +67,13 @@ extension Picture.Renderer.CPU.Far {
             let (dx, dy) = (corner & 1, corner >> 1)
             corner += 1
             guard column + dx < width, row + dy < height else { continue }
-            let index = (row + dy) * width + column + dx
+            let index = 4 * ((row + dy) * width + column + dx)
             let weight = (dx == 0 ? 1 - u : u) * (dy == 0 ? 1 - v : v)
-            guard weight > 0, depths[index].isFinite else { continue }
-            depth += weight * depths[index]
-            normal.0 += weight * normals[index][0]
-            normal.1 += weight * normals[index][1]
-            normal.2 += weight * normals[index][2]
+            guard weight > 0, values[index].isFinite else { continue }
+            depth += weight * values[index]
+            normal.0 += weight * values[index + 1]
+            normal.1 += weight * values[index + 2]
+            normal.2 += weight * values[index + 3]
             total += weight
         }
         guard total > 0 else { return nil }

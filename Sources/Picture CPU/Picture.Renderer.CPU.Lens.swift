@@ -46,6 +46,7 @@ extension Picture.Renderer.CPU.Lens {
     }
 
     /// Where in the raster a place in eye space is drawn, or nil for a place in the plane of the eye or behind it.
+    @inline(__always)
     func raster(of place: Vector<3, Double>) -> (x: Double, y: Double)? {
         func clip(_ row: Int) -> Double {
             rows[row][0] * place[0] + rows[row][1] * place[1] + rows[row][2] * place[2] + rows[row][3]

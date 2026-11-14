@@ -24,54 +24,58 @@ extension Picture.Renderer.CPU.Silhouette {
         let far = Int32(1 << 20)
         func sweep(_ target: Bool) -> [Float] {
             // For each point, the offset to the nearest point whose `inside` is `target`.
-            var dx = [Int32](repeating: far, count: columns * rows)
-            var dy = [Int32](repeating: far, count: columns * rows)
+            // Offsets kept side by side, x then y, and worked through in place without checks of their bounds.
+            var offsets = [Int32](repeating: far, count: 2 * columns * rows)
             for index in 0..<(columns * rows) where inside[index] == target {
-                dx[index] = 0
-                dy[index] = 0
+                offsets[2 * index] = 0
+                offsets[2 * index + 1] = 0
             }
             func length(_ x: Int32, _ y: Int32) -> Int64 { Int64(x) * Int64(x) + Int64(y) * Int64(y) }
-            func relax(_ index: Int, _ other: Int, _ stepX: Int32, _ stepY: Int32) {
-                guard dx[other] != far else { return }
-                let x = dx[other] + stepX
-                let y = dy[other] + stepY
-                if dx[index] == far || length(x, y) < length(dx[index], dy[index]) {
-                    dx[index] = x
-                    dy[index] = y
-                }
-            }
-            for row in 0..<rows {
-                for column in 0..<columns {
-                    let index = row * columns + column
-                    if row > 0 {
-                        relax(index, index - columns, 0, 1)
-                        if column > 0 { relax(index, index - columns - 1, 1, 1) }
-                        if column + 1 < columns { relax(index, index - columns + 1, -1, 1) }
+            offsets.withUnsafeMutableBufferPointer { offsets in
+                func relax(_ index: Int, _ other: Int, _ stepX: Int32, _ stepY: Int32) {
+                    let near = unsafe offsets[2 * other]
+                    guard near != far else { return }
+                    let x = near + stepX
+                    let y = unsafe offsets[2 * other + 1] + stepY
+                    let mine = unsafe offsets[2 * index]
+                    if mine == far || length(x, y) < length(mine, unsafe offsets[2 * index + 1]) {
+                        unsafe offsets[2 * index] = x
+                        unsafe offsets[2 * index + 1] = y
                     }
-                    if column > 0 { relax(index, index - 1, 1, 0) }
                 }
-                for column in stride(from: columns - 1, through: 0, by: -1) where column + 1 < columns {
-                    let index = row * columns + column
-                    relax(index, index + 1, -1, 0)
-                }
-            }
-            for row in stride(from: rows - 1, through: 0, by: -1) {
-                for column in stride(from: columns - 1, through: 0, by: -1) {
-                    let index = row * columns + column
-                    if row + 1 < rows {
-                        relax(index, index + columns, 0, -1)
-                        if column + 1 < columns { relax(index, index + columns + 1, -1, -1) }
-                        if column > 0 { relax(index, index + columns - 1, 1, -1) }
+                for row in 0..<rows {
+                    for column in 0..<columns {
+                        let index = row * columns + column
+                        if row > 0 {
+                            relax(index, index - columns, 0, 1)
+                            if column > 0 { relax(index, index - columns - 1, 1, 1) }
+                            if column + 1 < columns { relax(index, index - columns + 1, -1, 1) }
+                        }
+                        if column > 0 { relax(index, index - 1, 1, 0) }
                     }
-                    if column + 1 < columns { relax(index, index + 1, -1, 0) }
+                    for column in stride(from: columns - 1, through: 0, by: -1) where column + 1 < columns {
+                        let index = row * columns + column
+                        relax(index, index + 1, -1, 0)
+                    }
                 }
-                for column in 0..<columns where column > 0 {
-                    let index = row * columns + column
-                    relax(index, index - 1, 1, 0)
+                for row in stride(from: rows - 1, through: 0, by: -1) {
+                    for column in stride(from: columns - 1, through: 0, by: -1) {
+                        let index = row * columns + column
+                        if row + 1 < rows {
+                            relax(index, index + columns, 0, -1)
+                            if column + 1 < columns { relax(index, index + columns + 1, -1, -1) }
+                            if column > 0 { relax(index, index + columns - 1, 1, -1) }
+                        }
+                        if column + 1 < columns { relax(index, index + 1, -1, 0) }
+                    }
+                    for column in 0..<columns where column > 0 {
+                        let index = row * columns + column
+                        relax(index, index - 1, 1, 0)
+                    }
                 }
             }
             return (0..<(columns * rows)).map { index in
-                dx[index] == far ? Float.infinity : Float(Double(length(dx[index], dy[index])).squareRoot())
+                offsets[2 * index] == far ? Float.infinity : Float(Double(length(offsets[2 * index], offsets[2 * index + 1])).squareRoot())
             }
         }
         let sweeps = Mutex<[[Float]]>([[], []])
