@@ -78,6 +78,7 @@ extension Picture.Renderer.CPU.Canvas {
         let rimPixels = pane.rim * scale
 
         let refraction = pane.glass.refraction
+        let indices = refraction.map(Picture.Renderer.CPU.Spectra.Indices.init)
         let tilts = refraction?.tilts ?? [1, 1, 1]
 
         func glass(_ pane: Picture.Glass.Pane, _ x: Double, _ y: Double, _ sample: Picture.Plane.Region.Sample) -> Picture.Pixel {
@@ -88,8 +89,8 @@ extension Picture.Renderer.CPU.Canvas {
                 (x + linear.0 * offset[0] + linear.1 * offset[1], y + linear.2 * offset[0] + linear.3 * offset[1])
             }
             let read: Picture.Pixel
-            if let refraction, passage.body, passage.normal[2] < 1 {
-                read = Picture.Renderer.CPU.Spectra.pixel(refraction, read: { place(passage.offset(for: $0)) }) {
+            if let indices, passage.body, passage.normal[2] < 1 {
+                read = Picture.Renderer.CPU.Spectra.pixel(indices, read: { place(passage.offset(for: $0)) }) {
                     frost.read($0, $1, frosting: frosting)
                 }
             } else {
@@ -153,7 +154,7 @@ extension Picture.Renderer.CPU.Canvas {
                             let sy = Double(y) + (Double(row) + 0.5) / Double(samples)
                             let sample = region.sample(at: Picture.Renderer.CPU.point(inverse, sx, sy))
                             let value = sample.distance > 0 ? old : glass(pane, sx, sy, sample)
-                            mean = count == 0 ? value : mean.interpolated(to: value, at: 1 / Float(count + 1))
+                            mean = count == 0 ? value : mean.interpolated(to: value, at: Picture.Renderer.CPU.share(of: count + 1))
                             count += 1
                             column += 1
                         }

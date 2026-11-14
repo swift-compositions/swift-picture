@@ -418,15 +418,26 @@ extension Picture.Renderer.CPU.Canvas {
         }
         guard !stage.glass.isEmpty else { return }
         let scale = abs(state.transform[0, 0] * state.transform[1, 1] - state.transform[0, 1] * state.transform[1, 0]).squareRoot()
-        var frosts: [Double: Picture.Renderer.CPU.Frost] = [:]
         // The picture behind is read around the scene, as far again as the scene is wide or tall; past that a
         // read finds the nearest pixel kept.
         let frosted = Int(Swift.min(4 * (stage.surfaces.map { Swift.max($0.glass.frost, 0) }.max() ?? 0) * scale, 4096).rounded(.up))
         let reach = Swift.max(area.width, area.height) / 2 + frosted
         let before = seen(over: area.expanded(reach, reach), state)
         let around = area.expanded(Swift.max(area.width, area.height) / 2, Swift.max(area.width, area.height) / 2).intersection(before.box)
-        for surface in stage.surfaces where frosts[surface.glass.frost] == nil {
-            frosts[surface.glass.frost] = Picture.Renderer.CPU.Frost(before, over: around, deviation: surface.glass.frost * scale, state.workers)
+        // One frosted picture for each frost, in the order the surfaces first name it, and for each model the one
+        // its glass reads; a frost that is not a number reads nothing.
+        var levels: [Double] = []
+        var frosts: [Picture.Renderer.CPU.Frost] = []
+        var frostOf = [Int](repeating: -1, count: scene.models.count)
+        for surface in stage.surfaces where frostOf[surface.model] < 0 {
+            let level = surface.glass.frost
+            if let known = levels.firstIndex(of: level) {
+                frostOf[surface.model] = known
+            } else if !level.isNaN {
+                levels.append(level)
+                frosts.append(Picture.Renderer.CPU.Frost(before, over: around, deviation: level * scale, state.workers))
+                frostOf[surface.model] = frosts.count - 1
+            }
         }
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
         let eyes = scene.models.map { scene.camera.eye(of: $0.transform) }
@@ -462,8 +473,18 @@ extension Picture.Renderer.CPU.Canvas {
                 }
             }
         }
-        let shadings = stage.surfaces.map { $0.glass.shading }
-        let tilts = stage.surfaces.map { $0.glass.refraction?.tilts ?? [1, 1, 1] }
+        // What each model's glass reads with, made once for the model and not per triangle or per point.
+        let glasses = scene.models.map { model -> Picture.Glass? in
+            if case .glass(let glass) = model.material { return glass }
+            return nil
+        }
+        let shadings = glasses.map { $0?.shading ?? Picture.Glass().shading }
+        let tilts = glasses.map { $0?.refraction?.tilts ?? [1, 1, 1] }
+        let refractions = glasses.map { $0?.refraction }
+        let indices = glasses.map { $0?.refraction.map(Picture.Renderer.CPU.Spectra.Indices.init) }
+        let corners = stage.surfaces.map(\.corners)
+        let models = stage.surfaces.map(\.model)
+        let linear = Picture.Renderer.CPU.Affine(state.transform)
         let lens = Picture.Renderer.CPU.Lens(scene, state.transform)
         let far = Picture.Renderer.CPU.Far(stage, eyes: eyes, over: area)
         let bodies = zip(scene.models, eyes).map { model, eye in Picture.Renderer.CPU.Body(model, eye: eye, lens: lens, scale: scale) }
@@ -481,10 +502,11 @@ extension Picture.Renderer.CPU.Canvas {
                 return hit.triangle >= 0 && hit.depth <= upper && !hidden
             } value: { x, y, row, column, old in
                 let hit = hits[row * tile.width * samples + column]
-                let surface = stage.surfaces[hit.triangle]
-                let normal = Picture.Scene.Camera.direction(surface.normal(hit.weights), through: eyes[surface.model])
-                let shading = shadings[hit.triangle]
-                let frost = frosts[surface.glass.frost]
+                let model = models[hit.triangle]
+                let surface = corners[hit.triangle]
+                let normal = Picture.Scene.Camera.direction(surface.normal(hit.weights), through: eyes[model])
+                let shading = shadings[model]
+                let level = frostOf[model]
                 let frosting = Picture.Glass.frosting(facing: normal)
                 let sampleX = Double(x) + (Double(column % samples) + 0.5) / Double(samples)
                 let sampleY = Double(y) + (Double(row % samples) + 0.5) / Double(samples)
@@ -501,20 +523,20 @@ extension Picture.Renderer.CPU.Canvas {
                     }
                 }
                 func read(_ x: Double, _ y: Double) -> Picture.Pixel {
-                    frost?.read(x, y, frosting: frosting) ?? .transparent
+                    level >= 0 ? frosts[level].read(x, y, frosting: frosting) : .transparent
                 }
-                if let refraction = surface.glass.refraction {
+                if let refraction = refractions[model], let spectra = indices[model] {
                     let passage = Picture.Renderer.CPU.Passage(
                         from: surface.place(hit.weights),
                         normal: normal,
                         at: .init(x: sampleX, y: sampleY),
                         through: refraction,
-                        plane: bodies[surface.model]?.plane ?? -.infinity,
+                        plane: bodies[model]?.plane ?? -.infinity,
                         lens: lens,
                         far: far
                     )
                     let behind = Picture.Renderer.CPU.Spectra.pixel(
-                        refraction,
+                        spectra,
                         read: { index in
                             let at = passage.read(for: index, lens: lens)
                             return (at.x, at.y)
@@ -522,19 +544,19 @@ extension Picture.Renderer.CPU.Canvas {
                     ) { read($0, $1) }
                     return shading.pixel(
                         over: [behind, behind, behind],
-                        through: passage.length / (bodies[surface.model]?.thickness ?? 1),
+                        through: passage.length / (bodies[model]?.thickness ?? 1),
                         leaving: passage.leaving,
                         beyond: passage.beyond,
                         mirroring: passage.mirrored,
                         by: passage.share,
                         facing: normal,
                         outline: outline,
-                        tilts: tilts[hit.triangle]
+                        tilts: tilts[model]
                     )
                 }
-                let offset = surface.glass.offset(for: normal)
-                let across = state.transform[0, 0] * offset[0] + state.transform[0, 1] * offset[1]
-                let down = state.transform[1, 0] * offset[0] + state.transform[1, 1] * offset[1]
+                let offset = glasses[model]?.offset(for: normal) ?? .zero
+                let across = linear.xx * offset[0] + linear.xy * offset[1]
+                let down = linear.yx * offset[0] + linear.yy * offset[1]
                 let point = (
                     x: Double(x) + (Double(column % samples) + 0.5) / Double(samples) + across,
                     y: Double(y) + (Double(row % samples) + 0.5) / Double(samples) + down
@@ -602,7 +624,7 @@ extension Picture.Renderer.CPU.Canvas {
                         }
                         let sample = taken(row, column) ? value(x, y, row, column, old) : old
                         changed = changed || sample != old
-                        mean = count == 0 ? sample : mean.interpolated(to: sample, at: 1 / Float(count + 1))
+                        mean = count == 0 ? sample : mean.interpolated(to: sample, at: Picture.Renderer.CPU.share(of: count + 1))
                         count += 1
                         column += 1
                     }

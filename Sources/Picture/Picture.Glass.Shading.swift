@@ -16,6 +16,39 @@ extension Picture.Glass {
 
         /// The adaptation, or none.
         let adaptation: Picture.Glass.Adaptation?
+
+        /// What is read many times worked out once: the light made ready, the lightness the adaptation moves
+        /// toward, and the logarithm of what the tint lets through, by which a body's coat grows with its path.
+        let prepared: Picture.Glass.Light.Prepared?
+        let target: Float
+        let through: Double
+    }
+}
+
+extension Picture.Glass.Shading {
+    init(
+        tint: Picture.Pixel,
+        light: Picture.Glass.Light?,
+        shine: Picture.Pixel,
+        above: Picture.Pixel?,
+        below: Picture.Pixel?,
+        gain: Float,
+        saturation: Float,
+        adaptation: Picture.Glass.Adaptation?
+    ) {
+        self.init(
+            tint: tint,
+            light: light,
+            shine: shine,
+            above: above,
+            below: below,
+            gain: gain,
+            saturation: saturation,
+            adaptation: adaptation,
+            prepared: light.map(Picture.Glass.Light.Prepared.init),
+            target: adaptation.map { Picture.Glass.Adaptation.lightness(of: $0.color.pixel) } ?? 0,
+            through: Double.log(Double(1 - tint.alpha))
+        )
     }
 }
 
@@ -37,7 +70,7 @@ extension Picture.Glass.Shading {
     func adapted(_ read: Picture.Pixel) -> Picture.Pixel {
         let pixel = Picture.Glass.saturated(read, by: saturation, gain: gain)
         guard let adaptation, adaptation.strength > 0 else { return pixel }
-        return adaptation.pixel(pixel)
+        return adaptation.pixel(pixel, target: target)
     }
 
     /// The pixel of glass with a body. Red, green and blue each come from the pixel that colour's light reads,
@@ -64,7 +97,7 @@ extension Picture.Glass.Shading {
         )
         var coated = adapted(split)
         if tint.alpha > 0, length > 0 {
-            let taken = tint.alpha < 1 ? 1 - Float(Double.exp(length * Double.log(Double(1 - tint.alpha)))) : 1
+            let taken = tint.alpha < 1 ? 1 - Float(Double.exp(length * through)) : 1
             coated = tint.composited(over: coated, coverage: taken / tint.alpha)
         }
         if let above, let below {
@@ -88,7 +121,7 @@ extension Picture.Glass.Shading {
         outline: Picture.Glass.Outline?,
         tilts: InlineArray<3, Double>
     ) -> Picture.Pixel {
-        guard let light else { return coated }
+        guard let light = prepared else { return coated }
         let neutral = tilts[0] == 1 && tilts[1] == 1 && tilts[2] == 1
         func share(_ tilt: Double) -> Float {
             var total = tilt == 1 ? light.reflection(for: normal) : light.reflection(for: normal, tilt: tilt)
@@ -122,7 +155,7 @@ extension Picture.Glass.Shading {
 
     /// A pixel of the glass with the light it reflects at a normal added.
     func lit(_ coated: Picture.Pixel, facing normal: Vector<3, Double>) -> Picture.Pixel {
-        guard let light else { return coated }
+        guard let light = prepared else { return coated }
         let share = Float(light.reflection(for: normal))
         guard share > 0 else { return coated }
         return Self.held(shine.composited(over: coated, operator: .lighter, coverage: share))

@@ -67,8 +67,12 @@ extension Picture.Glass.Adaptation {
     /// backdrop's hue and chroma stay and only its lightness gives way; alpha is kept. A share of 0 gives the
     /// pixel bit for bit.
     public func pixel(_ pixel: Picture.Pixel) -> Picture.Pixel {
+        self.pixel(pixel, target: Self.lightness(of: color.pixel))
+    }
+
+    /// `pixel(_:)` with the colour's lightness, `lightness(of: color.pixel)`, worked out once by the caller.
+    func pixel(_ pixel: Picture.Pixel, target: Float) -> Picture.Pixel {
         let place = Self.oklab(of: pixel)
-        let target = Self.lightness(of: color.pixel)
         let share = Float(Swift.min(Swift.max(strength, 0), 1)) * abs(target - place.L)
         guard share > 0 else { return pixel }
         let moved = Self.color(L: place.L + (target - place.L) * share, a: place.a, b: place.b)

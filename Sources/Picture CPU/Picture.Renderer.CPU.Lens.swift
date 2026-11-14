@@ -10,6 +10,7 @@ extension Picture.Renderer.CPU {
         let width: Double
         let height: Double
         let transform: Picture.Transform
+        let map: Picture.Renderer.CPU.Affine
 
         /// Whether lines of sight meet at the eye; otherwise they all run along minus z.
         let converging: Bool
@@ -30,6 +31,7 @@ extension Picture.Renderer.CPU.Lens {
             width: scene.viewport.urx.underlying - scene.viewport.llx.underlying,
             height: scene.viewport.ury.underlying - scene.viewport.lly.underlying,
             transform: transform,
+            map: Picture.Renderer.CPU.Affine(transform),
             converging: rows[3][0] != 0 || rows[3][1] != 0 || rows[3][2] != 0
         )
     }
@@ -52,9 +54,9 @@ extension Picture.Renderer.CPU.Lens {
         guard divisor > 0 else { return nil }
         let across = left + (clip(0) / divisor + 1) / 2 * width
         let down = top + (1 - clip(1) / divisor) / 2 * height
-        let moved = transform.applied(to: Vector([across, down]))
-        guard moved[0].isFinite, moved[1].isFinite else { return nil }
-        return (moved[0], moved[1])
+        let moved = (map.x(across, down), map.y(across, down))
+        guard moved.0.isFinite, moved.1.isFinite else { return nil }
+        return moved
     }
 
     /// Whether a triangle with corners at places in eye space, whose unit normals there are `normals`, shows the

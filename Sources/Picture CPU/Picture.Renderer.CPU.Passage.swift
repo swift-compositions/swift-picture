@@ -20,6 +20,10 @@ extension Picture.Renderer.CPU {
         /// The depth in eye space of the plane the picture behind stands on.
         let plane: Double
 
+        /// The glass's own index, and the line of sight bent into the body by it.
+        let index: Refraction.Index<Double>
+        let inner: Vector<3, Double>
+
         /// Where light of the glass's own index reads the picture.
         var read: Read
 
@@ -88,6 +92,8 @@ extension Picture.Renderer.CPU.Passage {
             own: own,
             cosine: cosine,
             plane: plane,
+            index: index,
+            inner: inner,
             read: point,
             length: length,
             leaving: sight,
@@ -95,7 +101,7 @@ extension Picture.Renderer.CPU.Passage {
             mirrored: Refraction.reflected(sight, at: toward),
             share: refraction.surroundings == nil ? 0 : Refraction.Interface(from: .vacuum, into: index).reflectance(cosine: cosine)
         )
-        let way = passage.way(for: index, lens: lens)
+        let way = passage.way(within: inner, lens: lens)
         passage.read = way.read ?? point
         passage.leaving = way.out
         passage.beyond = refraction.surroundings?.share(leaving: way.out, along: sight) ?? 0
@@ -108,7 +114,8 @@ extension Picture.Renderer.CPU.Passage {
     /// few pixels of silhouette would otherwise read far and wide, which shows as moiré, and the line along the
     /// outline covers them.
     func read(for index: Refraction.Index<Double>, lens: Picture.Renderer.CPU.Lens) -> Read {
-        let read = way(for: index, lens: lens).read ?? point
+        // The glass's own index found its way when the passage was made.
+        let read = index == self.index ? self.read : way(for: index, lens: lens).read ?? point
         guard cosine < Self.grazing else { return read }
         let t = Swift.max(cosine, 0) / Self.grazing
         let share = t * t * (3 - 2 * t)
@@ -121,6 +128,16 @@ extension Picture.Renderer.CPU.Passage {
     func way(for index: Refraction.Index<Double>, lens: Picture.Renderer.CPU.Lens) -> (read: Read?, out: Vector<3, Double>) {
         let n = Swift.max(index, .vacuum)
         let within = Refraction.Interface(from: .vacuum, into: n).refracted(sight, at: toward).transmission ?? sight
+        return way(within: within, index: n, lens: lens)
+    }
+
+    /// `way(for:lens:)` of the glass's own index, whose line of sight bent in is `inner`.
+    func way(within: Vector<3, Double>, lens: Picture.Renderer.CPU.Lens) -> (read: Read?, out: Vector<3, Double>) {
+        way(within: within, index: index, lens: lens)
+    }
+
+    /// `way(for:lens:)` of an index at least vacuum's, whose line of sight bent in is `within`.
+    func way(within: Vector<3, Double>, index n: Refraction.Index<Double>, lens: Picture.Renderer.CPU.Lens) -> (read: Read?, out: Vector<3, Double>) {
         var out = within
         if let exit {
             let against = Self.dot(exit, within) > 0 ? Self.scaled(exit, -1) : exit

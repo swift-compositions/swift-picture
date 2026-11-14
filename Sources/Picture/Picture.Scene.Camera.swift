@@ -65,10 +65,15 @@ extension Picture.Scene.Camera {
     /// A direction at unit length after the upper-left 3 × 3 of a matrix into eye space, `eye(of:)` of a
     /// model, so that `direction(_:in:)` is this with the product made once per model instead of per call.
     public static func direction(_ vector: Vector<3, Double>, through eye: Matrix<4, 4, Double>) -> Vector<3, Double> {
-        let moved = eye.applied(to: Vector([vector[0], vector[1], vector[2], 0]))
-        let length = (moved[0] * moved[0] + moved[1] * moved[1] + moved[2] * moved[2]).squareRoot()
+        // `eye.applied(to:)` of (x, y, z, 0), each row summed from zero in the order of the columns as
+        // swift-matrix sums it, without the fourth row, which a direction does not use.
+        func row(_ row: Int) -> Double {
+            0 + eye[row, 0] * vector[0] + eye[row, 1] * vector[1] + eye[row, 2] * vector[2] + eye[row, 3] * 0
+        }
+        let moved = (row(0), row(1), row(2))
+        let length = (moved.0 * moved.0 + moved.1 * moved.1 + moved.2 * moved.2).squareRoot()
         guard length > 0, length.isFinite else { return .zero }
-        return Vector([moved[0] / length, moved[1] / length, moved[2] / length])
+        return Vector([moved.0 / length, moved.1 / length, moved.2 / length])
     }
 }
 
