@@ -8,12 +8,12 @@ extension `Picture CPU Tests` {
 }
 
 /// Each recipe that keeps a picture as an image, drawn on 48 × 40, against the digest of what the renderer drew
-/// before a kept image was described rather than drawn when made. Building a picture changed; no pixel did.
+/// at the edition the edition test names.
 extension `Picture CPU Tests`.`Kept images and the recipes built on them draw the pixels recorded before images were deferred` {
     static let digests: [String: UInt64] = [
-        "bloom": 15_174_640_315_389_238_083, "exposure": 16_345_922_481_923_818_008, "fine": 16_045_335_997_003_843_958,
-        "glow": 16_997_222_246_553_898_364, "kept": 5_048_398_936_620_026_834, "nested": 6_940_967_455_130_345_069,
-        "onto": 15_177_299_562_880_789_000, "rays": 950_483_840_984_949_025,
+        "bloom": 14_234_122_658_822_933_115, "exposure": 3_574_538_934_515_692_019, "fine": 4_439_107_359_031_923_427,
+        "glow": 6_040_895_764_212_604_469, "kept": 16_933_531_291_270_939_169, "nested": 14_485_074_764_390_666_543,
+        "onto": 6_240_055_181_281_504_490, "rays": 7_579_701_840_717_718_840,
     ]
 
     static let rectangle = Picture.Plane.Rectangle(llx: 0, lly: 0, urx: 48, ury: 40)

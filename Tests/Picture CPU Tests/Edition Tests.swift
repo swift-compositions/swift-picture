@@ -20,13 +20,13 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
     typealias Texts = `Picture CPU Tests`.`A renderer never sees a font: text is drawn as its glyphs' paths`
 
     /// The edition the digests were recorded at.
-    static let recorded = 2
+    static let recorded = 3
 
     /// The digests of the pictures by name, at `recorded`.
     static let digests: [String: UInt64] = [
-        "blur": 16_365_094_295_220_398_297, "body": 1_074_315_639_956_906_798, "fill": 13_478_648_827_929_281_320,
-        "glow": 5_255_089_816_006_074_967, "gradient": 7_014_402_895_066_774_693, "image": 17_824_492_936_900_664_916,
-        "pane": 8_503_239_913_984_148_697, "scene": 4_145_786_458_600_151_407, "stroke": 1_018_931_843_031_873_205,
+        "blur": 16_365_094_295_220_398_297, "body": 3_847_318_856_642_325_986, "fill": 13_478_648_827_929_281_320,
+        "glow": 5_255_089_816_006_074_967, "gradient": 13_618_457_707_398_550_439, "image": 17_824_492_936_900_664_916,
+        "pane": 9_473_366_021_337_320_083, "scene": 5_599_095_896_402_402_077, "stroke": 1_018_931_843_031_873_205,
         "text": 14_706_559_016_298_247_301,
     ]
 

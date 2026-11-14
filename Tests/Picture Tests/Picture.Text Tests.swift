@@ -104,6 +104,14 @@ extension `Picture Tests`.`A text is glyph outlines at places` {
     }
 
     @Test
+    func `A string's length is the number of glyphs it is set as, whatever its code points take in UTF-8`() throws {
+        for string in ["", "AVB A", "A\nV", "é—𝄞 A", "\n\n"] {
+            #expect(Picture.Text.length(of: string) == (try Picture.Text(string, font: Self.font(), size: 100)).glyphs.count)
+        }
+        #expect(Picture.Text.length(of: "é—𝄞 A") == 5)
+    }
+
+    @Test
     func `A code point the font does not map becomes glyph 0`() throws {
         let text = try Picture.Text("AxV", font: Self.font(), size: 100)
         #expect(text.glyphs.map(\.index) == [1, 0, 2])

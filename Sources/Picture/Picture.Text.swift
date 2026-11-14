@@ -373,3 +373,14 @@ extension Picture.Text {
         }
     }
 }
+
+extension Picture.Text {
+    /// How many glyphs a string is set as: one for each Unicode scalar that is not a line break, counted as the
+    /// first bytes of its UTF-8, which is how `init(_:font:size:measure:alignment:leading:tracking:figures:)`
+    /// reads it. A string's glyphs are the next `length(of:)` glyphs of a text it is part of.
+    public static func length(of string: String) -> Int {
+        string.utf8.reduce(into: 0) { count, byte in
+            if byte & 0xc0 != 0x80, byte != 0x0a { count += 1 }
+        }
+    }
+}

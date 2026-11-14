@@ -8,7 +8,7 @@ extension Picture.Renderer {
 extension Picture.Renderer.CPU {
     /// The edition of this renderer's drawing, raised by every change that can change a pixel it draws, so that
     /// a raster kept from an earlier edition is never taken for this one's.
-    package static let edition = 2
+    package static let edition = 3
 
     /// How far a flattened curve may stray from the true one, in pixels of the raster.
     static let tolerance: Double = 0.1

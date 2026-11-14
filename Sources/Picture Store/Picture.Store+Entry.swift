@@ -61,7 +61,7 @@
 
         /// The entry's file: its key in hex.
         func file(for key: Key) -> File? {
-            guard let name = try? File.Path.Component(utf8: (key.hex + ".entry").utf8) else { return nil }
+            guard let name = try? File.Path.Component(key.hex + ".entry") else { return nil }
             return directory[name]
         }
     }
