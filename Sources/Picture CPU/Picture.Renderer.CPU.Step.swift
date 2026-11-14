@@ -401,7 +401,6 @@ extension Picture.Renderer.CPU.Step {
         guard abs(left) < 0x1p40, abs(top) < 0x1p40 else { return nil }
         let across = x - 0.5 - left
         let down = y - 0.5 - top
-        // The four taps in order, kept in fixed storage: those of weight, and of them those the region holds.
         let taps: InlineArray<4, (x: Double, y: Double, weight: Double)> = [
             (left, top, (1 - across) * (1 - down)),
             (left + 1, top, across * (1 - down)),
@@ -421,11 +420,13 @@ extension Picture.Renderer.CPU.Step {
         guard count > 0, count < weighty else { return nil }
         var mean = Picture.Pixel.transparent
         var total = 0.0
-        for number in 0..<count {
+        var number = 0
+        while number < count {
             let tap = taps[held[number]]
             let pixel = sheet[Int(tap.x), Int(tap.y)]
             total += tap.weight
             mean = total == tap.weight ? pixel : mean.interpolated(to: pixel, at: Float(tap.weight / total))
+            number += 1
         }
         return mean
     }

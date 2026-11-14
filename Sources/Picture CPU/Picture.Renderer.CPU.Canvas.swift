@@ -232,8 +232,6 @@ extension Picture.Renderer.CPU.Canvas {
         let map = Picture.Renderer.CPU.Affine(inverse)
         let clip = state.mask
         let width = area.width
-        // The paint is read the way its kind reads it, the kind chosen once for the whole area and not per
-        // pixel; each reads exactly as `Picture.Paint.pixel(at:)` does at the pixel's centre.
         coverage.withUnsafeBufferPointer { coverage in
             unsafe Picture.Renderer.CPU.Mask.reading(clip) { clip in
                 @inline(__always)
@@ -356,7 +354,6 @@ extension Picture.Renderer.CPU.Canvas {
                         let pixel = held && x >= sheet.box.left && x < sheet.box.right ? unsafe above[first + x - sheet.box.left] : .transparent
                         let put: Picture.Pixel
                         if common {
-                            // `Picture.Layer.composited(_:over:)` with its operator and blend mode known.
                             if lighter {
                                 let added = pixel.composited(over: old, operator: .lighter, blend: .normal, coverage: opacity)
                                 put = added.alpha > 1 ? Picture.Pixel(color: added.color, alpha: 1) : added

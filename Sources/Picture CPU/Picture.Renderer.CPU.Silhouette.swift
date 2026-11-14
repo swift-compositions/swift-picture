@@ -24,7 +24,6 @@ extension Picture.Renderer.CPU.Silhouette {
         let far = Int32(1 << 20)
         func sweep(_ target: Bool) -> [Float] {
             // For each point, the offset to the nearest point whose `inside` is `target`.
-            // Offsets kept side by side, x then y, and worked through in place without checks of their bounds.
             var offsets = [Int32](repeating: far, count: 2 * columns * rows)
             for index in 0..<(columns * rows) where inside[index] == target {
                 offsets[2 * index] = 0

@@ -64,9 +64,9 @@ extension Picture.Scene.Camera {
 
     /// A direction at unit length after the upper-left 3 × 3 of a matrix into eye space, `eye(of:)` of a
     /// model, so that `direction(_:in:)` is this with the product made once per model instead of per call.
+    /// The product is applied to (x, y, z, 0) row by row, each summed from zero in the order of the columns, as
+    /// swift-matrix's `applied(to:)` sums it.
     public static func direction(_ vector: Vector<3, Double>, through eye: Matrix<4, 4, Double>) -> Vector<3, Double> {
-        // `eye.applied(to:)` of (x, y, z, 0), each row summed from zero in the order of the columns as
-        // swift-matrix sums it, without the fourth row, which a direction does not use.
         func row(_ row: Int) -> Double {
             0 + eye[row, 0] * vector[0] + eye[row, 1] * vector[1] + eye[row, 2] * vector[2] + eye[row, 3] * 0
         }

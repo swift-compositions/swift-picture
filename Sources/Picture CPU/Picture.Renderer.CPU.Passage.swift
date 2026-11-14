@@ -114,7 +114,6 @@ extension Picture.Renderer.CPU.Passage {
     /// few pixels of silhouette would otherwise read far and wide, which shows as moiré, and the line along the
     /// outline covers them.
     func read(for index: Refraction.Index<Double>, lens: Picture.Renderer.CPU.Lens) -> Read {
-        // The glass's own index found its way when the passage was made.
         let read = index == self.index ? self.read : way(for: index, lens: lens).read ?? point
         guard cosine < Self.grazing else { return read }
         let t = Swift.max(cosine, 0) / Self.grazing

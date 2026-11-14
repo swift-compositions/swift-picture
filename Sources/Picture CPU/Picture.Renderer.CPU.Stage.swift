@@ -424,8 +424,6 @@ extension Picture.Renderer.CPU.Canvas {
         let reach = Swift.max(area.width, area.height) / 2 + frosted
         let before = seen(over: area.expanded(reach, reach), state)
         let around = area.expanded(Swift.max(area.width, area.height) / 2, Swift.max(area.width, area.height) / 2).intersection(before.box)
-        // One frosted picture for each frost, in the order the surfaces first name it, and for each model the one
-        // its glass reads; a frost that is not a number reads nothing.
         var levels: [Double] = []
         var frosts: [Picture.Renderer.CPU.Frost] = []
         var frostOf = [Int](repeating: -1, count: scene.models.count)
@@ -434,9 +432,9 @@ extension Picture.Renderer.CPU.Canvas {
             if let known = levels.firstIndex(of: level) {
                 frostOf[surface.model] = known
             } else if !level.isNaN {
+                frostOf[surface.model] = frosts.count
                 levels.append(level)
                 frosts.append(Picture.Renderer.CPU.Frost(before, over: around, deviation: level * scale, state.workers))
-                frostOf[surface.model] = frosts.count - 1
             }
         }
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
@@ -473,7 +471,6 @@ extension Picture.Renderer.CPU.Canvas {
                 }
             }
         }
-        // What each model's glass reads with, made once for the model and not per triangle or per point.
         let glasses = scene.models.map { model -> Picture.Glass? in
             if case .glass(let glass) = model.material { return glass }
             return nil
