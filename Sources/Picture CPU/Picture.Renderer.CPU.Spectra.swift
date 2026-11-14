@@ -13,40 +13,6 @@ extension Picture.Renderer.CPU {
 }
 
 extension Picture.Renderer.CPU.Spectra {
-    /// A refraction's indices at the wavelengths the spectra read, worked out once for a glass instead of at
-    /// every point: its own index, those at both ends of the visible range, and for each count up to the limit
-    /// the indices at that spectrum's wavelengths, each `Picture.Glass.Refraction.index(at:)`.
-    struct Indices {
-        let own: Refraction.Index<Double>
-        let short: Refraction.Index<Double>
-        let long: Refraction.Index<Double>
-        let dispersive: Bool
-
-        /// The indices of every spectrum one after another, and where each count's own begin.
-        let indices: [Refraction.Index<Double>]
-        let starts: [Int]
-
-        init(_ refraction: Picture.Glass.Refraction) {
-            let range = Picture.Glass.Spectrum.range
-            self.own = refraction.index
-            self.dispersive = refraction.medium.isDispersive
-            self.short = refraction.index(at: range.lowerBound)
-            self.long = refraction.index(at: range.upperBound)
-            var indices: [Refraction.Index<Double>] = []
-            var starts: [Int] = []
-            if dispersive {
-                for spectrum in Picture.Renderer.CPU.Spectra.table {
-                    starts.append(indices.count)
-                    for wavelength in spectrum.wavelengths { indices.append(refraction.index(at: wavelength)) }
-                }
-            }
-            self.indices = indices
-            self.starts = starts
-        }
-    }
-}
-
-extension Picture.Renderer.CPU.Spectra {
     /// The picture as a dispersive refraction shows it at a point: `read` gives where light of an index reads, in
     /// raster space, and `sample` the picture there. Where the shortest and the longest visible wavelengths read
     /// less than a quarter of a pixel apart, the point is read once at the glass's own index; otherwise at

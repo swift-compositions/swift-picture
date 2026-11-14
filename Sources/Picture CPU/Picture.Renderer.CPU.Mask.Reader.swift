@@ -8,14 +8,6 @@ extension Picture.Renderer.CPU.Mask {
         let present: Bool
     }
 
-    /// One row of a mask as `Reader.row(_:)` gives it.
-    @unsafe struct Row {
-        let left: Int
-        let right: Int
-        let base: UnsafePointer<Float>?
-        let present: Bool
-    }
-
     /// Calls `body` with a reader of a mask, or of no mask.
     static func reading<Result>(_ mask: Self?, _ body: (Reader) -> Result) -> Result {
         guard let mask else {
@@ -40,16 +32,5 @@ extension Picture.Renderer.CPU.Mask.Reader {
             base: base + (y - box.top) * box.width,
             present: true
         )
-    }
-}
-
-extension Picture.Renderer.CPU.Mask.Row {
-    /// The share the mask leaves open at a column of the row, as `State.share(_:_:)` gives it: nil without a
-    /// mask, 0 outside its box.
-    @inline(__always)
-    func share(_ x: Int) -> Float? {
-        guard unsafe present else { return nil }
-        guard unsafe x >= left, unsafe x < right, let base = unsafe base else { return 0 }
-        return unsafe base[x - left]
     }
 }
