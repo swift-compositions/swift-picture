@@ -1,3 +1,4 @@
+import Numeric
 import Picture
 
 extension Picture.Renderer.CPU {
@@ -116,8 +117,7 @@ extension Picture.Renderer.CPU.Passage {
     func read(for index: Refraction.Index<Double>, lens: Picture.Renderer.CPU.Lens) -> Read {
         let read = index == self.index ? self.read : way(for: index, lens: lens).read ?? point
         guard cosine < Self.grazing else { return read }
-        let t = Swift.max(cosine, 0) / Self.grazing
-        let share = t * t * (3 - 2 * t)
+        let share = Double.math.smoothstep(Swift.max(cosine, 0) / Self.grazing)
         return Read(x: point.x + (read.x - point.x) * share, y: point.y + (read.y - point.y) * share)
     }
 

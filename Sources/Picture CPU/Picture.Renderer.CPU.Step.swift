@@ -53,7 +53,7 @@ extension Picture.Renderer.CPU.Step {
         if case .kaleidoscope(let kaleidoscope) = effect {
             guard let fold = try Self(effect, transform, inverse) else { return [] }
             guard kaleidoscope.spokes != nil || kaleidoscope.seam != nil else { return [fold] }
-            let determinant = transform[0, 0] * transform[1, 1] - transform[0, 1] * transform[1, 0]
+            let determinant = transform.linear.determinant
             let footprint = 1 / abs(determinant).squareRoot()
             let spokes = kaleidoscope.spokes?.pixel
             let seam = kaleidoscope.seam?.color.pixel
@@ -70,7 +70,7 @@ extension Picture.Renderer.CPU.Step {
         }
         guard zoom.amount != 0 else { return [] }
         let low = 1 - zoom.amount
-        let ratio = Double.exp(Double.log(low) / Double(segments))
+        let ratio = Double.math.pow(low, 1 / Double(segments))
         guard low > 0, low.isFinite, ratio.isFinite else {
             return try Self(effect, transform, inverse).map { [$0] } ?? []
         }

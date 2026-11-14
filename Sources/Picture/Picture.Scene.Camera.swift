@@ -225,27 +225,17 @@ extension Picture.Scene.Camera {
 extension Picture.Scene.Camera {
     /// The point of the world that this camera shows at a point of a viewport, at a distance ahead of the eye:
     /// the way back from `sight(of:in:viewport:)`, whose position and distance for this point are the ones given,
-    /// up to rounding. It is nil for a viewport with no area, a point the lens does not take back, and a view
-    /// that is not a rigid motion, a rotation and a move, to within a millionth.
+    /// up to rounding: `Projection.Viewport.normalized(_:)` of the point, `Projection.eye(_:distance:)` at the
+    /// distance, and the inverse of the view as a `Matrix.Rigid`. It is nil for a viewport with no area or not
+    /// finite, a point that lands nowhere finite, and a view that is not a rigid motion, a rotation and a move,
+    /// to within a millionth.
     public func point(under point: Picture.Plane.Point<2>, distance: Double, viewport: Picture.Plane.Rectangle) -> Point::Point<3, Double>? {
-        let left = viewport.llx.underlying
-        let top = viewport.lly.underlying
-        let width = viewport.urx.underlying - left
-        let height = viewport.ury.underlying - top
-        guard width != 0, height != 0, let pose = Pose(view) else { return nil }
-        let x = 2 * (point[0] - left) / width - 1
-        let y = 1 - 2 * (point[1] - top) / height
-        guard let window = projection.eye(Point::Point<3, Double>([x, y, projection.depth.range.lowerBound])) else { return nil }
-        var eye = (x: window[0], y: window[1], z: -distance)
-        if projection.kind == .perspective {
-            guard window[2] < 0 else { return nil }
-            let stretch = distance / -window[2]
-            eye = (window[0] * stretch, window[1] * stretch, -distance)
-        }
-        let world = pose.rotation.transposed.applied(to: Vector([eye.x, eye.y, eye.z]))
-        let found = Point::Point<3, Double>([world[0] + pose.place[0], world[1] + pose.place[1], world[2] + pose.place[2]])
-        guard found[0].isFinite, found[1].isFinite, found[2].isFinite else { return nil }
-        return found
+        guard let viewport = Picture.Scene.viewport(of: viewport), let pose = Matrix<4, 4, Double>.Rigid(view, within: 1e-6) else { return nil }
+        let normalized = viewport.normalized(Point::Point<2, Double>(x: point[0], y: point[1]))
+        let eye = projection.eye(normalized, distance: distance)
+        let world = pose.inverse.applied(to: Vector([eye.x, eye.y, eye.z]))
+        guard world[0].isFinite, world[1].isFinite, world[2].isFinite else { return nil }
+        return Point::Point<3, Double>([world[0], world[1], world[2]])
     }
 
     /// The model transform that stands a model's origin at `point(under:distance:viewport:)`, unturned.
@@ -305,50 +295,23 @@ extension Picture.Scene.Camera {
         return Self(projection: Self.mixed(projection, other.projection, at: share), view: Self.mixed(view, other.view, at: share))
     }
 
-    /// Two lenses mixed by their bounds.
+    /// Two lenses mixed by their bounds: `Projection.interpolated(to:at:)`.
     static func mixed(_ first: Projection<Double>, _ second: Projection<Double>, at share: Double) -> Projection<Double> {
-        guard first != second else { return first }
-        func along(_ a: Double, _ b: Double) -> Double { a == b ? a : a + (b - a) * share }
-        guard first.kind == second.kind, first.depth == second.depth else { return share < 1 ? first : second }
-        do throws(Projection<Double>.Error) {
-            return try Projection<Double>(
-                first.kind,
-                left: along(first.left, second.left),
-                right: along(first.right, second.right),
-                bottom: along(first.bottom, second.bottom),
-                top: along(first.top, second.top),
-                near: along(first.near, second.near),
-                far: along(first.far, second.far),
-                depth: first.depth
-            )
-        } catch {
-            return share < 1 ? first : second
-        }
+        first.interpolated(to: second, at: share)
     }
 
-    /// Two views mixed as rigid motions where both are, and entry by entry where either is not.
+    /// Two views mixed as rigid motions where both are, and entry by entry where either is not. Rigid views are
+    /// mixed as the eyes they stand for: the inverses, the poses, go by `Matrix.Rigid.interpolated(to:at:)`, so
+    /// the eye's place goes straight, and the result is inverted back into a view.
     static func mixed(_ first: Matrix<4, 4, Double>, _ second: Matrix<4, 4, Double>, at share: Double) -> Matrix<4, 4, Double> {
-        guard let start = Picture.Scene.Camera.Pose(first), let end = Picture.Scene.Camera.Pose(second) else {
+        guard let start = Matrix<4, 4, Double>.Rigid(first, within: 1e-6), let end = Matrix<4, 4, Double>.Rigid(second, within: 1e-6) else {
             return Matrix<4, 4, Double>(
                 rows: InlineArray { row in
                     InlineArray { column in first[row, column] + (second[row, column] - first[row, column]) * share }
                 }
             )
         }
-        let turn = Quaternion(start.rotation).interpolated(to: Quaternion(end.rotation), at: share)
-        let rotation = Matrix<3, 3, Double>(turn)
-        let place = Vector<3, Double>([
-            start.place[0] + (end.place[0] - start.place[0]) * share,
-            start.place[1] + (end.place[1] - start.place[1]) * share,
-            start.place[2] + (end.place[2] - start.place[2]) * share,
-        ])
-        let moved = rotation.applied(to: place)
-        return Matrix<4, 4, Double>(rows: [
-            [rotation[0, 0], rotation[0, 1], rotation[0, 2], -moved[0]],
-            [rotation[1, 0], rotation[1, 1], rotation[1, 2], -moved[1]],
-            [rotation[2, 0], rotation[2, 1], rotation[2, 2], -moved[2]],
-            [0, 0, 0, 1],
-        ])
+        return start.inverse.interpolated(to: end.inverse, at: share).inverse.matrix
     }
 }
 
@@ -363,25 +326,85 @@ extension Picture.Scene.Camera {
     /// lens draws a unit one unit ahead, from the lens's vertical scale and the viewport's height. On the line of
     /// sight that is f · tan α, the radius of a circle; off it the silhouette is an ellipse drawn out along that
     /// line, and this is its half width across. Through an orthographic lens it is the radius times the vertical
-    /// scale. It is nil for a ball that holds the eye or reaches the plane of the eye, a radius that is negative
-    /// or not finite, and a viewport with no height.
+    /// scale. It is `Projection.radius(of:at:in:)` of the centre in eye space, in the viewport. It is nil for a
+    /// ball that holds the eye or reaches the plane of the eye, a radius that is negative or not finite, and a
+    /// viewport with no area or not finite.
     public func radius(
         of radius: Double,
         at center: Point::Point<3, Double>,
         in model: Matrix<4, 4, Double> = .identity,
         viewport: Picture.Plane.Rectangle
     ) -> Double? {
-        let height = viewport.ury.underlying - viewport.lly.underlying
-        guard radius >= 0, radius.isFinite, height != 0 else { return nil }
-        let scale = Matrix(projection)[1, 1] * abs(height) / 2
-        guard projection.kind == .perspective else { return radius * abs(scale) }
+        guard let viewport = Picture.Scene.viewport(of: viewport) else { return nil }
         let eye = eye(of: model).applied(to: Vector([center[0], center[1], center[2], 1]))
-        let distance = (eye[0] * eye[0] + eye[1] * eye[1] + eye[2] * eye[2]).squareRoot()
-        guard distance > radius, distance.isFinite else { return nil }
-        let sine = radius / distance
-        let cosine = -eye[2] / distance
-        let room = cosine * cosine - sine * sine
-        guard cosine > 0, room > 0 else { return nil }
-        return abs(scale) * sine / room.squareRoot()
+        return projection.radius(of: radius, at: Point::Point<3, Double>(x: eye[0], y: eye[1], z: eye[2]), in: viewport).map(abs)
+    }
+}
+
+extension Picture.Scene.Camera {
+    /// `init(fieldOfView:aspect:near:far:depth:view:)` for numbers written in source: a lens the projection
+    /// refuses traps. A camera built at run time goes through the initializer, which throws.
+    public static func perspective(
+        fieldOfView: Radian<Double>,
+        aspect: Double,
+        near: Double,
+        far: Double,
+        depth: Projection<Double>.Depth,
+        view: Matrix<4, 4, Double> = .identity
+    ) -> Self {
+        do throws(Projection<Double>.Error) {
+            return try Self(fieldOfView: fieldOfView, aspect: aspect, near: near, far: far, depth: depth, view: view)
+        } catch {
+            preconditionFailure("A perspective's field of view, aspect, near and far make a view volume: \(error)")
+        }
+    }
+
+    /// `init(focal:viewport:near:far:depth:view:)` for numbers written in source: a lens the projection refuses
+    /// traps. A camera built at run time goes through the initializer, which throws.
+    public static func perspective(
+        focal: Double,
+        viewport: Picture.Plane.Rectangle,
+        near: Double,
+        far: Double,
+        depth: Projection<Double>.Depth,
+        view: Matrix<4, 4, Double> = .identity
+    ) -> Self {
+        do throws(Projection<Double>.Error) {
+            return try Self(focal: focal, viewport: viewport, near: near, far: far, depth: depth, view: view)
+        } catch {
+            preconditionFailure("A focal length, a viewport with height, near and far make a view volume: \(error)")
+        }
+    }
+
+    /// `init(distance:scale:viewport:near:far:depth:)` for numbers written in source: a lens the projection
+    /// refuses traps. A camera built at run time goes through the initializer, which throws.
+    public static func perspective(
+        distance: Double,
+        scale: Double,
+        viewport: Picture.Plane.Rectangle,
+        near: Double,
+        far: Double,
+        depth: Projection<Double>.Depth
+    ) -> Self {
+        do throws(Projection<Double>.Error) {
+            return try Self(distance: distance, scale: scale, viewport: viewport, near: near, far: far, depth: depth)
+        } catch {
+            preconditionFailure("A distance, a scale, a viewport with height, near and far make a view volume: \(error)")
+        }
+    }
+
+    /// `init(projection:at:looking:up:)` for points written in source: a target at the place, or an `up` along
+    /// the line of sight, traps. A camera built at run time goes through the initializer, which throws.
+    public static func looking(
+        at target: Point::Point<3, Double>,
+        from place: Point::Point<3, Double>,
+        up: Vector<3, Double> = Vector([0, 1, 0]),
+        projection: Projection<Double>
+    ) -> Self {
+        do throws(Matrix<4, 4, Double>.Error) {
+            return try Self(projection: projection, at: place, looking: target, up: up)
+        } catch {
+            preconditionFailure("A camera looks at a target away from its place, with up off the line of sight: \(error)")
+        }
     }
 }

@@ -240,22 +240,10 @@ extension Picture.Renderer.CPU.Stage {
 }
 
 extension Picture.Renderer.CPU.Stage {
-    /// How far ahead of the eye lies what a lens draws at a normalised depth, as `Camera.distance(at:)` gives it
-    /// bit for bit, with the lens's coefficients taken once: minus the z of `Projection.eye(_:)`.
+    /// How far ahead of the eye lies what a lens draws at a normalised depth, as `Camera.distance(at:)` gives it:
+    /// minus the z of `Projection.eye(_:)`, and infinitely far where that has none.
     static func distance(_ projection: Projection<Double>) -> (_ depth: Double) -> Double {
-        let rows = projection.coefficients
-        let (scale, offset) = (rows[2][2], rows[2][3])
-        switch projection.kind {
-        case .perspective:
-            return { depth in
-                let denominator = depth + scale
-                guard denominator != 0 else { return .infinity }
-                return -(-offset / denominator)
-            }
-
-        case .orthographic:
-            return { depth in -((depth - offset) / scale) }
-        }
+        { depth in projection.eye(Point<3, Double>(x: 0, y: 0, z: depth)).map { -$0.z } ?? .infinity }
     }
 }
 
@@ -420,7 +408,7 @@ extension Picture.Renderer.CPU.Canvas {
             }
         }
         guard !stage.glass.isEmpty else { return }
-        let scale = abs(state.transform[0, 0] * state.transform[1, 1] - state.transform[0, 1] * state.transform[1, 0]).squareRoot()
+        let scale = abs(state.transform.linear.determinant).squareRoot()
         // The picture behind is read around the scene, as far again as the scene is wide or tall; past that a
         // read finds the nearest pixel kept.
         let frosted = Int(Swift.min(4 * (stage.surfaces.map { Swift.max($0.glass.frost, 0) }.max() ?? 0) * scale, 4096).rounded(.up))

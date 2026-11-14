@@ -21,7 +21,7 @@
             over ground: Picture.Pixel,
             form: Swift.String
         ) -> Key? {
-            var head: [UInt8] = Array("Picture.Store 2\n".utf8)
+            var head: [UInt8] = Array("Picture.Store \(Self.format)\n".utf8)
             for text in [edition, form] {
                 Self.number(UInt64(text.utf8.count), into: &head)
                 head.append(contentsOf: text.utf8)
@@ -67,6 +67,11 @@
     }
 
     extension Picture.Store {
+        /// The store's format, which keys and entries begin with: raised whenever what a key is made of changes, so
+        /// entries kept under an earlier format are simply missed. 3 since a picture's bytes are a function of its
+        /// value alone, an array met twice written in full rather than by its address.
+        static let format: UInt64 = 3
+
         /// The start of every entry.
         static let magic: [UInt8] = Array("PICSTORE".utf8)
 
@@ -88,7 +93,7 @@
         /// An entry: the header, then the payload.
         static func entry(_ payload: [Byte], key: Key) -> [Byte] {
             var head: [UInt8] = magic
-            number(2, into: &head)
+            number(format, into: &head)
             head.append(contentsOf: key.digest.bytes.map(\.bitPattern))
             number(UInt64(payload.count), into: &head)
             number(UInt64(RFC_1950.Adler32.checksum(payload)), into: &head)
@@ -102,7 +107,7 @@
         static func payload(_ entry: [Byte], key: Key) -> [Byte]? {
             guard entry.count >= header,
                 entry[0..<8].map(\.bitPattern) == magic,
-                number(entry, at: 8) == 2,
+                number(entry, at: 8) == format,
                 Array(entry[16..<48]) == key.digest.bytes,
                 number(entry, at: 48) == UInt64(entry.count - header)
             else { return nil }

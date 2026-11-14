@@ -40,7 +40,7 @@ extension Picture.Scene.Material.Shade {
     /// normal of no length and a lamp direction of no length give 0.
     public func cosine(facing normal: Vector<3, Double>) -> Double {
         guard let n = Self.facing(normal) else { return 0 }
-        let reach = (toward[0] * toward[0] + toward[1] * toward[1] + toward[2] * toward[2]).squareRoot()
+        let reach = toward.length
         guard reach > 0, reach.isFinite else { return 0 }
         return Swift.max((n.0 * toward[0] + n.1 * toward[1] + n.2 * toward[2]) / reach, 0)
     }
@@ -53,7 +53,7 @@ extension Picture.Scene.Material.Shade {
         guard let n = Self.facing(normal) else { return 0 }
         let edge = 1 - Swift.min(Swift.max(n.2, 0), 1)
         let power = Swift.max(sharpness, 0)
-        let falloff = edge > 0 ? Double.exp(power * Double.log(edge)) : (power == 0 ? 1 : 0)
+        let falloff = edge > 0 ? Double.math.pow(edge, power) : (power == 0 ? 1 : 0)
         return rim * falloff
     }
 
@@ -70,7 +70,7 @@ extension Picture.Scene.Material.Shade {
 
     /// A normal at unit length turned to face the eye, nil for one of no length.
     static func facing(_ normal: Vector<3, Double>) -> (Double, Double, Double)? {
-        let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).squareRoot()
+        let length = normal.length
         guard length > 0, length.isFinite else { return nil }
         let sign: Double = normal[2] < 0 ? -1 : 1
         return (sign * normal[0] / length, sign * normal[1] / length, sign * normal[2] / length)

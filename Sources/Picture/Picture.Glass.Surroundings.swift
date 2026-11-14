@@ -1,3 +1,4 @@
+import Numeric
 public import Vector
 
 extension Picture.Glass {
@@ -27,10 +28,9 @@ extension Picture.Glass.Surroundings {
     /// How much of `above` a direction shows, 0 straight down to 1 straight up, level at both ends: for a
     /// direction whose unit length has the height h, s²(3 - 2s) with s = (h + 1) / 2. A half for no direction.
     public static func share(toward direction: Vector<3, Double>) -> Double {
-        let length = (direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]).squareRoot()
+        let length = direction.length
         guard length > 0, length.isFinite else { return 0.5 }
-        let s = Swift.min(Swift.max((direction[1] / length + 1) / 2, 0), 1)
-        return s * s * (3 - 2 * s)
+        return Double.math.smoothstep((direction[1] / length + 1) / 2)
     }
 
     /// The working pixel the surroundings show in a direction: `below` mixed toward `above` by the share.
@@ -49,7 +49,6 @@ extension Picture.Glass.Surroundings {
         let start = 0.7 * width
         guard tangent > start else { return 0 }
         guard tangent < width else { return 1 }
-        let s = (tangent - start) / (width - start)
-        return s * s * (3 - 2 * s)
+        return Double.math.smoothstep(tangent, from: start, to: width)
     }
 }

@@ -91,41 +91,87 @@ extension Picture.Scene {
 
 extension Picture.Scene {
     /// The scene as its camera sees it through a shutter that was open for the last `shutter` of the way
-    /// from an earlier camera, blurred by the camera's travel as the exposure says. The shutter opened at the
-    /// camera `earlier.mixed(to: camera, at: 1 − shutter)`. A shutter that is not positive, a camera that did
-    /// not move, and an exposure of no samples or no bands give the scene itself.
+    /// from an earlier camera, blurred by the camera's travel as the exposure says: `exposure(since:shutter:_:)`
+    /// of this scene seen by the earlier camera, so the shutter opened at the camera
+    /// `earlier.mixed(to: camera, at: 1 − shutter)`. A shutter that is not positive, a camera that did not move,
+    /// and an exposure of no samples or no bands give the scene itself.
     public func exposure(since earlier: Camera, shutter: Double = 1, _ exposure: Exposure) -> Picture {
+        var then = self
+        then.camera = earlier
+        return self.exposure(since: then, shutter: shutter, exposure)
+    }
+
+    /// The scene through a shutter that was open for the last `shutter` of the way from the same scene a moment
+    /// earlier, blurred by how its camera and its models moved as the exposure says. The earlier scene gives the
+    /// earlier camera and the earlier transform of each model, paired with this scene's models by their place
+    /// in the list; a model past the end of the earlier list stood still. Everything else is this scene's. The
+    /// shutter opened at `mixed(since:at:)` of 1 − shutter: the camera as `Camera.mixed(to:at:)` mixes it, and
+    /// each model's transform as a rigid motion (`Matrix.Rigid.interpolated(to:at:)`, its origin going straight
+    /// and its turn even) where both transforms are one to within a millionth, and entry by entry where either is
+    /// not. `samples(n)` is `Picture.exposure(samples:_:)` of the scene mixed from the opening to this one at each
+    /// fraction; `bands(n)` draws each band of `bands` as it stood at the opening, in a layer under
+    /// `smear(since:)` of the band against the band at the opening. A shutter that is not positive, a scene that
+    /// did not move, and an exposure of no samples or no bands give the scene itself.
+    public func exposure(since earlier: Picture.Scene, shutter: Double = 1, _ exposure: Exposure) -> Picture {
         guard shutter > 0 else { return [.scene(self)] }
-        let opened = earlier.mixed(to: camera, at: 1 - shutter)
-        guard opened != camera else { return [.scene(self)] }
+        let opened = mixed(since: earlier, at: 1 - shutter)
+        guard opened != self else { return [.scene(self)] }
         switch exposure {
         case .samples(let samples):
             guard samples > .zero else { return [.scene(self)] }
             return Picture.exposure(samples: samples) { fraction in
-                var scene = self
-                scene.camera = opened.mixed(to: camera, at: fraction)
-                return [.scene(scene)]
+                [.scene(mixed(since: opened, at: fraction))]
             }
 
         case .bands(let bands):
             guard bands > .zero else { return [.scene(self)] }
             return Picture(
-                self.bands(Int(clamping: bands)).map { band in
-                    guard let zoom = band.smear(since: opened) else { return .scene(band) }
-                    var then = band
-                    then.camera = opened
+                self.members(Int(clamping: bands)).map { members in
+                    var band = self
+                    band.models = members.map { models[$0] }
+                    var then = opened
+                    then.models = members.map { opened.models[$0] }
+                    guard let zoom = band.smear(since: then) else { return .scene(band) }
                     return .layer(Picture.Layer([.scene(then)], effects: [.zoom(zoom)]))
                 }
             )
         }
     }
 
-    /// The scene's models in `count` bands by the distance ahead of the eye of each model's mean vertex, cut
+    /// The scene a share of the way from an earlier one: the camera `earlier.camera.mixed(to: camera, at:)`, and
+    /// each model's transform from its earlier one, paired by place in the list, as a rigid motion where both are
+    /// one to within a millionth and entry by entry otherwise; a model the earlier scene does not list stands
+    /// still. A share of 1 gives this scene's camera and transforms.
+    func mixed(since earlier: Picture.Scene, at share: Double) -> Self {
+        var scene = self
+        scene.camera = earlier.camera.mixed(to: camera, at: share)
+        for index in models.indices where index < earlier.models.count {
+            scene.models[index].transform = Self.mixed(earlier.models[index].transform, models[index].transform, at: share)
+        }
+        return scene
+    }
+
+    /// Two model transforms mixed: equal ones kept, the first at a share of 0 and the second at 1, as rigid
+    /// motions where both are one to within a millionth, and entry by entry where either is not.
+    static func mixed(_ first: Matrix<4, 4, Double>, _ second: Matrix<4, 4, Double>, at share: Double) -> Matrix<4, 4, Double> {
+        if first == second || share == 0 { return first }
+        if share == 1 { return second }
+        guard let start = Matrix<4, 4, Double>.Rigid(first, within: 1e-6), let end = Matrix<4, 4, Double>.Rigid(second, within: 1e-6) else {
+            return Matrix<4, 4, Double>(
+                rows: InlineArray { row in
+                    InlineArray { column in first[row, column] + (second[row, column] - first[row, column]) * share }
+                }
+            )
+        }
+        return start.interpolated(to: end, at: share).matrix
+    }
+
+    /// The places in the list of the scene's models in `count` bands by the distance ahead of the eye of each model's mean vertex, cut
     /// evenly in one over that distance between the farthest model and the nearest, so that a forward travel
-    /// smears each band about as much more than the one behind it; the bands from far to near, each a scene of
-    /// its models in their order, empty bands left out. A model with no vertices or a mean vertex not ahead of
+    /// smears each band about as much more than the one behind it; the bands from far to near, each its models'
+    /// places in their order, empty bands left out. A model with no vertices or a mean vertex not ahead of
     /// the eye goes with the nearest.
-    func bands(_ count: Int) -> [Self] {
+    func members(_ count: Int) -> [[Int]] {
         let nearness: [Double?] = models.map { model in
             let vertices = model.mesh.vertices
             guard !vertices.isEmpty else { return nil }
@@ -145,11 +191,8 @@ extension Picture.Scene {
             return Swift.min(count - 1, Int(((inverse - low) / (high - low) * Double(count)).rounded(.down)))
         }
         return (0..<count).compactMap { band in
-            let members = zip(models, bands).filter { $0.1 == band }.map(\.0)
-            guard !members.isEmpty else { return nil }
-            var scene = self
-            scene.models = members
-            return scene
+            let members = zip(models.indices, bands).filter { $0.1 == band }.map(\.0)
+            return members.isEmpty ? nil : members
         }
     }
 
@@ -160,12 +203,22 @@ extension Picture.Scene {
     /// taken as a zoom of amount 10⁻⁶ about a centre far along the shift. It is nil when fewer than two vertices
     /// are seen by both or none moves by a millionth of a unit.
     public func smear(since earlier: Camera) -> Picture.Effect.Zoom? {
+        var then = self
+        then.camera = earlier
+        return smear(since: then)
+    }
+
+    /// The radial blur that best smears the scene along the way its points came on the frame since the same scene
+    /// a moment earlier: `smear(since:)` of a camera, with each vertex seen then through the earlier scene's camera
+    /// and the earlier transform of its model, paired by place in the list; a model the earlier scene does not
+    /// list stood still.
+    public func smear(since earlier: Picture.Scene) -> Picture.Effect.Zoom? {
         var count = 0.0
         var sums = (px: 0.0, py: 0.0, qx: 0.0, qy: 0.0, pp: 0.0, pq: 0.0)
         var pairs: [(now: Picture.Plane.Point<2>, then: Picture.Plane.Point<2>)] = []
-        for model in models {
+        for (index, model) in models.enumerated() {
             let now = camera.map(of: model.transform)
-            let then = earlier.map(of: model.transform)
+            let then = earlier.camera.map(of: index < earlier.models.count ? earlier.models[index].transform : model.transform)
             for vertex in model.mesh.vertices {
                 guard let seen = position(of: vertex, through: now)?.point,
                     let normalized = Camera.normalized(vertex, through: then)

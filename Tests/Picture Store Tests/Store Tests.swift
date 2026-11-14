@@ -57,6 +57,34 @@ import Testing
             #expect(keys[0] == store.key(Self.picture, width: 24, height: 16, over: .transparent, form: "raw"))
         }
 
+        @Test func `a picture's key is of its value alone: shared and copied equal arrays give one key, one changed element another`() throws {
+            let store = Picture.Store(try Self.directory(), edition: "one")
+            func key(_ picture: Picture) -> Picture.Store.Key? {
+                store.key(picture, width: 24, height: 16, over: .transparent, form: "raw")
+            }
+            let swarm = Picture.Sprites(
+                (0..<40).map { index in
+                    Picture.Sprites.Sprite(center: .init([Double(index), 3]), radius: 2, color: .init(red: 1, green: Float(index) / 40, blue: 0))
+                }
+            )
+            let copied = Picture.Sprites(swarm.sprites.map { $0 }, profile: swarm.profile)
+            let shared: Picture = [.sprites(swarm), .sprites(swarm)]
+            let fresh: Picture = [.sprites(swarm), .sprites(copied)]
+            #expect(key(shared) != nil)
+            #expect(key(shared) == key(fresh))
+            let inner = Picture((0..<12).map { Self.square(Double($0), 1.5, .white) })
+            let again = Picture(inner.elements.map { $0 })
+            let groups: Picture = [.group(.init(inner)), .group(.init(inner))]
+            let copies: Picture = [.group(.init(inner)), .group(.init(again))]
+            #expect(key(groups) != nil)
+            #expect(key(groups) == key(copies))
+            var changed = swarm.sprites
+            changed[39].radius = 2.5
+            #expect(key(shared) != key([.sprites(swarm), .sprites(Picture.Sprites(changed, profile: swarm.profile))]))
+            let other = Picture((0..<12).map { Self.square(Double($0), $0 == 11 ? 1.25 : 1.5, .white) })
+            #expect(key(groups) != key([.group(.init(inner)), .group(.init(other))]))
+        }
+
         @Test func `a truncated, damaged or misnamed entry is a miss`() throws {
             let store = Picture.Store.cpu(try Self.directory())
             let key = try Self.key(store)
@@ -83,10 +111,10 @@ import Testing
             let image = Picture.Image(inner, in: rectangle, scale: 2)
             let picture: Picture = [.fill(Picture.Plane.Path(subpaths: []), .image(image))]
             let store = Picture.Store(try Self.directory(), edition: "fixed")
-            // Written by an earlier run: the image's source keeps a `Hasher` value that differs per process,
+            // Written by an earlier run, at the store's format 3: the image's source keeps a `Hasher` value that differs per process,
             // which its canonical value, the part it names, leaves out.
             let hex = try Self.key(store, picture).hex
-            #expect(hex == "f96abac74c3ed3dc5183f72a23f0b32af2475b3e0eb36300ce164efefe5ec18d")
+            #expect(hex == "a4c416eaec9a2cfccd504622061a90fe8f283237bd8257c4e19f079b271f895b")
         }
 
         @Test func `processes keeping one entry at once leave one whole entry`() async throws {

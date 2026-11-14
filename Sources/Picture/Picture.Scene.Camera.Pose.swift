@@ -25,16 +25,12 @@ extension Picture.Scene.Camera {
 
 extension Picture.Scene.Camera.Pose {
     /// A view taken apart, or nil when its last row is not (0, 0, 0, 1) or its upper left 3 × 3 is not a
-    /// rotation to within a millionth.
+    /// rotation to within a millionth: `Matrix.Rigid(_:within:)` of swift-matrix, whose rotation is the pose's and
+    /// whose inverse's translation is the place.
     public init?(_ view: Matrix<4, 4, Double>) {
-        guard view[3, 0] == 0, view[3, 1] == 0, view[3, 2] == 0, view[3, 3] == 1 else { return nil }
-        let rotation = Matrix<3, 3, Double>(rows: InlineArray { row in InlineArray { column in view[row, column] } })
-        let product = rotation.multiplied(by: rotation.transposed)
-        let identity = Matrix<3, 3, Double>.identity
-        let drift = (0..<9).map { abs(product[$0 / 3, $0 % 3] - identity[$0 / 3, $0 % 3]) }.max() ?? 0
-        guard drift <= 1e-6, rotation.determinant > 0 else { return nil }
-        let moved = rotation.transposed.applied(to: Vector([view[0, 3], view[1, 3], view[2, 3]]))
-        self.init(rotation: rotation, place: Point::Point([-moved[0], -moved[1], -moved[2]]))
+        guard let rigid = Matrix<4, 4, Double>.Rigid(view, within: 1e-6) else { return nil }
+        let place = rigid.inverse.translation
+        self.init(rotation: rigid.rotation, place: Point::Point([place[0], place[1], place[2]]))
     }
 
     /// An eye standing at a place of the world and turned by three angles: first `yaw` about the world's y
@@ -96,5 +92,38 @@ extension Picture.Scene.Camera.Pose {
     /// The way the top of the view points, in the world: the rotation's middle row.
     public var up: Vector<3, Double> {
         Vector([rotation[1, 0], rotation[1, 1], rotation[1, 2]])
+    }
+}
+
+extension Picture.Scene.Camera.Pose {
+    /// The pose a share of the way to another, as an eye that moves and turns between them at an even pace: the
+    /// eye's motion, the rotation's transpose and then the place, goes by `Matrix.Rigid.interpolated(to:at:)` of
+    /// swift-matrix, so the place goes straight and the turn the shorter way about one axis at an even angular
+    /// rate. A share of 0 gives this pose and a share of 1 the other, exactly. A pose whose rotation is not one to
+    /// within a millionth is mixed entry by entry, and its place straight.
+    public func interpolated(to other: Self, at share: Double) -> Self {
+        if share == 0 { return self }
+        if share == 1 { return other }
+        guard let start = Self.motion(of: self), let end = Self.motion(of: other) else {
+            return Self(
+                rotation: Matrix<3, 3, Double>(
+                    rows: InlineArray { row in
+                        InlineArray { column in rotation[row, column] + (other.rotation[row, column] - rotation[row, column]) * share }
+                    }
+                ),
+                place: place.interpolated(to: other.place, at: share)
+            )
+        }
+        let mixed = start.interpolated(to: end, at: share)
+        return Self(rotation: mixed.rotation.transposed, place: Point::Point([mixed.translation[0], mixed.translation[1], mixed.translation[2]]))
+    }
+
+    /// The eye's own motion, from its axes to the world's: the rotation transposed, then the place.
+    static func motion(of pose: Self) -> Matrix<4, 4, Double>.Rigid? {
+        Matrix<4, 4, Double>.Rigid(
+            rotation: pose.rotation.transposed,
+            translation: Vector([pose.place[0], pose.place[1], pose.place[2]]),
+            within: 1e-6
+        )
     }
 }

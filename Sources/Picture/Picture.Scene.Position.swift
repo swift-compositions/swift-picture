@@ -1,4 +1,5 @@
 public import Point
+public import Projection
 
 extension Picture.Scene {
     /// A point of a scene as it is drawn: where in the picture, and how deep.
@@ -14,17 +15,33 @@ extension Picture.Scene {
 }
 
 extension Picture.Scene.Position {
-    /// The position of normalised coordinates in a viewport: x from −1…1 onto the viewport's x range, y from
-    /// 1…−1 onto its y range, and the normalised z as depth.
+    /// The position of normalised coordinates in a viewport: `Projection.Viewport.point(_:)` of swift-projection
+    /// for a viewport whose y grows downward, as a raster's rows do, so x goes from −1…1 onto the viewport's x
+    /// range and y from 1…−1 onto its y range, and the normalised z as depth. A viewport with no area or not
+    /// finite puts every point at its first corner.
     @inlinable
     public init(_ normalized: Point::Point<3, Double>, in viewport: Picture.Plane.Rectangle) {
-        let left = viewport.llx.underlying
-        let top = viewport.lly.underlying
-        let width = viewport.urx.underlying - left
-        let height = viewport.ury.underlying - top
-        self.init(
-            point: Picture.Plane.Point<2>([left + (normalized[0] + 1) / 2 * width, top + (1 - normalized[1]) / 2 * height]),
-            depth: normalized[2]
+        guard let viewport = Picture.Scene.viewport(of: viewport) else {
+            self.init(point: Picture.Plane.Point<2>([viewport.llx.underlying, viewport.lly.underlying]), depth: normalized[2])
+            return
+        }
+        let point = viewport.point(Point::Point<2, Double>(x: normalized[0], y: normalized[1]))
+        self.init(point: Picture.Plane.Point<2>([point.x, point.y]), depth: normalized[2])
+    }
+}
+
+extension Picture.Scene {
+    /// A rectangle of the picture as swift-projection's viewport, its y growing downward: x from `llx`, y from
+    /// `lly`, nil for one with no area or not finite.
+    @usableFromInline
+    package static func viewport(of rectangle: Picture.Plane.Rectangle) -> Projection<Double>.Viewport? {
+        let (x, y) = (rectangle.llx.underlying, rectangle.lly.underlying)
+        return try? Projection<Double>.Viewport(
+            x: x,
+            y: y,
+            width: rectangle.urx.underlying - x,
+            height: rectangle.ury.underlying - y,
+            direction: .down
         )
     }
 }

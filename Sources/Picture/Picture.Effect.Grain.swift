@@ -35,9 +35,8 @@ extension Picture.Effect.Grain {
     public func share(of cell: Cell) -> Double {
         let counter = Threefry.Block(UInt64(bitPattern: Int64(cell.column)), UInt64(bitPattern: Int64(cell.row)))
         let drawn = Threefry.block(key: seed, counter: counter)
-        let first = Double(drawn.first >> 11) * 0x1p-53
-        let second = Double(drawn.second >> 11) * 0x1p-53
-        return first + second - 1
+        let units = drawn.units(as: Double.self)
+        return units.first + units.second - 1
     }
 
     /// The share of `amount` the cell that holds a point is changed by, and 0 where no cell does.

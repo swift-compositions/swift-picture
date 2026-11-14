@@ -57,8 +57,8 @@ extension Picture.Glass.Pane {
         let p = Swift.max(profile, 1)
         let v = 1 - inward / rim
         if p == 2 { return thickness * (1 - v * v).squareRoot() }
-        let rest = 1 - Double.exp(p * Double.log(v))
-        return thickness * Double.exp(Double.log(rest) / p)
+        let rest = 1 - Double.math.pow(v, p)
+        return thickness * Double.math.pow(rest, 1 / p)
     }
 
     /// How fast the top rises going in, at a distance `inward` in from the boundary: the derivative of
@@ -71,8 +71,8 @@ extension Picture.Glass.Pane {
         let p = Swift.max(profile, 1)
         let v = 1 - inward / rim
         if p == 2 { return thickness / rim * v / (1 - v * v).squareRoot() }
-        let power = Double.exp(p * Double.log(v))
-        return thickness / rim * power / v * Double.exp((1 / p - 1) * Double.log(1 - power))
+        let power = Double.math.pow(v, p)
+        return thickness / rim * power / v * Double.math.pow(1 - power, 1 / p - 1)
     }
 
     /// The top's unit normal in eye space at a point of the picture, where x runs right, y up and z toward the

@@ -53,17 +53,17 @@ extension Picture.Glass.Light.Prepared {
 
     /// `Picture.Glass.Light.reflection(for:)`.
     func reflection(for normal: Vector<3, Double>) -> Double {
-        let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).squareRoot()
+        let length = normal.length
         guard length > 0, length.isFinite else { return 0 }
         let sign: Double = normal[2] < 0 ? -1 : 1
         let n = (sign * normal[0] / length, sign * normal[1] / length, sign * normal[2] / length)
         var highlight = 0.0
         if shines {
             let cosine = size > 0 ? (n.0 * half.0 + n.1 * half.1 + n.2 * half.2) / size : 0
-            highlight = cosine > 0 ? strength * Double.exp(gloss * Double.log(cosine)) : 0
+            highlight = cosine > 0 ? strength * Double.math.pow(cosine, gloss) : 0
         }
         let edge = 1 - Swift.min(Swift.max(n.2, 0), 1)
-        let falloff = edge > 0 ? Double.exp(power * Double.log(edge)) : (power == 0 ? 1 : 0)
+        let falloff = edge > 0 ? Double.math.pow(edge, power) : (power == 0 ? 1 : 0)
         let shone = sheen * falloff * side(of: n)
         return Swift.min(Swift.max(highlight + shone, 0), 1)
     }
@@ -78,14 +78,14 @@ extension Picture.Glass.Light.Prepared {
         let toward = (1 + a) / 2
         let away = (1 - a) / 2
         let f = focus
-        func power(_ value: Double) -> Double { f == 2 ? value * value : (value > 0 ? Double.exp(f * Double.log(value)) : (f == 0 ? 1 : 0)) }
+        func power(_ value: Double) -> Double { f == 2 ? value * value : (value > 0 ? Double.math.pow(value, f) : (f == 0 ? 1 : 0)) }
         return power(toward) + counter * power(away)
     }
 
     /// `Picture.Glass.Light.reflection(for:tilt:)`.
     func reflection(for normal: Vector<3, Double>, tilt: Double) -> Double {
         guard tilt != 1 else { return reflection(for: normal) }
-        let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).squareRoot()
+        let length = normal.length
         let across = (normal[0] * normal[0] + normal[1] * normal[1]).squareRoot()
         guard length > 0, across > 0, length.isFinite else { return reflection(for: normal) }
         let sign: Double = normal[2] < 0 ? -1 : 1
@@ -105,8 +105,7 @@ extension Picture.Glass.Light.Prepared {
         } else if u >= 2.5 {
             profile = 0
         } else {
-            let t = (u - 1) / 1.5
-            profile = 1 - t * t * (3 - 2 * t)
+            profile = 1 - Double.math.smoothstep(u, from: 1, to: 2.5)
         }
         guard profile > 0 else { return 0 }
         return Swift.min(Swift.max(light.rim, 0), 1) * profile * side(of: (across.x, across.y, 0))

@@ -1,3 +1,4 @@
+import Color_Standard
 public import Vector
 
 extension Picture {
@@ -124,14 +125,15 @@ extension Picture.Glass {
 }
 
 extension Picture.Glass {
-    /// A pixel brightened by a gain and with each of red, green and blue moved away from its luminance (0.2126
-    /// red, 0.7152 green and 0.0722 blue, in linear light) by a factor: each becomes
+    /// A pixel brightened by a gain and with each of red, green and blue moved away from its luminance
+    /// (`Color.luminance(red:green:blue:)` of swift-color-standard: 0.2126 red, 0.7152 green and 0.0722 blue, in
+    /// linear light) by a factor: each becomes
     /// gain × (luminance + (component − luminance) × factor), held to 0 up to the pixel's alpha. Alpha is kept, and
     /// a gain and a factor of 1 give the pixel bit for bit.
     public static func saturated(_ pixel: Picture.Pixel, by factor: Float, gain: Float = 1) -> Picture.Pixel {
         guard factor != 1 || gain != 1 else { return pixel }
         let c = pixel.color
-        let luminance = 0.2126 * c.red + 0.7152 * c.green + 0.0722 * c.blue
+        let luminance = Color_Standard::Color.luminance(red: c.red, green: c.green, blue: c.blue)
         func moved(_ value: Float) -> Float { Swift.min(Swift.max(gain * (luminance + (value - luminance) * factor), 0), Swift.max(pixel.alpha, 0)) }
         return Picture.Pixel(color: .init(red: moved(c.red), green: moved(c.green), blue: moved(c.blue)), alpha: pixel.alpha)
     }

@@ -33,7 +33,7 @@ extension Picture.Renderer.CPU.Canvas {
     mutating func draw(_ pane: Picture.Glass.Pane, _ state: Picture.Renderer.CPU.State) {
         guard let inverse = state.inverse else { return }
         let transform = state.transform
-        let determinant = abs(transform[0, 0] * transform[1, 1] - transform[0, 1] * transform[1, 0])
+        let determinant = abs(transform.linear.determinant)
         let scale = determinant.squareRoot()
         guard scale > 0, scale.isFinite, let rectangle = pane.region.boundingBox else { return }
         let reach = state.reach(in: box)

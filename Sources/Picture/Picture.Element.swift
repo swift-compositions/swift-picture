@@ -59,15 +59,10 @@ extension Picture.Element {
         radius: Double,
         core: Double = 0.25
     ) -> Self {
-        let (x, y) = (center[0], center[1])
-        let corners: [Picture.Plane.Point<2>] = [
-            .init([x - radius, y - radius]), .init([x + radius, y - radius]),
-            .init([x + radius, y + radius]), .init([x - radius, y + radius]),
-        ]
-        let sides = zip(corners, corners.dropFirst() + corners.prefix(1)).map { start, end in
-            Picture.Plane.Path.Segment.line(.init(start: start, end: end))
-        }
-        let square = Picture.Plane.Path(subpaths: [.init(startPoint: corners[0], segments: sides, isClosed: true)])
+        let (x, y): (Double, Double) = (center[0], center[1])
+        let (left, top, right, bottom): (Double, Double, Double, Double) = (x - radius, y - radius, x + radius, y + radius)
+        let rectangle = Picture.Plane.Rectangle(llx: .init(left), lly: .init(top), urx: .init(right), ury: .init(bottom))
+        let square = Picture.Plane.Path(rectangle)
         return .fill(square, .glow(color, center: center, radius: radius, core: core))
     }
 }

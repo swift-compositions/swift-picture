@@ -18,7 +18,7 @@ extension Picture.Scene.Material.Shade.Prepared {
         let toward = shade.toward
         self.init(
             toward: toward,
-            reach: (toward[0] * toward[0] + toward[1] * toward[1] + toward[2] * toward[2]).squareRoot(),
+            reach: toward.length,
             rim: shade.rim,
             power: Swift.max(shade.sharpness, 0)
         )
@@ -29,7 +29,7 @@ extension Picture.Scene.Material.Shade.Prepared {
         guard let n = Picture.Scene.Material.Shade.facing(normal) else { return 0 + 0 }
         let cosine = reach > 0 && reach.isFinite ? Swift.max((n.0 * toward[0] + n.1 * toward[1] + n.2 * toward[2]) / reach, 0) : 0
         let edge = 1 - Swift.min(Swift.max(n.2, 0), 1)
-        let falloff = edge > 0 ? Double.exp(power * Double.log(edge)) : (power == 0 ? 1 : 0)
+        let falloff = edge > 0 ? Double.math.pow(edge, power) : (power == 0 ? 1 : 0)
         return cosine + rim * falloff
     }
 }

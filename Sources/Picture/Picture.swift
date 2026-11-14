@@ -123,15 +123,9 @@ extension Picture {
         return [kept, .layer(Layer([spread], opacity: strength, operator: .lighter))]
     }
 
-    /// The path around a rectangle.
+    /// The path around a rectangle: swift-geometry's `Path(_:radius:)` with square corners.
     static func area(_ rectangle: Plane.Rectangle) -> Plane.Path {
-        let (left, top) = (rectangle.llx.underlying, rectangle.lly.underlying)
-        let (right, bottom) = (rectangle.urx.underlying, rectangle.ury.underlying)
-        let corners: [Plane.Point<2>] = [.init([left, top]), .init([right, top]), .init([right, bottom]), .init([left, bottom])]
-        let sides = zip(corners, corners.dropFirst() + corners.prefix(1)).map { start, end in
-            Plane.Path.Segment.line(.init(start: start, end: end))
-        }
-        return Plane.Path(subpaths: [.init(startPoint: corners[0], segments: sides, isClosed: true)])
+        Plane.Path(rectangle)
     }
 }
 

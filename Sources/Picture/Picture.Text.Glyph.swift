@@ -68,7 +68,8 @@ extension Picture.Text.Glyph {
                 if let seed {
                     let cell = Threefry.Block(UInt64(bitPattern: Int64(column)), UInt64(bitPattern: Int64(row)))
                     let drawn = Threefry.block(key: seed, counter: cell)
-                    place = (Double(drawn.first >> 11) * 0x1p-53, Double(drawn.second >> 11) * 0x1p-53)
+                    let units = drawn.units(as: Double.self)
+                    place = (units.first, units.second)
                 }
                 let point = Picture.Plane.Point<2>([(Double(column) + place.across) * spacing, (Double(row) + place.down) * spacing])
                 if path.contains(point, rule: Winding.Rule.nonzero) { points.append(point) }

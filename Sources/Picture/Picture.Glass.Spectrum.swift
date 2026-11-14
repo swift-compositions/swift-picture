@@ -1,4 +1,4 @@
-import Numeric
+import Color_Standard
 public import Refraction
 
 extension Picture.Glass {
@@ -35,7 +35,8 @@ extension Picture.Glass.Spectrum {
         Refraction::Refraction.Wavelength(nanometres: 400)...Refraction::Refraction.Wavelength(nanometres: 700)
 
     /// `count` wavelengths at the midpoints of as many equal parts of `range`, each weighted by `response(at:)`
-    /// and every colour's weights divided by their sum, so a flat white is gathered back to white. One
+    /// and every colour's weights divided by their sum, so a flat white is gathered back to white:
+    /// `Color.Spectrum(sampling:count:observer:)` of swift-color-standard with the analytic observer. One
     /// wavelength (and a count below one) is the d line alone with every share 1, so a spectrum of one is the
     /// plain bend at the glass's own index.
     public init(count: Int) {
@@ -43,41 +44,23 @@ extension Picture.Glass.Spectrum {
             self.init(wavelengths: [.d], weights: [Weight(red: 1, green: 1, blue: 1)])
             return
         }
-        let low = Self.range.lowerBound.nanometres
-        let width = Self.range.upperBound.nanometres - low
-        let wavelengths = (0..<count).map {
-            Refraction::Refraction.Wavelength(nanometres: low + width * (Double($0) + 0.5) / Double(count))
-        }
-        let raw = wavelengths.map(Self.response(at:))
-        let total = raw.reduce((0.0, 0.0, 0.0)) { ($0.0 + $1.red, $0.1 + $1.green, $0.2 + $1.blue) }
-        let weights = raw.map {
-            Weight(
-                red: total.0 > 0 ? Float($0.red / total.0) : 0,
-                green: total.1 > 0 ? Float($0.green / total.1) : 0,
-                blue: total.2 > 0 ? Float($0.blue / total.2) : 0
-            )
-        }
+        let spectrum = Color_Standard::Color.Spectrum(
+            sampling: Self.range.lowerBound.nanometres...Self.range.upperBound.nanometres,
+            count: Cardinal(UInt(count)),
+            observer: .analytic
+        )
+        let wavelengths = spectrum.wavelengths.map { Refraction::Refraction.Wavelength(nanometres: $0) }
+        let weights = spectrum.weights.map { Weight(red: Float($0.red), green: Float($0.green), blue: Float($0.blue)) }
         self.init(wavelengths: wavelengths, weights: weights)
     }
 
-    /// How much a wavelength excites linear red, green and blue: the CIE 1931 colour matching functions in the
-    /// multi-lobe fit of Wyman, Sloan and Shirley (2013), taken from XYZ into linear sRGB, each held at 0 or more.
+    /// How much a wavelength excites linear red, green and blue: `Color.Spectrum.response(at:observer:)` of
+    /// swift-color-standard, the CIE 1931 colour matching functions of swift-iso-11664 in the multi-lobe fit of
+    /// Wyman, Sloan and Shirley (2013), taken from XYZ into linear sRGB, each held at 0 or more.
     public static func response(
         at wavelength: Refraction::Refraction.Wavelength<Double>
     ) -> (red: Double, green: Double, blue: Double) {
-        let wavelength = wavelength.nanometres
-        func lobe(_ mean: Double, _ below: Double, _ above: Double) -> Double {
-            let t = (wavelength - mean) / (wavelength < mean ? below : above)
-            return Double.exp(-0.5 * t * t)
-        }
-        let x = 1.056 * lobe(599.8, 37.9, 31.0) + 0.362 * lobe(442.0, 16.0, 26.7) - 0.065 * lobe(501.1, 20.4, 26.2)
-        let y = 0.821 * lobe(568.8, 46.9, 40.5) + 0.286 * lobe(530.9, 16.3, 31.1)
-        let z = 1.217 * lobe(437.0, 11.8, 36.0) + 0.681 * lobe(459.0, 26.0, 13.8)
-        return (
-            Swift.max(3.2406 * x - 1.5372 * y - 0.4986 * z, 0),
-            Swift.max(-0.9689 * x + 1.8758 * y + 0.0415 * z, 0),
-            Swift.max(0.0557 * x - 0.2040 * y + 1.0570 * z, 0)
-        )
+        Color_Standard::Color.Spectrum.response(at: wavelength.nanometres, observer: .analytic)
     }
 
     /// Pixels read at each wavelength gathered into one: each colour the weighted sum of that colour over the

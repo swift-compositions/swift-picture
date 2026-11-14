@@ -5,12 +5,13 @@ public import Standard_Library_Extensions
 /// type's stored properties by `Mirror` and fail when one is added, and each `switch` is exhaustive.
 extension Picture: Swift.Mirror.Written {
     public func write(into writer: Swift.Mirror.Writer) -> Bool {
-        guard !writer.again(elements) else { return true }
-        writer.number(UInt64(elements.count))
-        for element in elements {
-            guard element.write(into: writer) else { return false }
+        writer.shared(elements) { writer in
+            writer.number(UInt64(elements.count))
+            for element in elements {
+                guard element.write(into: writer) else { return false }
+            }
+            return true
         }
-        return true
     }
 }
 
@@ -67,14 +68,22 @@ extension Picture.Shape: Swift.Mirror.Written {
 
     /// A path: its subpaths, each its start, its segments and whether it is closed, a line segment by its ends.
     static func write(_ path: Picture.Plane.Path, into writer: Swift.Mirror.Writer) -> Bool {
-        guard !writer.again(path.subpaths) else { return true }
-        writer.number(UInt64(path.subpaths.count))
-        for subpath in path.subpaths {
-            point(subpath.startPoint, into: writer)
-            writer.number(subpath.isClosed ? 1 : 0)
-            guard !writer.again(subpath.segments) else { continue }
-            writer.number(UInt64(subpath.segments.count))
-            for segment in subpath.segments {
+        writer.shared(path.subpaths) { writer in
+            writer.number(UInt64(path.subpaths.count))
+            for subpath in path.subpaths {
+                point(subpath.startPoint, into: writer)
+                writer.number(subpath.isClosed ? 1 : 0)
+                guard write(subpath.segments, into: writer) else { return false }
+            }
+            return true
+        }
+    }
+
+    /// A subpath's segments, a line segment by its ends.
+    static func write(_ segments: [Picture.Plane.Path.Segment], into writer: Swift.Mirror.Writer) -> Bool {
+        writer.shared(segments) { writer in
+            writer.number(UInt64(segments.count))
+            for segment in segments {
                 switch segment {
                 case .line(let line):
                     writer.number(0)
@@ -94,8 +103,8 @@ extension Picture.Shape: Swift.Mirror.Written {
                     guard writer.write(arc) else { return false }
                 }
             }
+            return true
         }
-        return true
     }
 
     /// A point of the plane, by its two coordinates.
