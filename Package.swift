@@ -146,7 +146,8 @@ let package = Package(
         .testTarget(
             name: "Picture PNG Integration Tests",
             dependencies: [
-                .target(name: "Picture PNG Integration")
+                .target(name: "Picture PNG Integration"),
+                .product(name: "IEC 61966", package: "swift-iec-61966"),
             ]
         ),
     ],
