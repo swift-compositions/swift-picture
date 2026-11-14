@@ -10,6 +10,18 @@ extension `Picture CPU Tests` {
 
     static let renderer = Picture.Renderer.cpu
 
+    /// The pixels an image holds; none for an image that is still a drawing.
+    static func raster(of image: Picture.Image) -> Raster<Picture.Pixel> {
+        guard case .pixels(let raster) = image.content else { return Raster(width: .zero, height: .zero, repeating: .transparent) }
+        return raster
+    }
+
+    /// The source of an image that is still a drawing, nil for one that holds its pixels.
+    static func source(of image: Picture.Image) -> Picture.Image.Source? {
+        guard case .drawing(let source) = image.content else { return nil }
+        return source
+    }
+
     static func at(_ x: Double, _ y: Double) -> Picture.Plane.Point<2> { .init([x, y]) }
 
     static func pixel(_ red: Float, _ green: Float, _ blue: Float, _ alpha: Float) -> Pixel {

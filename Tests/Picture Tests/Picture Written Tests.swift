@@ -33,7 +33,7 @@ import Testing
         #expect(Self.labels(Self.corners[0]) == ["position"])
         #expect(Self.labels(Picture.Color.white) == ["red", "green", "blue", "alpha"])
         let tile = Raster<Picture.Pixel>(width: 2, height: 2, repeating: .transparent)
-        #expect(Self.labels(Picture.Image(tile)) == ["held", "placement", "sampling", "edge", "source"])
+        #expect(Self.labels(Picture.Image(tile)) == ["stored", "placement", "sampling", "edge"])
         #expect(Self.labels(Picture.Gradient([.init(offset: 0, color: .white)])) == ["stops", "ramp"])
         #expect(Self.labels(Picture.Gradient.Stop(offset: 0, color: .white)) == ["offset", "color"])
         #expect(Self.labels(tile) == ["width", "height", "storage"])

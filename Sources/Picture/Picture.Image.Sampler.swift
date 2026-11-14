@@ -24,7 +24,11 @@ extension Picture.Image {
 
         public init(_ image: Picture.Image) {
             self.image = image
-            self.raster = image.raster
+            if case .pixels(let held) = image.stored {
+                self.raster = held.raster
+            } else {
+                self.raster = Raster(width: .zero, height: .zero, repeating: .transparent)
+            }
             let placement = image.placement
             if placement[2, 0] == 0, placement[2, 1] == 0, placement[2, 2] == 1 {
                 let map = Picture.Transform(rows: [
@@ -48,7 +52,7 @@ extension Picture.Image {
                 }
             }
             self.flat = affine != nil
-            self.reads = image.source == nil && inverse != nil
+            if case .pixels = image.stored { self.reads = inverse != nil } else { self.reads = false }
             let matrix = inverse ?? .identity
             var entries = InlineArray<9, Double>(repeating: 0)
             for row in 0..<3 {
@@ -66,11 +70,6 @@ extension Picture.Image {
             self.entries = entries
         }
     }
-}
-
-extension Picture.Image {
-    /// This image made ready to be read many times.
-    public var sampler: Sampler { Sampler(self) }
 }
 
 extension Picture.Image.Sampler {

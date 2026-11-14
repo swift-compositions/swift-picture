@@ -55,7 +55,7 @@ extension Picture.Renderer.CPU.Store {
         var keys: [Key] = []
         var order: [Int] = []
         Picture.Renderer.CPU.images(of: picture) { image in
-            guard let source = image.source else { return }
+            guard case .drawing(let source) = image.content else { return }
             let key = Key(source)
             if let place = places[key] {
                 order.append(place)
@@ -108,10 +108,9 @@ extension Picture.Renderer.CPU.Store {
         }
         var next = 0
         return Picture.Renderer.CPU.mapped(picture) { image in
-            guard image.source != nil else { return image }
+            guard case .drawing = image.content else { return image }
             var drawn = image
-            if let raster = rasters[order[next]] { drawn.raster = raster }
-            drawn.source = nil
+            drawn.content = .pixels(rasters[order[next]] ?? Raster(width: .zero, height: .zero, repeating: .transparent))
             next += 1
             return drawn
         }
@@ -124,7 +123,7 @@ extension Picture.Renderer.CPU.Store {
     static func sources(of picture: Picture, into named: inout Set<Key>) {
         var found: [Picture.Image.Source] = []
         Picture.Renderer.CPU.images(of: picture) { image in
-            if let source = image.source { found.append(source) }
+            if case .drawing(let source) = image.content { found.append(source) }
         }
         for source in found where named.insert(Key(source)).inserted {
             for inner in source.pictures {

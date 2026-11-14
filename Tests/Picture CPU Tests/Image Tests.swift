@@ -24,10 +24,10 @@ extension `Picture CPU Tests`.`A picture kept as an image shows the picture wher
     func `At scale one its raster is the picture's own pixels inside the rectangle`() throws {
         let whole = try Tests.drawn(Self.picture, on: Tests.canvas(9, 7))
         let image = try Picture.Image(Self.picture, in: Self.part(2, 1, 5, 4), scale: 1, through: Tests.renderer)
-        #expect(image.raster.width == 5)
-        #expect(image.raster.height == 4)
+        #expect(Tests.raster(of: image).width == 5)
+        #expect(Tests.raster(of: image).height == 4)
         for (x, y) in Tests.positions(5, 4) {
-            #expect(Tests.close(Tests.at(image.raster, x, y), Tests.at(whole, x + 2, y + 1)))
+            #expect(Tests.close(Tests.at(Tests.raster(of: image), x, y), Tests.at(whole, x + 2, y + 1)))
         }
     }
 
@@ -47,7 +47,7 @@ extension `Picture CPU Tests`.`A picture kept as an image shows the picture wher
     func `At a larger scale it is the picture drawn that much larger`() throws {
         let image = try Picture.Image(Self.picture, in: Self.part(2, 1, 5, 4), scale: 3, through: Tests.renderer)
         let enlarged: Picture = [.group(.init(Self.picture, transform: .init(rows: [[3, 0, -6], [0, 3, -3]])))]
-        #expect(image.raster == (try Tests.drawn(enlarged, on: Tests.canvas(15, 12))))
+        #expect(Tests.raster(of: image) == (try Tests.drawn(enlarged, on: Tests.canvas(15, 12))))
         #expect(image.placement == Matrix<3, 3, Double>(Picture.Transform(rows: [[1.0 / 3, 0, 2], [0, 1.0 / 3, 1]])))
     }
 
@@ -56,14 +56,14 @@ extension `Picture CPU Tests`.`A picture kept as an image shows the picture wher
         let image = try Picture.Image(Self.picture, in: Self.part(2, 1, 5, 4), scale: 1, samples: 2, through: Tests.renderer)
         let fine = try Picture.Image(Self.picture, in: Self.part(2, 1, 5, 4), scale: 2, through: Tests.renderer)
         for (x, y) in Tests.positions(5, 4) {
-            let four = [(0, 0), (1, 0), (0, 1), (1, 1)].map { Tests.at(fine.raster, 2 * x + UInt($0.0), 2 * y + UInt($0.1)) }
+            let four = [(0, 0), (1, 0), (0, 1), (1, 1)].map { Tests.at(Tests.raster(of: fine), 2 * x + UInt($0.0), 2 * y + UInt($0.1)) }
             let mean = Tests.pixel(
                 four.reduce(0) { $0 + $1.color.red } / 4,
                 four.reduce(0) { $0 + $1.color.green } / 4,
                 four.reduce(0) { $0 + $1.color.blue } / 4,
                 four.reduce(0) { $0 + $1.alpha } / 4
             )
-            #expect(Tests.close(Tests.at(image.raster, x, y), mean))
+            #expect(Tests.close(Tests.at(Tests.raster(of: image), x, y), mean))
         }
     }
 
@@ -72,9 +72,9 @@ extension `Picture CPU Tests`.`A picture kept as an image shows the picture wher
         let white = Picture.Color(red: 1, green: 1, blue: 1)
         let speck: Picture = [.sprites(.init([.init(center: Tests.at(1.02, 1.02), radius: 0.2, color: white)], profile: .hard))]
         let coarse = try Picture.Image(speck, in: Self.part(0, 0, 2, 2), scale: 1, through: Tests.renderer)
-        #expect(coarse.raster.pixels.allSatisfy { $0 == .transparent })
+        #expect(Tests.raster(of: coarse).pixels.allSatisfy { $0 == .transparent })
         let fine = try Picture.Image(speck, in: Self.part(0, 0, 2, 2), scale: 1, samples: 8, through: Tests.renderer)
-        #expect(fine.raster.pixels.reduce(0) { $0 + $1.alpha } > 0.05)
+        #expect(Tests.raster(of: fine).pixels.reduce(0) { $0 + $1.alpha } > 0.05)
     }
 
     @Test

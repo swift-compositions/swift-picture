@@ -23,12 +23,12 @@ extension `Picture Tests`.`A picture kept as an image is drawn once, at a scale,
     @Test
     func `The raster has scale pixels to a unit, rounded up, and starts transparent`() throws {
         let image = try Picture.Image([Tests.shape(4, .white)], in: Self.rectangle(3, -2, 2.5, 1), scale: 4, through: Self.stub)
-        #expect(image.raster.width == 10)
-        #expect(image.raster.height == 4)
-        #expect(image.raster.pixels.allSatisfy { $0 == Self.grey })
+        #expect(Tests.raster(of: image).width == 10)
+        #expect(Tests.raster(of: image).height == 4)
+        #expect(Tests.raster(of: image).pixels.allSatisfy { $0 == Self.grey })
         let ragged = try Picture.Image(.empty, in: Self.rectangle(0, 0, 2.1, 0.2), scale: 3, through: Self.stub)
-        #expect(ragged.raster.width == 7)
-        #expect(ragged.raster.height == 1)
+        #expect(Tests.raster(of: ragged).width == 7)
+        #expect(Tests.raster(of: ragged).height == 1)
     }
 
     @Test
@@ -45,9 +45,9 @@ extension `Picture Tests`.`A picture kept as an image is drawn once, at a scale,
     @Test
     func `Samples do not change the raster's size`() throws {
         let image = try Picture.Image(.empty, in: Self.rectangle(0, 0, 5, 3), scale: 2, samples: 3, through: Self.stub)
-        #expect(image.raster.width == 10)
-        #expect(image.raster.height == 6)
-        #expect(image.raster.pixels.allSatisfy { Tests.close($0, Self.grey) })
+        #expect(Tests.raster(of: image).width == 10)
+        #expect(Tests.raster(of: image).height == 6)
+        #expect(Tests.raster(of: image).pixels.allSatisfy { Tests.close($0, Self.grey) })
     }
 
     @Test
@@ -67,14 +67,14 @@ extension `Picture Tests`.`A picture kept as an image is drawn once, at a scale,
     func `An image made without a renderer names its picture, stands where the drawn one will, and paints nothing yet`() throws {
         let picture: Picture = [Tests.shape(4, .white)]
         let named = Picture.Image(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2, sampling: .nearest, edge: .extend)
-        #expect(named.source == Picture.Image.Source(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2))
-        #expect(named.raster.isEmpty)
+        #expect(Tests.source(of: named) == Picture.Image.Source(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2))
+        #expect(Tests.raster(of: named).isEmpty)
         #expect(named.placement == Matrix<3, 3, Double>(Picture.Transform(rows: [[0.25, 0, 3], [0, 0.25, -2]])))
         #expect(named.pixel(at: Tests.at(4, -1.5)) == .transparent)
         let drawn = try named.drawn(through: Self.stub)
         #expect(drawn == (try Picture.Image(picture, in: Self.rectangle(3, -2, 2.5, 1), scale: 4, samples: 2, sampling: .nearest, edge: .extend, through: Self.stub)))
-        #expect(drawn.source == nil)
-        #expect(drawn.raster.width == 10)
+        #expect(Tests.source(of: drawn) == nil)
+        #expect(Tests.raster(of: drawn).width == 10)
         #expect(try drawn.drawn(through: .absent) == drawn)
         #expect(throws: Picture.Renderer.Error.absent) { try named.drawn(through: .absent) }
     }

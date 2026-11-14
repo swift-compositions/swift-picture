@@ -142,9 +142,18 @@ extension Picture.Paint: Swift.Mirror.Written {
 
 extension Picture.Image: Swift.Mirror.Written {
     public func write(into writer: Swift.Mirror.Writer) -> Bool {
-        writer.number(UInt64(Int(clamping: raster.width)))
-        writer.number(UInt64(Int(clamping: raster.height)))
-        guard writer.write(raster.pixels), writer.write(placement), writer.write(sampling) else { return false }
+        switch stored {
+        case .pixels(let held):
+            writer.number(0)
+            writer.number(UInt64(Int(clamping: held.raster.width)))
+            writer.number(UInt64(Int(clamping: held.raster.height)))
+            guard writer.write(held.raster.pixels) else { return false }
+
+        case .drawing(let source):
+            writer.number(1)
+            guard writer.write(source) else { return false }
+        }
+        guard writer.write(placement), writer.write(sampling) else { return false }
         switch edge {
         case .extend: writer.number(0)
         case .wrap: writer.number(1)
@@ -154,12 +163,7 @@ extension Picture.Image: Swift.Mirror.Written {
             writer.number(3)
             guard writer.write(pixel) else { return false }
         }
-        guard let source else {
-            writer.number(0)
-            return true
-        }
-        writer.number(1)
-        return writer.write(source)
+        return true
     }
 }
 

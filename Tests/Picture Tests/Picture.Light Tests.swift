@@ -143,13 +143,13 @@ extension `Picture Tests`.`Light falls off, is kept above a threshold, and a gra
 
     @Test
     func `A ramp's place is where pixel reads between its stops`() {
-        let ramp = Picture.Gradient([.init(offset: 0.2, color: .black), .init(offset: 0.6, color: .white)]).ramp
+        let ramp = Picture.Gradient.Ramp(Picture.Gradient([.init(offset: 0.2, color: .black), .init(offset: 0.6, color: .white)]))
         let before = ramp.place(of: 0)
         #expect(before?.from == 0 && before?.to == 0 && before?.fraction == 0)
         let between = ramp.place(of: 0.4)
         #expect(between?.from == 0 && between?.to == 1 && Tests.close(between?.fraction ?? 0, 0.5))
         let after = ramp.place(of: 0.6)
         #expect(after?.from == 1 && after?.to == 1 && after?.fraction == 0)
-        #expect(Picture.Gradient([]).ramp.place(of: 0.5) == nil)
+        #expect(Picture.Gradient.Ramp(Picture.Gradient([])).place(of: 0.5) == nil)
     }
 }

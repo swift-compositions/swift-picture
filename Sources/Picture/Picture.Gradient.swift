@@ -6,7 +6,7 @@ extension Picture {
         }
 
         /// The stops made ready to be read many times, made when the stops are set.
-        public private(set) var ramp: Ramp
+        private(set) var ramp: Ramp
 
         public init(_ stops: [Stop]) {
             self.stops = stops
@@ -35,7 +35,7 @@ extension Picture.Gradient {
 }
 
 extension Picture.Gradient {
-    /// The pixel at a parameter, read from the `ramp`, which takes the stops' colours out of sRGB once.
+    /// The pixel at a parameter, read from its `Ramp`, which takes the stops' colours out of sRGB once.
     public func pixel(at parameter: Float) -> Picture.Pixel {
         ramp.pixel(at: parameter)
     }

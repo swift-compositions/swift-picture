@@ -93,8 +93,8 @@ extension `Picture CPU Tests`.`Building a picture draws nothing: a renderer draw
         #expect(image == copy && image == apart)
         #expect(image.hashValue == copy.hashValue && image.hashValue == apart.hashValue)
         var changed = apart
-        changed.raster = Raster(width: 40, height: 30, repeating: Picture.Color(red: 0.2, green: 0.6, blue: 0.8).pixel)
+        changed.content = .pixels(Raster(width: 40, height: 30, repeating: Picture.Color(red: 0.2, green: 0.6, blue: 0.8).pixel))
         #expect(changed != image)
-        #expect(changed.raster != image.raster)
+        #expect(Tests.raster(of: changed) != Tests.raster(of: image))
     }
 }

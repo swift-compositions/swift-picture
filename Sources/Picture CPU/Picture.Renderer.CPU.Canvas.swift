@@ -261,7 +261,7 @@ extension Picture.Renderer.CPU.Canvas {
                     painted { _, _ in pixel }
 
                 case .linear(let linear):
-                    let ramp = linear.gradient.ramp
+                    let ramp = Picture.Gradient.Ramp(linear.gradient)
                     let start = (linear.start[0], linear.start[1])
                     let across = linear.end[0] - linear.start[0]
                     let down = linear.end[1] - linear.start[1]
@@ -279,7 +279,7 @@ extension Picture.Renderer.CPU.Canvas {
                     }
 
                 case .radial(let radial):
-                    let ramp = radial.gradient.ramp
+                    let ramp = Picture.Gradient.Ramp(radial.gradient)
                     let radius = radial.radius
                     guard radius > 0 else {
                         let pixel = ramp.pixel(at: Float(0.0))
@@ -296,7 +296,7 @@ extension Picture.Renderer.CPU.Canvas {
                     }
 
                 case .image(let image):
-                    let sampler = image.sampler
+                    let sampler = Picture.Image.Sampler(image)
                     painted { x, y in sampler.pixel(at: map.point(x, y)) }
                 }
             }

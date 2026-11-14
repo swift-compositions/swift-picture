@@ -69,7 +69,7 @@ extension Picture.Renderer.CPU.Stage {
 
             case .shaded(let shade):
                 let ramp = ramps.count
-                ramps.append(shade.ramp.ramp)
+                ramps.append(Picture.Gradient.Ramp(shade.ramp))
                 let prepared = Picture.Scene.Material.Shade.Prepared(shade)
                 for face in mesh.faces {
                     let polygon = Self.clipped(face.vertices.map { corners[Int(bitPattern: $0)] })

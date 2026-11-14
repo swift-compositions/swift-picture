@@ -31,7 +31,7 @@ extension `Picture CPU Tests`.`The CPU renderer keeps, refuses and draws back as
         let count = Deferred.Count()
         func key(_ level: Float) throws -> Picture.Renderer.CPU.Store.Key {
             let image = Picture.Image(Deferred.Counted(level: level, count: count), placement: Picture.Transform.identity)
-            return Picture.Renderer.CPU.Store.Key(try #require(image.source))
+            return Picture.Renderer.CPU.Store.Key(try #require(Tests.source(of: image)))
         }
         let raster = Raster(width: 6, height: 5, repeating: Picture.Pixel.transparent)
         let store = Picture.Renderer.CPU.Store(bound: 70)

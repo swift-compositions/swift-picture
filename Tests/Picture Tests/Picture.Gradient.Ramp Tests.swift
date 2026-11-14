@@ -45,7 +45,7 @@ extension `Picture Tests`.`A gradient's ramp reads as the gradient does` {
     func `At every parameter the ramp, and the gradient through it, give the stops' pixels mixed as the law says, bit for bit`() {
         let parameters: [Float] = (-8...40).map { Float($0) / 32 } + [0.1, 0.4, 0.5, 0.9, .nan, .infinity, -.infinity]
         for gradient in Self.gradients {
-            let ramp = gradient.ramp
+            let ramp = Picture.Gradient.Ramp(gradient)
             #expect(ramp.offsets == gradient.stops.map(\.offset))
             #expect(ramp.pixels == gradient.stops.map(\.color.pixel))
             for parameter in parameters {
@@ -59,7 +59,7 @@ extension `Picture Tests`.`A gradient's ramp reads as the gradient does` {
     /// The law of `Picture.Gradient.color(at:)` as it was written before the ramp was kept: a ramp made afresh
     /// from the stops at every call.
     static func color(_ gradient: Picture.Gradient, at parameter: Float) -> Picture.Color {
-        var ramp = Picture.Gradient([]).ramp
+        var ramp = Picture.Gradient.Ramp(Picture.Gradient([]))
         ramp.offsets = gradient.stops.map(\.offset)
         ramp.pixels = gradient.stops.map(\.color.pixel)
         guard let place = ramp.place(of: parameter) else { return .clear }
@@ -79,9 +79,8 @@ extension `Picture Tests`.`A gradient's ramp reads as the gradient does` {
         }
         var changed = Self.gradients[2]
         changed.stops.append(.init(offset: 1, color: .init(red: 1, green: 0, blue: 0)))
-        #expect(changed.ramp.offsets == changed.stops.map(\.offset))
-        #expect(changed.ramp.pixels == changed.stops.map(\.color.pixel))
-        #expect(changed.ramp == Picture.Gradient.Ramp(changed))
+        #expect(Picture.Gradient.Ramp(changed).offsets == changed.stops.map(\.offset))
+        #expect(Picture.Gradient.Ramp(changed).pixels == changed.stops.map(\.color.pixel))
         #expect(changed != Self.gradients[2])
     }
 }

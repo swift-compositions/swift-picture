@@ -114,7 +114,7 @@ import Testing
             // Written by an earlier run, at the store's format 4: the image's source keeps a `Hasher` value that differs per process,
             // which its canonical value, the part it names, leaves out.
             let hex = try Self.key(store, picture).hex
-            #expect(hex == "ea9a6456f6aa863c21faa206e27996f90dd9cbfd434fc885cb51faab1b4e80f3")
+            #expect(hex == "7dfe475a5d0f87ad29473296f66eda49d0d61e842e255ce3c45a46611ab58370")
         }
 
         @Test func `processes keeping one entry at once leave one whole entry`() async throws {

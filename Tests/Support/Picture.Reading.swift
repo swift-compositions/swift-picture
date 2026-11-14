@@ -106,7 +106,7 @@ extension Picture.Reading {
 
             case .image(let image):
                 alpha = 1
-                if let part = image.source?.drawing(as: Picture.Image.Part.self) {
+                if case .drawing(let source) = image.content, let part = source.drawing(as: Picture.Image.Part.self) {
                     walk(part.picture, transform, opacity: opacity, into: &placed)
                 }
 
