@@ -14,9 +14,19 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
     typealias Glass = Picture.Glass
 
     /// An orthographic camera over x −2…2 and y −2…2 into a viewport of 40 × 40, depth 0 at z 0 and 1 at z −10.
-    static func flat(_ models: [Picture.Scene.Model]) throws -> Picture.Scene {
+    static func flat(
+        _ models: [Picture.Scene.Model],
+        surroundings: Glass.Surroundings? = nil,
+        shadows: [Glass.Shadow] = []
+    ) throws -> Picture.Scene {
         let projection = try Projection<Double>.orthographic(width: 4, height: 4, near: 0, far: 10, depth: .unit)
-        return Picture.Scene(camera: .init(projection: projection), viewport: .init(llx: 0, lly: 0, urx: 40, ury: 40), models: models)
+        return Picture.Scene(
+            camera: .init(projection: projection),
+            viewport: .init(llx: 0, lly: 0, urx: 40, ury: 40),
+            models: models,
+            surroundings: surroundings,
+            shadows: shadows
+        )
     }
 
     /// A perspective camera, near plane at 1, a window of −1…1 there, into a viewport of 40 × 40.
@@ -30,12 +40,12 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
     }
 
     /// A ball of radius 1.5 five units in front of the eye: fifteen pixels of radius around (20, 20).
-    static func ball(_ glass: Glass) -> Picture.Scene.Model {
-        Picture.Scene.Model(.sphere(radius: 1.5, meridians: 48, parallels: 24), transform: translation(0, 0, -5), material: .glass(glass))
+    static func ball(_ glass: Glass, distance: Double = 1) -> Picture.Scene.Model {
+        Picture.Scene.Model(.sphere(radius: 1.5, meridians: 48, parallels: 24), transform: translation(0, 0, -5), material: .glass(glass, distance: distance))
     }
 
     /// Two squares of side 3 facing each other across a slab one unit thick, the near one at z −4.
-    static func slab(_ glass: Glass) throws -> Picture.Scene.Model {
+    static func slab(_ glass: Glass, distance: Double = 1) throws -> Picture.Scene.Model {
         let h = 1.5
         let mesh = try Mesh(
             vertices: [
@@ -44,7 +54,7 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
             ],
             faces: [Polygon(0, 1, 2, 3), Polygon(4, 5, 6, 7)]
         )
-        return Picture.Scene.Model(mesh, material: .glass(glass))
+        return Picture.Scene.Model(mesh, material: .glass(glass, distance: distance))
     }
 
     /// Red on the left half and blue on the right, behind everything.
@@ -62,7 +72,7 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         )
         let background: [Picture.Element] = [.shape(.init(Tests.rectangle(-20, -20, 80, 80), fill: .init(gradient)))]
         let plain = try Tests.drawn(Picture(background), on: Tests.canvas(40, 40))
-        let slab = try Self.slab(.init(bend: 30, refraction: .init(index: 1.5, distance: 3)))
+        let slab = try Self.slab(.init(.body(.init(index: 1.5))), distance: 3)
         #expect(Tests.close(try Tests.drawn(Picture(background + [.scene(try Self.flat([slab]))]), on: Tests.canvas(40, 40)), plain, within: 1e-4))
         // Through a lens that converges, only the line of sight down the middle meets the slab head-on.
         let deep = try Tests.drawn(Picture(background + [.scene(try Self.deep([slab]))]), on: Tests.canvas(40, 40))
@@ -70,19 +80,19 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         #expect(Tests.close(Tests.at(deep, 20, 20), Tests.at(plain, 20, 20), within: 2e-3))
         #expect(!Tests.close(Tests.at(deep, 26, 20), Tests.at(plain, 26, 20), within: 2e-3))
         // A ball's rim covers part of a pixel, whose mean is then not the gradient's at its middle.
-        let ball = Self.ball(.init(bend: 30, refraction: .init(index: 1, distance: 3)))
+        let ball = Self.ball(.init(.body(.init(index: 1))), distance: 3)
         let through = try Tests.drawn(Picture(background + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
         #expect(Tests.close(through, plain, within: 0.02))
         for (x, y): (UInt, UInt) in [(20, 20), (10, 20), (29, 20), (20, 9), (26, 27)] {
             #expect(Tests.close(Tests.at(through, x, y), Tests.at(plain, x, y), within: 1e-4))
         }
-        let bent = Self.ball(.init(bend: 30, refraction: .init(index: 1.5, distance: 3)))
+        let bent = Self.ball(.init(.body(.init(index: 1.5))), distance: 3)
         #expect(!Tests.close(try Tests.drawn(Picture(background + [.scene(try Self.flat([bent]))]), on: Tests.canvas(40, 40)), plain, within: 0.02))
     }
 
     @Test
     func `A ball turns the picture behind it over when the picture is far behind, and not when it is near`() throws {
-        let ball = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: 40)))
+        let ball = Self.ball(.init(.body(.init(index: 1.5))), distance: 40)
         let raster = try Tests.drawn(Picture(Self.halves + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
         for y: UInt in [16, 20, 24] {
             #expect(Tests.close(Tests.at(raster, 14, y), Tests.blue.pixel, within: 1e-3))
@@ -90,7 +100,7 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         }
         #expect(Tests.at(raster, 2, 20) == Tests.red.pixel)
         #expect(Tests.at(raster, 37, 20) == Tests.blue.pixel)
-        let near = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: 0)))
+        let near = Self.ball(.init(.body(.init(index: 1.5))), distance: 0)
         let upright = try Tests.drawn(Picture(Self.halves + [.scene(try Self.flat([near]))]), on: Tests.canvas(40, 40))
         #expect(Tests.close(Tests.at(upright, 14, 20), Tests.red.pixel, within: 1e-3))
         #expect(Tests.close(Tests.at(upright, 25, 20), Tests.blue.pixel, within: 1e-3))
@@ -99,11 +109,11 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
     @Test
     func `A body takes the same line along its silhouette and the same shadow outside it as a pane`() throws {
         let black: [Picture.Element] = [Tests.fill(Tests.rectangle(-40, -40, 120, 120), Picture.Color(gray: 0.5))]
-        var glass = Glass(refraction: .init(index: 1))
+        var glass = Glass(.body(.init(index: 1)))
         let plain = try Tests.drawn(Picture(black + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
         glass.light = .init(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, rim: 1, width: 1, counter: 1, focus: 2)
-        glass.shadows = [.init(color: .init(red: 0, green: 0, blue: 0, alpha: 0.8), softness: 2, x: 0, y: 0)]
-        let lit = try Tests.drawn(Picture(black + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
+        let shadows: [Glass.Shadow] = [.init(color: .init(red: 0, green: 0, blue: 0, alpha: 0.8), softness: 2, offset: Vector([0, 0]))]
+        let lit = try Tests.drawn(Picture(black + [.scene(try Self.flat([Self.ball(glass)], shadows: shadows))]), on: Tests.canvas(40, 40))
         // The ball's top is at y 5 and its bottom at y 35; its middle is untouched by line or shadow.
         #expect(Tests.at(lit, 20, 5).color.red > Tests.at(plain, 20, 5).color.red + 0.1)
         #expect(Tests.at(lit, 20, 34).color.red > Tests.at(plain, 20, 34).color.red + 0.1)
@@ -120,13 +130,13 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         func drawn(_ glass: Glass) throws -> Tests.Canvas {
             try Tests.drawn(Picture(stripes + [.scene(try Self.flat([Self.ball(glass)]))]), on: Tests.canvas(40, 40))
         }
-        let clear = try drawn(.init(refraction: .init(index: 1)))
-        let frosted = try drawn(.init(refraction: .init(index: 1), frost: 3))
+        let clear = try drawn(.init(.body(.init(index: 1))))
+        let frosted = try drawn(.init(.body(.init(index: 1)), frost: 3))
         let sharp = (17..<23).map { Tests.at(clear, UInt($0), 20).color.red }
         let soft = (17..<23).map { Tests.at(frosted, UInt($0), 20).color.red }
         #expect(sharp.max()! - sharp.min()! > 0.7)
         #expect(soft.max()! - soft.min()! < 0.2)
-        let lifted = try drawn(.init(refraction: .init(index: 1), frost: 3, adaptation: .init(toward: .white, strength: 0.5)))
+        let lifted = try drawn(.init(.body(.init(index: 1)), frost: 3, adaptation: .init(toward: .white, strength: 0.5)))
         #expect(Tests.at(lifted, 20, 20).color.red > Tests.at(frosted, 20, 20).color.red)
     }
 
@@ -137,7 +147,7 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
             Tests.fill(Tests.rectangle(18, -40, 4, 120), .white),
         ]
         func drawn(_ abbe: Double, over picture: [Picture.Element]) throws -> Tests.Canvas {
-            let ball = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: 40, abbe: abbe)))
+            let ball = Self.ball(.init(.body(.init(index: 1.5, abbe: abbe))), distance: 40)
             return try Tests.drawn(Picture(picture + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
         }
         let one = try drawn(.infinity, over: stripes)
@@ -155,7 +165,7 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
     @Test
     func `The tint deepens with the path through the body, one coat across its thickness`() throws {
         let tint = Picture.Color(red: 1, green: 0, blue: 0, alpha: 0.3)
-        let ball = Self.ball(.init(bend: 0, tint: tint, refraction: .init(index: 1, distance: 1)))
+        let ball = Self.ball(.init(.body(.init(index: 1)), tint: tint), distance: 1)
         let raster = try Tests.drawn([Tests.fill(Tests.rectangle(-40, -40, 120, 120), .white), .scene(try Self.flat([ball]))], on: Tests.canvas(40, 40))
         func taken(_ length: Double) -> Picture.Pixel {
             var deep = tint
@@ -172,15 +182,15 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
     @Test
     func `The rim shows the surroundings turned over, as a ball shows everything, and the middle the picture behind`() throws {
         let around = Glass.Surroundings(above: .white, below: .black, width: 1)
-        let ball = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: 4, surroundings: around)))
+        let ball = Self.ball(.init(.body(.init(index: 1.5))), distance: 4)
         let background = Tests.fill(Tests.rectangle(-40, -40, 120, 120), Picture.Color(red: 0.5, green: 0.5, blue: 0.5))
-        let raster = try Tests.drawn([background, .scene(try Self.flat([ball]))], on: Tests.canvas(40, 40))
+        let raster = try Tests.drawn([background, .scene(try Self.flat([ball], surroundings: around))], on: Tests.canvas(40, 40))
         let behind = Picture.Color(red: 0.5, green: 0.5, blue: 0.5).pixel
         let middle = Tests.at(raster, 20, 20)
         #expect(abs(middle.color.green - behind.color.green) < 0.05)
         #expect(Tests.at(raster, 20, 6).color.green < behind.color.green - 0.05)
         #expect(Tests.at(raster, 20, 33).color.green > behind.color.green + 0.2)
-        let bare = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: 4)))
+        let bare = Self.ball(.init(.body(.init(index: 1.5))), distance: 4)
         let plain = try Tests.drawn([background, .scene(try Self.flat([bare]))], on: Tests.canvas(40, 40))
         #expect(Tests.close(plain, try Tests.drawn([background], on: Tests.canvas(40, 40)), within: 1e-4))
     }
@@ -192,7 +202,7 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
             Tests.fill(Tests.rectangle(21, -40, 1, 120), .white),
         ]
         func lit(_ distance: Double) throws -> [UInt] {
-            let ball = Self.ball(.init(bend: 0, refraction: .init(index: 1.5, distance: distance)))
+            let ball = Self.ball(.init(.body(.init(index: 1.5))), distance: distance)
             let raster = try Tests.drawn(Picture(line + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
             return (8..<33).map(UInt.init).filter { Tests.at(raster, $0, 20).color.red > 0.25 }
         }
@@ -212,13 +222,13 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
             .init(from: Tests.at(0, 0), to: Tests.at(40, 10), .init([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.blue)]))
         )
         let background: [Picture.Element] = [.shape(.init(Tests.rectangle(-20, -20, 80, 80), fill: .init(gradient)))]
-        let glass = Glass(bend: 0, refraction: .init(index: 1.5, distance: 6, abbe: 30))
-        let small = try Self.flat([Self.ball(glass)])
+        let glass = Glass(.body(.init(index: 1.5, abbe: 30)))
+        let small = try Self.flat([Self.ball(glass, distance: 6)])
         let projection = try Projection<Double>.orthographic(width: 40, height: 40, near: 0, far: 100, depth: .unit)
         let large = Picture.Scene(
             camera: .init(projection: projection),
             viewport: .init(llx: 0, lly: 0, urx: 40, ury: 40),
-            models: [Picture.Scene.Model(.sphere(radius: 15, meridians: 48, parallels: 24), transform: Self.translation(0, 0, -50), material: .glass(glass))]
+            models: [Picture.Scene.Model(.sphere(radius: 15, meridians: 48, parallels: 24), transform: Self.translation(0, 0, -50), material: .glass(glass, distance: 6))]
         )
         let a = try Tests.drawn(Picture(background + [.scene(small)]), on: Tests.canvas(40, 40))
         let b = try Tests.drawn(Picture(background + [.scene(large)]), on: Tests.canvas(40, 40))
@@ -235,12 +245,16 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         )
         let background: [Picture.Element] = [.shape(.init(Tests.rectangle(-20, -20, 80, 80), fill: .init(gradient)))]
         for distance in [0.0, 3, 40] {
-            let refraction = Glass.Refraction(index: 1.5, distance: distance, abbe: .infinity)
-            let fine = Picture.Scene.Model(.sphere(radius: 1.5, meridians: 192, parallels: 96), transform: Self.translation(0, 0, -5), material: .glass(.init(refraction: refraction)))
+            let body = Glass.Body(index: 1.5, abbe: .infinity)
+            let fine = Picture.Scene.Model(
+                .sphere(radius: 1.5, meridians: 192, parallels: 96),
+                transform: Self.translation(0, 0, -5),
+                material: .glass(.init(.body(body)), distance: distance)
+            )
             let raster = try Tests.drawn(Picture(background + [.scene(try Self.flat([fine]))]), on: Tests.canvas(40, 40))
             func read(_ x: UInt) -> Double { 40 * Double(Tests.at(raster, x, 19).color.blue + Tests.at(raster, x, 20).color.blue) / 2 }
             let seen = 5 / (read(22) - read(17))
-            let law = refraction.enlargement(radius: 15)
+            let law = body.enlargement(radius: 15, distance: distance)
             // The law is paraxial; a read 2.5 pixels off the axis of a ball 15 pixels in radius bends a few per cent more.
             #expect(abs(seen - law) <= 0.1 * abs(law), "distance \(distance): drawn \(seen), law \(law)")
         }
@@ -260,16 +274,16 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
         let background: [Picture.Element] = [.shape(.init(Tests.rectangle(-20, -20, 80, 80), fill: .init(gradient)))]
         for (meridians, parallels): (Cardinal, Cardinal) in [(48, 24), (24, 12)] {
             for distance in [0.0, 3, 40] {
-                let refraction = Glass.Refraction(index: 1.5, distance: distance, abbe: .infinity)
+                let body = Glass.Body(index: 1.5, abbe: .infinity)
                 let ball = Picture.Scene.Model(
                     .sphere(radius: 1.5, meridians: meridians, parallels: parallels),
                     transform: Self.translation(0, 0, -5),
-                    material: .glass(.init(refraction: refraction))
+                    material: .glass(.init(.body(body)), distance: distance)
                 )
                 let raster = try Tests.drawn(Picture(background + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
                 func read(_ x: UInt) -> Double { 40 * Double(Tests.at(raster, x, 19).color.blue + Tests.at(raster, x, 20).color.blue) / 2 }
                 let seen = 1 / (read(20) - read(19))
-                let law = refraction.enlargement(radius: 15)
+                let law = body.enlargement(radius: 15, distance: distance)
                 #expect(abs(seen - law) <= 0.03 * abs(law), "\(meridians) × \(parallels), distance \(distance): drawn \(seen), law \(law)")
             }
         }

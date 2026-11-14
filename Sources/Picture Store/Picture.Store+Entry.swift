@@ -68,9 +68,9 @@
 
     extension Picture.Store {
         /// The store's format, which keys and entries begin with: raised whenever what a key is made of changes, so
-        /// entries kept under an earlier format are simply missed. 3 since a picture's bytes are a function of its
-        /// value alone, an array met twice written in full rather than by its address.
-        static let format: UInt64 = 3
+        /// entries kept under an earlier format are simply missed. 4 since a glass is a skin or a body, an image
+        /// pixels or a drawing, and their names and shapes changed.
+        static let format: UInt64 = 4
 
         /// The start of every entry.
         static let magic: [UInt8] = Array("PICSTORE".utf8)

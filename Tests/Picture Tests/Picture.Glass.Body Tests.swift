@@ -9,7 +9,7 @@ extension `Picture Tests` {
 extension `Picture Tests`.`Glass with a body bends light going in and coming out` {
     typealias Tests = `Picture Tests`
     typealias Glass = Picture.Glass
-    typealias Refraction = Picture.Glass.Refraction
+    typealias Body = Picture.Glass.Body
 
     static func close(_ a: Vector<3, Double>, _ b: Vector<3, Double>, within tolerance: Double = 1e-12) -> Bool {
         Tests.close(a[0], b[0], within: tolerance) && Tests.close(a[1], b[1], within: tolerance) && Tests.close(a[2], b[2], within: tolerance)
@@ -17,16 +17,16 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
 
     @Test
     func `The glass's index is its medium's by Cauchy's law, never below vacuum's`() {
-        let glass = Refraction(index: 1.5, abbe: 30)
+        let glass = Body(index: 1.5, abbe: 30)
         #expect(glass.index(at: .d) == 1.5)
         #expect(glass.index(at: .init(nanometres: 420)) > glass.index(at: .init(nanometres: 520)))
         #expect(glass.index(at: .init(nanometres: 520)) > glass.index(at: .init(nanometres: 680)))
-        let plain = Refraction()
-        #expect(plain.index == 1.5 && plain.distance == 1 && plain.medium.abbe == Refraction.Dispersion.subtle && plain.surroundings == nil)
-        let none = Refraction(abbe: Refraction.Dispersion.none)
+        let plain = Body()
+        #expect(plain.index == 1.5 && plain.medium.abbe == 45)
+        let none = Body(abbe: .infinity)
         #expect(none.index(at: .init(nanometres: 420)) == 1.5 && none.index(at: .init(nanometres: 680)) == 1.5)
-        #expect(Refraction(index: 1.01, abbe: 0.01).index(at: .init(nanometres: 700)) == .vacuum)
-        #expect(Refraction(index: 0.8).index == .vacuum)
+        #expect(Body(index: 1.01, abbe: 0.01).index(at: .init(nanometres: 700)) == .vacuum)
+        #expect(Body(index: 0.8).index == .vacuum)
     }
 
     @Test
@@ -53,8 +53,8 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
 
     @Test
     func `With dispersion blue's sheen leans further than red's, and without it every colour's is the glass's`() {
-        #expect(Refraction(index: 1.5, abbe: .infinity).tilts[0] == 1 && Refraction(index: 1.5, abbe: .infinity).tilts[2] == 1)
-        let tilts = Refraction(index: 1.5, abbe: 20).tilts
+        #expect(Body(index: 1.5, abbe: .infinity).tilts[0] == 1 && Body(index: 1.5, abbe: .infinity).tilts[2] == 1)
+        let tilts = Body(index: 1.5, abbe: 20).tilts
         #expect(tilts[2] > tilts[1] && tilts[1] > tilts[0])
         #expect(abs(tilts[1] - 1) < 0.03)
         let light = Glass.Light(direction: Vector([0, 1, 1]), gloss: 0, highlight: 0, sheen: 1, sharpness: 4)
@@ -94,47 +94,45 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
     }
 
     @Test
-    func `Each colour comes from its own read, and the tint is taken on by the length of the way through`() {
-        let reads: InlineArray<3, Picture.Pixel> = [Tests.pixel(0.9, 0.1, 0.1, 1), Tests.pixel(0.2, 0.8, 0.2, 1), Tests.pixel(0.3, 0.3, 0.7, 1)]
-        let normal = Vector<3, Double>([0, 0, 1])
-        func pixel(_ glass: Glass, through length: Double, beyond: Double = 0, by share: Double = 0) -> Picture.Pixel {
-            glass.pixel(over: reads, through: length, leaving: Vector([0, -1, 0]), beyond: beyond, mirroring: Vector([0, 1, 0]), by: share, facing: normal)
-        }
+    func `The tint is taken on by the length of the way through`() {
         let split = Tests.pixel(0.9, 0.8, 0.7, 1)
-        let clear = Glass(bend: 0, refraction: .init())
+        let normal = Vector<3, Double>([0, 0, 1])
+        func pixel(_ glass: Glass, through length: Double) -> Picture.Pixel {
+            Glass.Shading(glass).pixel(over: split, through: length, leaving: Vector([0, -1, 0]), mirroring: Vector([0, 1, 0]), facing: normal)
+        }
+        let clear = Glass(.body(.init()))
         #expect(pixel(clear, through: 3) == split)
         let tint = Picture.Color(red: 1, green: 0, blue: 0, alpha: 0.5)
-        let rosy = Glass(bend: 0, tint: tint, refraction: .init())
+        let rosy = Glass(.body(.init()), tint: tint)
         #expect(pixel(rosy, through: 0) == split)
         #expect(Tests.close(pixel(rosy, through: 1), tint.pixel.composited(over: split)))
         #expect(Tests.close(pixel(rosy, through: 2), Picture.Color(red: 1, green: 0, blue: 0, alpha: 0.75).pixel.composited(over: split)))
-        #expect(pixel(Glass(bend: 0, tint: .black, refraction: .init()), through: 0.01) == Tests.pixel(0, 0, 0, 1))
+        #expect(pixel(Glass(.body(.init()), tint: .black), through: 0.01) == Tests.pixel(0, 0, 0, 1))
     }
 
     @Test
     func `Surroundings are mixed in where light misses the picture and where the surface mirrors, and the light is added last`() {
         let grey = Tests.pixel(0.5, 0.5, 0.5, 1)
-        let reads: InlineArray<3, Picture.Pixel> = [grey, grey, grey]
         let normal = Vector<3, Double>([0, 0, 1])
         let around = Glass.Surroundings(above: .white, below: .black, width: 1)
-        let glass = Glass(bend: 0, refraction: .init(surroundings: around))
-        func pixel(_ glass: Glass, beyond: Double, by share: Double) -> Picture.Pixel {
-            glass.pixel(over: reads, through: 1, leaving: Vector([0, -1, 0]), beyond: beyond, mirroring: Vector([0, 1, 0]), by: share, facing: normal)
+        let glass = Glass(.body(.init()))
+        func pixel(_ glass: Glass, around surroundings: Glass.Surroundings? = around, beyond: Double, by share: Double) -> Picture.Pixel {
+            Glass.Shading(glass, surroundings: surroundings)
+                .pixel(over: grey, through: 1, leaving: Vector([0, -1, 0]), beyond: beyond, mirroring: Vector([0, 1, 0]), by: share, facing: normal)
         }
         #expect(pixel(glass, beyond: 0, by: 0) == grey)
         #expect(Tests.close(pixel(glass, beyond: 1, by: 0), Tests.pixel(0, 0, 0, 1)))
         #expect(Tests.close(pixel(glass, beyond: 0.5, by: 0), Tests.pixel(0.25, 0.25, 0.25, 1)))
         #expect(Tests.close(pixel(glass, beyond: 0, by: 1), Tests.pixel(1, 1, 1, 1)))
         #expect(Tests.close(pixel(glass, beyond: 1, by: 0.5), Tests.pixel(0.5, 0.5, 0.5, 1)))
-        #expect(pixel(Glass(bend: 0, refraction: .init()), beyond: 1, by: 1) == grey)
+        #expect(pixel(glass, around: nil, beyond: 1, by: 1) == grey)
+        #expect(pixel(Glass(.skin(bend: 0)), beyond: 1, by: 1) == grey)
         let light = Glass.Light(direction: Vector([0, 0, 1]), color: .init(red: 1, green: 0, blue: 0), gloss: 2, rim: 0)
-        let lit = Glass(bend: 0, light: light, refraction: .init(abbe: .infinity, surroundings: around))
+        let lit = Glass(.body(.init(abbe: .infinity)), light: light)
         let added = Picture.Color(red: 1, green: 0, blue: 0).pixel.composited(over: grey, operator: .lighter, coverage: 1)
         let alpha = Swift.min(Swift.max(added.alpha, 0), 1)
         let held = Picture.Pixel(color: .init(red: Swift.min(added.color.red, alpha), green: Swift.min(added.color.green, alpha), blue: Swift.min(added.color.blue, alpha)), alpha: alpha)
         #expect(pixel(lit, beyond: 0, by: 0) == held)
-        let shaded = lit.shading.pixel(over: reads, through: 1, leaving: normal, beyond: 0.3, mirroring: normal, by: 0.2, facing: normal)
-        #expect(shaded == lit.pixel(over: reads, through: 1, leaving: normal, beyond: 0.3, mirroring: normal, by: 0.2, facing: normal))
     }
 }
 
@@ -142,22 +140,22 @@ extension `Picture Tests`.`Glass with a body bends light going in and coming out
     @Test
     func `A ball enlarges what touches it index over two less index times, and turns it over past its focus`() {
         for index in [1.3, 1.5, 1.7] {
-            let touching = Refraction(index: .init(index), distance: 0).enlargement(radius: 15)
+            let touching = Body(index: .init(index)).enlargement(radius: 15, distance: 0)
             #expect(Tests.close(touching, index / (2 - index), within: 1e-12))
         }
-        #expect(Tests.close(Refraction(index: 1.5, distance: 0).enlargement(radius: 2), 3, within: 1e-12))
+        #expect(Tests.close(Body(index: 1.5).enlargement(radius: 2, distance: 0), 3, within: 1e-12))
         let focus = 1.5 * 15 / (2 * 0.5) - 15
         var previous = 0.0
         for distance in stride(from: 0.0, to: focus, by: 0.5) {
-            let enlargement = Refraction(index: 1.5, distance: distance).enlargement(radius: 15)
+            let enlargement = Body(index: 1.5).enlargement(radius: 15, distance: distance)
             #expect(enlargement > previous)
             previous = enlargement
         }
-        #expect(Refraction(index: 1.5, distance: focus + 1).enlargement(radius: 15) < 0)
-        #expect(Refraction(index: 1.5, distance: 40).enlargement(radius: 15) > -1)
+        #expect(Body(index: 1.5).enlargement(radius: 15, distance: focus + 1) < 0)
+        #expect(Body(index: 1.5).enlargement(radius: 15, distance: 40) > -1)
         // The law is in units of the picture: a ball twice the size at twice the distance enlarges alike.
-        #expect(Tests.close(Refraction(index: 1.5, distance: 6).enlargement(radius: 30), Refraction(index: 1.5, distance: 3).enlargement(radius: 15), within: 1e-12))
-        #expect(Refraction(index: 1, distance: 3).enlargement(radius: 15) == 1)
-        #expect(Refraction(index: 1.5, distance: 3).enlargement(radius: 0) == 1)
+        #expect(Tests.close(Body(index: 1.5).enlargement(radius: 30, distance: 6), Body(index: 1.5).enlargement(radius: 15, distance: 3), within: 1e-12))
+        #expect(Body(index: 1).enlargement(radius: 15, distance: 3) == 1)
+        #expect(Body(index: 1.5).enlargement(radius: 0, distance: 3) == 1)
     }
 }

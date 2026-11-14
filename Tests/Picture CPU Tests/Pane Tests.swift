@@ -13,10 +13,8 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
 
     static let region = Picture.Plane.Region.rectangle(.init(llx: 10, lly: 10, urx: 70, ury: 50), radius: 12)
 
-    static func pane(_ glass: Picture.Glass, shadow: Picture.Glass.Shadow? = nil) -> Picture.Element {
-        var glass = glass
-        glass.shadows = shadow.map { [$0] } ?? []
-        return .pane(Picture.Glass.Pane(region, glass: glass, thickness: 8, rim: 10))
+    static func pane(_ glass: Picture.Glass, distance: Double = 1, shadow: Picture.Glass.Shadow? = nil) -> Picture.Element {
+        .pane(Picture.Glass.Pane(region, glass: glass, thickness: 8, rim: 10, distance: distance, shadows: shadow.map { [$0] } ?? []))
     }
 
     /// Black and white stripes four pixels wide.
@@ -28,8 +26,8 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     func `A pane over a flat colour gives that colour under its tint`() throws {
         let colour = Picture.Color(red: 0.2, green: 0.6, blue: 0.9)
         let tint = Picture.Color(red: 1, green: 1, blue: 1, alpha: 0.25)
-        let glass = Picture.Glass(tint: tint, refraction: .init(index: 1.6, distance: 5, abbe: 20), frost: 6)
-        let raster = try Tests.drawn([Tests.fill(Tests.rectangle(-100, -100, 300, 300), colour), Self.pane(glass)], on: Tests.canvas(80, 60))
+        let glass = Picture.Glass(.body(.init(index: 1.6, abbe: 20)), tint: tint, frost: 6)
+        let raster = try Tests.drawn([Tests.fill(Tests.rectangle(-100, -100, 300, 300), colour), Self.pane(glass, distance: 5)], on: Tests.canvas(80, 60))
         let expected = tint.pixel.composited(over: colour.pixel)
         for (x, y) in Tests.positions(80, 60) {
             let inside = Self.region.distance(to: Tests.at(Double(x) + 0.5, Double(y) + 0.5)) < -1
@@ -42,7 +40,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     @Test
     func `A clear pane of index one shows the picture as it is, and leaves the outside alone`() throws {
         let plain = try Tests.drawn(Picture(Self.stripes), on: Tests.canvas(80, 60))
-        let through = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(refraction: .init(index: 1)))]), on: Tests.canvas(80, 60))
+        let through = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(.body(.init(index: 1))))]), on: Tests.canvas(80, 60))
         // Pixels on the boundary and in the outer rim are the mean of points read between pixel centres.
         for (x, y) in Tests.positions(80, 60) {
             let distance = Self.region.distance(to: Tests.at(Double(x) + 0.5, Double(y) + 0.5))
@@ -54,7 +52,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     @Test
     func `The rim lenses the picture while the level middle shows it in place`() throws {
         let plain = try Tests.drawn(Picture(Self.stripes), on: Tests.canvas(80, 60))
-        let through = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(refraction: .init(index: 1.5, distance: 10)))]), on: Tests.canvas(80, 60))
+        let through = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(.body(.init(index: 1.5))), distance: 10)]), on: Tests.canvas(80, 60))
         for x: UInt in 30..<50 { #expect(Tests.close(Tests.at(through, x, 30), Tests.at(plain, x, 30), within: 1e-5)) }
         var changed = false
         for x: UInt in 11..<18 where !Tests.close(Tests.at(through, x, 30), Tests.at(plain, x, 30), within: 1e-2) { changed = true }
@@ -64,9 +62,9 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     @Test
     func `A shadow darkens around the pane and the pane shows the picture without it`() throws {
         let white = Picture.Color.white
-        let shadow = Picture.Glass.Shadow(color: Picture.Color(red: 0, green: 0, blue: 0, alpha: 0.5), softness: 4, x: 0, y: 4)
+        let shadow = Picture.Glass.Shadow(color: Picture.Color(red: 0, green: 0, blue: 0, alpha: 0.5), softness: 4, offset: Vector([0, 4]))
         let raster = try Tests.drawn(
-            [Tests.fill(Tests.rectangle(-100, -100, 300, 300), white), Self.pane(Picture.Glass(refraction: .init()), shadow: shadow)],
+            [Tests.fill(Tests.rectangle(-100, -100, 300, 300), white), Self.pane(Picture.Glass(.body(.init())), shadow: shadow)],
             on: Tests.canvas(80, 60)
         )
         #expect(Tests.at(raster, 40, 53).color.red < 0.9)
@@ -77,13 +75,13 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     @Test
     func `Drawing a pane is the same twice and on any number of threads`() throws {
         let glass = Picture.Glass(
+            .body(.init(index: 1.5, abbe: 25)),
             tint: Picture.Color(red: 0.9, green: 0.95, blue: 1, alpha: 0.1),
             light: .init(direction: Vector([-0.3, 0.9, 0.4]), rim: 0.8),
-            refraction: .init(index: 1.5, distance: 6, abbe: 25),
             frost: 7,
             adaptation: .init(toward: .white, strength: 0.4)
         )
-        let picture = Picture(Self.stripes + [Self.pane(glass, shadow: .init())])
+        let picture = Picture(Self.stripes + [Self.pane(glass, distance: 6, shadow: .init())])
         let once = try Tests.drawn(picture, on: Tests.canvas(80, 60))
         #expect(try Tests.drawn(picture, on: Tests.canvas(80, 60)) == once)
         for threads: Cardinal in [1, 3, 8] {
@@ -95,8 +93,8 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
 
     @Test
     func `Frost blurs what a pane shows`() throws {
-        let clear = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(refraction: .init(index: 1)))]), on: Tests.canvas(80, 60))
-        let frosted = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(refraction: .init(index: 1), frost: 4))]), on: Tests.canvas(80, 60))
+        let clear = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(.body(.init(index: 1))))]), on: Tests.canvas(80, 60))
+        let frosted = try Tests.drawn(Picture(Self.stripes + [Self.pane(Picture.Glass(.body(.init(index: 1)), frost: 4))]), on: Tests.canvas(80, 60))
         let spread = (36..<44).map { Tests.at(frosted, UInt($0), 30).color.red }
         let sharp = (36..<44).map { Tests.at(clear, UInt($0), 30).color.red }
         #expect((spread.max()! - spread.min()!) < 0.2)
@@ -112,7 +110,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
             Tests.fill(Tests.rectangle(60, -40, 100, 160), .white),
         ]
         for deviation in [6.0, 9, 12, 24] {
-            let glass = Picture.Glass(refraction: .init(index: 1), frost: deviation)
+            let glass = Picture.Glass(.body(.init(index: 1)), frost: deviation)
             let pane = Picture.Glass.Pane(.rectangle(.init(llx: 20, lly: 15, urx: 100, ury: 65), radius: 8), glass: glass, thickness: 6, rim: 10)
             let frosted = try Tests.drawn(Picture(step + [.pane(pane)]), on: Tests.canvas(120, 80))
             let blurred = try Tests.drawn([.layer(Picture.Layer(Picture(step), effects: [.blur(.init(deviation: deviation))]))], on: Tests.canvas(120, 80))
@@ -130,7 +128,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
         func drawn(_ gap: Double) throws -> Tests.Canvas {
             let a = Picture.Plane.Region.ball(.init(center: Tests.at(40 - 10 - gap / 2, 30), radius: .init(10)))
             let b = Picture.Plane.Region.ball(.init(center: Tests.at(40 + 10 + gap / 2, 30), radius: .init(10)))
-            let glass = Picture.Glass(tint: Picture.Color(red: 1, green: 0, blue: 0, alpha: 1), refraction: .init(index: 1))
+            let glass = Picture.Glass(.body(.init(index: 1)), tint: Picture.Color(red: 1, green: 0, blue: 0, alpha: 1))
             let pane = Picture.Glass.Pane(.union([a, b], radius: 12), glass: glass, thickness: 4, rim: 4)
             return try Tests.drawn([Tests.fill(Tests.rectangle(0, 0, 80, 60), .white), .pane(pane)], on: Tests.canvas(80, 60))
         }
@@ -142,7 +140,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     func `Dispersion fans a white line behind the rim into colours, keeps white white and changes nothing without it`() throws {
         let line: [Picture.Element] = [Tests.fill(Tests.rectangle(0, 0, 80, 60), .black), Tests.fill(Tests.rectangle(20, 0, 2, 60), .white)]
         func drawn(_ abbe: Double, over picture: [Picture.Element]) throws -> Tests.Canvas {
-            try Tests.drawn(Picture(picture + [Self.pane(Picture.Glass(refraction: .init(index: 1.5, distance: 12, abbe: abbe)))]), on: Tests.canvas(80, 60))
+            try Tests.drawn(Picture(picture + [Self.pane(Picture.Glass(.body(.init(index: 1.5, abbe: abbe))), distance: 12)]), on: Tests.canvas(80, 60))
         }
         let fanned = try drawn(12, over: line)
         let most = fanned.pixels.map { abs($0.color.red - $0.color.blue) }.max() ?? 0
@@ -157,7 +155,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     @Test
     func `The light's line brightens a band along the boundary, brightest on the side toward the light`() throws {
         let black = [Tests.fill(Tests.rectangle(-100, -100, 300, 300), .black)]
-        let plain = Picture.Glass(refraction: .init(index: 1))
+        let plain = Picture.Glass(.body(.init(index: 1)))
         var lit = plain
         lit.light = Picture.Glass.Light(direction: Vector([0, 1, 0.2]), gloss: 0, highlight: 0, rim: 1, width: 1.5, counter: 0.5, focus: 2)
         let dark = try Tests.drawn(Picture(black + [Self.pane(plain)]), on: Tests.canvas(80, 60))
@@ -174,7 +172,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     func `A pane takes a rectangle with continuous corners as any region`() throws {
         let colour = Picture.Color(red: 0.2, green: 0.6, blue: 0.9)
         let shape = Picture.Plane.Superellipse(.init(llx: 10, lly: 10, urx: 70, ury: 50), radius: 16, exponent: 5)
-        let pane = Picture.Glass.Pane(.superellipse(shape), glass: Picture.Glass(refraction: .init(index: 1.5, distance: 4)), thickness: 6, rim: 8)
+        let pane = Picture.Glass.Pane(.superellipse(shape), glass: Picture.Glass(.body(.init(index: 1.5))), thickness: 6, rim: 8, distance: 4)
         let raster = try Tests.drawn([Tests.fill(Tests.rectangle(-100, -100, 300, 300), colour), .pane(pane)], on: Tests.canvas(80, 60))
         #expect(Tests.close(Tests.at(raster, 40, 30), colour.pixel, within: 2e-4))
         #expect(Tests.at(raster, 11, 11) == colour.pixel)

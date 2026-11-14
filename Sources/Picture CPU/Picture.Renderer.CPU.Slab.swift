@@ -11,8 +11,8 @@ extension Picture.Renderer.CPU.Slab {
     static func bounds(of pane: Picture.Glass.Pane, _ transform: Picture.Transform) -> Picture.Renderer.CPU.Box {
         guard let rectangle = pane.region.boundingBox else { return .empty }
         var reach = 0.0
-        for shadow in pane.glass.shadows {
-            reach = Swift.max(reach, abs(shadow.x) + abs(shadow.y) + 4 * Swift.max(shadow.softness, 0))
+        for shadow in pane.shadows {
+            reach = Swift.max(reach, abs(shadow.offset[0]) + abs(shadow.offset[1]) + 4 * Swift.max(shadow.softness, 0))
         }
         guard reach.isFinite else { return .empty }
         let grown = Picture.Plane.Rectangle(
@@ -45,11 +45,11 @@ extension Picture.Renderer.CPU.Canvas {
         let outer = Picture.Renderer.CPU.Slab.bounds(of: pane, transform).intersection(reach)
         let coarse = Picture.Renderer.CPU.Slab.Coarse(region, over: outer, inverse, scale: scale)
 
-        for shadow in pane.glass.shadows where shadow.color.alpha > 0 {
+        for shadow in pane.shadows where shadow.color.alpha > 0 {
             let area = outer
             let color = shadow.color.with(alpha: 1).pixel
             let strength = shadow.color.alpha
-            let shift = (abs(shadow.x) + abs(shadow.y)) * scale
+            let shift = (abs(shadow.offset[0]) + abs(shadow.offset[1])) * scale
             let far = 8 * Swift.max(shadow.softness, 0) * scale
             update(
                 area,
@@ -61,7 +61,7 @@ extension Picture.Renderer.CPU.Canvas {
                         // Deep inside the pane, which covers it, or so far out that the shadow there is below 1/2000.
                         guard bound.upper > -(shift + 1.5), bound.lower < shift + far + 1 else { return old }
                         let point = Picture.Renderer.CPU.point(inverse, Double(x) + 0.5, Double(y) + 0.5)
-                        let moved = Picture.Plane.Point<2>([point[0] - shadow.x, point[1] - shadow.y])
+                        let moved = Picture.Plane.Point<2>([point[0] - shadow.offset[0], point[1] - shadow.offset[1]])
                         let share = Float(shadow.share(at: region.distance(to: moved))) * strength
                         guard share > 0 else { return old }
                         return Picture.Renderer.CPU.limited(old, color.composited(over: old, coverage: share), state.share(x, y))
@@ -73,17 +73,17 @@ extension Picture.Renderer.CPU.Canvas {
 
         let deviation = pane.glass.frost * scale
         let frost = Picture.Renderer.CPU.Frost(before, over: inside.expanded(margin, margin).intersection(before.box), deviation: deviation, state.workers)
-        let shading = pane.glass.shading
+        let shading = Picture.Glass.Shading(pane.glass, surroundings: pane.surroundings)
         let linear = (transform[0, 0], transform[0, 1], transform[1, 0], transform[1, 1])
         let rimPixels = pane.rim * scale
 
-        let refraction = pane.glass.refraction
-        let indices = refraction.map(Picture.Renderer.CPU.Spectra.Indices.init)
-        let tilts = refraction?.tilts ?? [1, 1, 1]
+        let body = pane.glass.body
+        let indices = body.map(Picture.Renderer.CPU.Spectra.Indices.init)
+        let tilts = body?.tilts ?? [1, 1, 1]
 
         func glass(_ pane: Picture.Glass.Pane, _ x: Double, _ y: Double, _ sample: Picture.Plane.Region.Sample) -> Picture.Pixel {
             let passage = Picture.Glass.Pane.Passage(through: pane, for: sample)
-            let outline = Picture.Glass.Outline(inward: -sample.distance, x: sample.gradient[0], y: -sample.gradient[1])
+            let outline = Picture.Glass.Outline(inward: -sample.distance, outward: Vector([sample.gradient[0], -sample.gradient[1]]))
             let frosting = Picture.Glass.frosting(facing: passage.normal)
             func place(_ offset: Vector<2, Double>) -> (x: Double, y: Double) {
                 (x + linear.0 * offset[0] + linear.1 * offset[1], y + linear.2 * offset[0] + linear.3 * offset[1])
@@ -98,7 +98,7 @@ extension Picture.Renderer.CPU.Canvas {
                 read = frost.read(at.x, at.y, frosting: frosting)
             }
             return shading.pixel(
-                over: [read, read, read],
+                over: Picture.Renderer.CPU.Spectra.joined(read),
                 through: 1,
                 leaving: passage.leaving,
                 beyond: 0,
@@ -129,7 +129,7 @@ extension Picture.Renderer.CPU.Canvas {
                     if bound.upper < -rimDepth {
                         let read = frost.read(cx, cy)
                         let pixel = shading.pixel(
-                            over: [read, read, read],
+                            over: Picture.Renderer.CPU.Spectra.joined(read),
                             through: 1,
                             leaving: level.leaving,
                             beyond: 0,
@@ -176,13 +176,14 @@ extension Picture.Renderer.CPU.Slab {
     /// the rim from half a pixel in, where the bend is steepest, to the level middle. Reads nearer the boundary,
     /// which bend further, find the frost's nearest edge pixel.
     static func reach(of pane: Picture.Glass.Pane, scale: Double) -> Double {
-        var largest = abs(pane.glass.bend)
+        var largest = 0.0
+        if case .skin(let bend) = pane.glass.surface { largest = abs(bend) }
         let start = 0.5 / scale
         let steps = 64
         for step in 0...steps {
             let inward = start + (Swift.max(pane.rim, start) - start) * Double(step) / Double(steps)
             let passage = Picture.Glass.Pane.Passage(through: pane, for: .init(distance: -inward, gradient: Vector([1, 0])))
-            let index = pane.glass.refraction?.index(at: Picture.Glass.Spectrum.range.lowerBound) ?? .vacuum
+            let index = pane.glass.body?.index(at: Picture.Glass.Spectrum.range.lowerBound) ?? .vacuum
             let offset = passage.offset(for: index)
             let length = (offset[0] * offset[0] + offset[1] * offset[1]).squareRoot()
             if length.isFinite { largest = Swift.max(largest, length) }

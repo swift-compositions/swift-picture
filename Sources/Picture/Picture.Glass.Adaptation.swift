@@ -20,53 +20,38 @@ extension Picture.Glass {
 }
 
 extension Picture.Glass.Adaptation {
-    /// A pixel's place in Oklab (Ottosson 2020), lightness L and the opponent axes a and b, from its linear colour
-    /// over its alpha with each component held to 0…1: `Color.Oklab.coordinates(red:green:blue:)` of
-    /// swift-color-standard. The origin without alpha.
-    public static func oklab(of pixel: Picture.Pixel) -> (L: Float, a: Float, b: Float) {
-        guard pixel.alpha > 0 else { return (0, 0, 0) }
+    /// A pixel's lightness, 0 to 1: the Oklab L (`Color.Oklab.coordinates(red:green:blue:)` of swift-color-standard)
+    /// of its linear colour over its alpha with each component held to 0…1; 0 without alpha.
+    static func lightness(of pixel: Picture.Pixel) -> Float {
+        guard pixel.alpha > 0 else { return 0 }
         func held(_ value: Float) -> Float { Swift.min(Swift.max(value / pixel.alpha, 0), 1) }
-        let place = Color_Standard::Color.Oklab.coordinates(
-            red: held(pixel.color.red),
-            green: held(pixel.color.green),
-            blue: held(pixel.color.blue)
-        )
-        return (place.l, place.a, place.b)
+        return Color_Standard::Color.Oklab.coordinates(red: held(pixel.color.red), green: held(pixel.color.green), blue: held(pixel.color.blue)).l
     }
 
-    /// The linear colour at a place in Oklab, `Color.Oklab.linear(l:a:b:)` of swift-color-standard, each
-    /// component held to 0…1.
-    public static func color(L: Float, a: Float, b: Float) -> (red: Float, green: Float, blue: Float) {
-        let linear = Color_Standard::Color.Oklab.linear(l: L, a: a, b: b)
-        func held(_ value: Float) -> Float { Swift.min(Swift.max(value, 0), 1) }
-        return (held(linear.red), held(linear.green), held(linear.blue))
-    }
-
-    /// A pixel's lightness, 0 to 1: its Oklab L.
-    public static func lightness(of pixel: Picture.Pixel) -> Float {
-        oklab(of: pixel).L
-    }
-
-    /// The share by which a pixel's lightness is moved toward the colour's: `strength`, held to 0…1, times the
-    /// difference of their lightnesses.
-    public func share(for pixel: Picture.Pixel) -> Float {
-        let strength = Float(Swift.min(Swift.max(self.strength, 0), 1))
-        return strength * abs(Self.lightness(of: color.pixel) - Self.lightness(of: pixel))
-    }
-
-    /// A pixel with its Oklab lightness moved toward the colour's by its share and its a and b kept, so the
-    /// backdrop's hue and chroma stay and only its lightness gives way; alpha is kept. A share of 0 gives the
-    /// pixel bit for bit.
+    /// A pixel with its Oklab lightness moved toward the colour's by `strength`, held to 0…1, times the difference
+    /// of their lightnesses, and its a and b kept, so the backdrop's hue and chroma stay and only its lightness
+    /// gives way: its linear colour over its alpha, each component held to 0…1, taken into Oklab by
+    /// `Color.Oklab.coordinates(red:green:blue:)` of swift-color-standard and back by `Color.Oklab.linear(l:a:b:)`,
+    /// each component held to 0…1 again. Alpha is kept, and a share of 0 gives the pixel bit for bit.
     public func pixel(_ pixel: Picture.Pixel) -> Picture.Pixel {
         self.pixel(pixel, target: Self.lightness(of: color.pixel))
     }
 
     /// `pixel(_:)` with the colour's lightness, `lightness(of: color.pixel)`, worked out once by the caller.
     func pixel(_ pixel: Picture.Pixel, target: Float) -> Picture.Pixel {
-        let place = Self.oklab(of: pixel)
-        let share = Float(Swift.min(Swift.max(strength, 0), 1)) * abs(target - place.L)
+        var place = (l: Float(0), a: Float(0), b: Float(0))
+        if pixel.alpha > 0 {
+            func held(_ value: Float) -> Float { Swift.min(Swift.max(value / pixel.alpha, 0), 1) }
+            let found = Color_Standard::Color.Oklab.coordinates(red: held(pixel.color.red), green: held(pixel.color.green), blue: held(pixel.color.blue))
+            place = (found.l, found.a, found.b)
+        }
+        let share = Float(Swift.min(Swift.max(strength, 0), 1)) * abs(target - place.l)
         guard share > 0 else { return pixel }
-        let moved = Self.color(L: place.L + (target - place.L) * share, a: place.a, b: place.b)
-        return Picture.Pixel(color: .init(red: moved.red * pixel.alpha, green: moved.green * pixel.alpha, blue: moved.blue * pixel.alpha), alpha: pixel.alpha)
+        let linear = Color_Standard::Color.Oklab.linear(l: place.l + (target - place.l) * share, a: place.a, b: place.b)
+        func held(_ value: Float) -> Float { Swift.min(Swift.max(value, 0), 1) }
+        return Picture.Pixel(
+            color: .init(red: held(linear.red) * pixel.alpha, green: held(linear.green) * pixel.alpha, blue: held(linear.blue) * pixel.alpha),
+            alpha: pixel.alpha
+        )
     }
 }

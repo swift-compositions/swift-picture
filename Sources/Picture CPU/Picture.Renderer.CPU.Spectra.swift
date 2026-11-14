@@ -13,6 +13,14 @@ extension Picture.Renderer.CPU {
 }
 
 extension Picture.Renderer.CPU.Spectra {
+    /// One read taken as the reads of red, green and blue that the law of a body's pixel gathers: each colour
+    /// from its own read and alpha the mean of the three alphas, which rounding can move off the one alpha.
+    static func joined(_ read: Picture.Pixel) -> Picture.Pixel {
+        Picture.Pixel(color: read.color, alpha: (read.alpha + read.alpha + read.alpha) / 3)
+    }
+}
+
+extension Picture.Renderer.CPU.Spectra {
     /// The picture as a dispersive refraction shows it at a point: `read` gives where light of an index reads, in
     /// raster space, and `sample` the picture there. Where the shortest and the longest visible wavelengths read
     /// less than a quarter of a pixel apart, the point is read once at the glass's own index; otherwise at

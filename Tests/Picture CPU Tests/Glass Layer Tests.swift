@@ -18,15 +18,21 @@ extension `Picture CPU Tests`.`Glass in a layer reads the picture beneath the la
         + [Tests.fill(Tests.rectangle(30, 20, 14, 14), Tests.red)]
 
     static let glass = Picture.Glass(
+        .body(.init(index: 1.5, abbe: 20)),
         tint: Picture.Color(red: 0.2, green: 0.4, blue: 1, alpha: 0.2),
         light: .init(direction: Vector([-0.3, 0.9, 0.4]), rim: 0.8, width: 1.5),
-        refraction: .init(index: 1.5, distance: 8, abbe: 20),
-        frost: 2,
-        shadows: [.init(color: .init(red: 0, green: 0, blue: 0, alpha: 0.5), softness: 3, x: 0, y: 3)]
+        frost: 2
     )
 
     static let pane = Picture.Element.pane(
-        Picture.Glass.Pane(.rectangle(.init(llx: 12, lly: 10, urx: 68, ury: 48), radius: 14), glass: glass, thickness: 8, rim: 10)
+        Picture.Glass.Pane(
+            .rectangle(.init(llx: 12, lly: 10, urx: 68, ury: 48), radius: 14),
+            glass: glass,
+            thickness: 8,
+            rim: 10,
+            distance: 8,
+            shadows: [.init(color: .init(red: 0, green: 0, blue: 0, alpha: 0.5), softness: 3, offset: Vector([0, 3]))]
+        )
     )
 
     static func drawn(_ elements: [Picture.Element]) throws -> Tests.Canvas {

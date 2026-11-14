@@ -116,7 +116,7 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
             vertices: [Vertex([-1, -1, -5]), Vertex([1, -1, -5 + 2 * tilt]), Vertex([1, 1, -5 + 2 * tilt]), Vertex([-1, 1, -5])],
             faces: [Polygon(0, 1, 2, 3)]
         )
-        let glass = Picture.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25))
+        let glass = Picture.Glass(.skin(bend: 4), tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25))
         let cover = Picture.Scene.Model(try Self.square(0.75, 0, -2, side: 1), material: .flat(.white))
         let scene = try Self.flat([.init(pane, material: .glass(glass)), cover])
         let raster = try Tests.drawn([background, .scene(scene)], on: Tests.canvas(40, 40))
@@ -125,11 +125,11 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         let offset = glass.offset(for: normal)
         for (x, y): (UInt, UInt) in [(15, 15), (18, 22), (20, 18)] {
             let read = gradient.pixel(at: Tests.at(Double(x) + 0.5 + offset[0], Double(y) + 0.5 + offset[1]))
-            #expect(Tests.close(Tests.at(raster, x, y), glass.pixel(over: read), within: 1e-4))
+            #expect(Tests.close(Tests.at(raster, x, y), Picture.Glass.Shading(glass).pixel(over: read), within: 1e-4))
         }
         #expect(Tests.at(raster, 35, 20) == gradient.pixel(at: Tests.at(35.5, 20.5)))
         #expect(Tests.at(raster, 27, 20) == Picture.Color.white.pixel)
-        let clear = try Self.flat([.init(pane, material: .glass(.init(bend: 0)))])
+        let clear = try Self.flat([.init(pane, material: .glass(.init(.skin(bend: 0))))])
         let through = try Tests.drawn([background, .scene(clear)], on: Tests.canvas(40, 40))
         #expect(Tests.close(through, try Tests.drawn([background], on: Tests.canvas(40, 40))))
     }
@@ -146,7 +146,7 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
             faces: [Polygon(0, 1, 2, 3)]
         )
         let light = Picture.Glass.Light(direction: Vector([-1, 0.5, 1]), color: .white, gloss: 3, sheen: 0.4)
-        let glass = Picture.Glass(bend: 4, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25), light: light)
+        let glass = Picture.Glass(.skin(bend: 4), tint: .init(red: 1, green: 1, blue: 1, alpha: 0.25), light: light)
         let raster = try Tests.drawn([background, .scene(try Self.flat([.init(pane, material: .glass(glass))]))], on: Tests.canvas(40, 40))
         let length = (1 + tilt * tilt).squareRoot()
         let normal = Vector<3, Double>([-tilt / length, 0, 1 / length])
@@ -154,8 +154,8 @@ extension `Picture CPU Tests`.`A renderer draws a scene straight onto what is be
         let offset = glass.offset(for: normal)
         for (x, y): (UInt, UInt) in [(15, 15), (18, 22), (20, 18)] {
             let read = gradient.pixel(at: Tests.at(Double(x) + 0.5 + offset[0], Double(y) + 0.5 + offset[1]))
-            #expect(Tests.close(Tests.at(raster, x, y), glass.pixel(over: read, facing: normal), within: 1e-4))
-            #expect(Tests.at(raster, x, y) != glass.pixel(over: read))
+            #expect(Tests.close(Tests.at(raster, x, y), Picture.Glass.Shading(glass).pixel(over: read, facing: normal), within: 1e-4))
+            #expect(Tests.at(raster, x, y) != Picture.Glass.Shading(glass).pixel(over: read))
         }
     }
 

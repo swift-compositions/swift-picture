@@ -46,9 +46,19 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
     ]
 
     /// A scene seen square-on through an orthographic camera, into a viewport of 24 × 24.
-    static func scene(_ models: [Picture.Scene.Model]) throws -> Picture.Scene {
+    static func scene(
+        _ models: [Picture.Scene.Model],
+        surroundings: Picture.Glass.Surroundings? = nil,
+        shadows: [Picture.Glass.Shadow] = []
+    ) throws -> Picture.Scene {
         let projection = try Projection<Double>.orthographic(width: 4, height: 4, near: 0, far: 10, depth: .unit)
-        return Picture.Scene(camera: .init(projection: projection), viewport: .init(llx: 0, lly: 0, urx: 24, ury: 24), models: models)
+        return Picture.Scene(
+            camera: .init(projection: projection),
+            viewport: .init(llx: 0, lly: 0, urx: 24, ury: 24),
+            models: models,
+            surroundings: surroundings,
+            shadows: shadows
+        )
     }
 
     /// A scene seen through a perspective lens whose window at the near plane 1 is −1…1, into a viewport of 24 × 24.
@@ -73,14 +83,15 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
         let shaded = Picture.Scene.Model(.sphere(radius: 1.5, meridians: 12, parallels: 6), transform: Refraction.translation(0, 0, -5), material: .shaded(shade))
         let pane = Picture.Glass.Pane(
             .rectangle(.init(llx: 4, lly: 5, urx: 20, ury: 19), radius: 4),
-            glass: Picture.Glass(refraction: .init(index: 1.5, distance: 4)),
+            glass: Picture.Glass(.body(.init(index: 1.5))),
             thickness: 4,
-            rim: 4
+            rim: 4,
+            distance: 4
         )
         let ball = Picture.Scene.Model(
             .sphere(radius: 1.5, meridians: 8, parallels: 4),
             transform: Refraction.translation(0, 0, -5),
-            material: .glass(.init(bend: 0, refraction: .init(index: 1.5, distance: 8, abbe: 10)))
+            material: .glass(.init(.body(.init(index: 1.5, abbe: 10))), distance: 8)
         )
         return try [
             "fill": [Tests.fill(triangle, Tests.translucent), Tests.fill(Tests.rectangle(10.5, 10.25, 17, 9), Tests.blue, rule: .evenodd)],
@@ -119,18 +130,18 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
         let turn = Matrix<4, 4, Double>(rows: [[1, 0, 0, 0], [0, 0.6, -0.8, 0], [0, 0.8, 0.6, -5], [0, 0, 0, 1]])
         let color = Picture.Color(red: 0.9, green: 0.5, blue: 0.3)
         let light = Picture.Glass.Light(direction: Vector([-0.4, -0.6, 1]), rim: 0.6, width: 1, sheen: 0.4)
-        let shadow = Picture.Glass.Shadow(softness: 2, x: 1, y: 2)
+        let shadow = Picture.Glass.Shadow(softness: 2, offset: Vector([1, 2]))
+        let around = Picture.Glass.Surroundings(above: .white, below: .black, width: 0.5)
         let lit = Picture.Glass(
+            .body(.init(index: 1.5, abbe: 10)),
             tint: .init(red: 0.9, green: 0.95, blue: 1, alpha: 0.2),
             light: light,
-            refraction: .init(index: 1.5, distance: 6, abbe: 10, surroundings: .init(above: .white, below: .black, width: 0.5)),
             frost: 0.6,
             gain: 1.1,
             saturation: 1.2,
-            adaptation: .init(toward: .white, strength: 0.4),
-            shadows: [shadow]
+            adaptation: .init(toward: .white, strength: 0.4)
         )
-        let skin = Picture.Glass(bend: 3, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1), light: light, frost: 0.8, shadows: [shadow])
+        let skin = Picture.Glass(.skin(bend: 3), tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1), light: light, frost: 0.8)
         var perspective = Picture.Image(
             Raster<Picture.Pixel>(width: 4, height: 4) { x, y in
                 Tests.pixel(Float(Int(bitPattern: x)) / 4, 0.3, Float(Int(bitPattern: y)) / 4, 1)
@@ -138,7 +149,15 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
             placement: Matrix<3, 3, Double>(rows: [[5, 0.5, 2], [0.4, 4, 3], [0.02, 0.03, 1]])
         )
         perspective.sampling = .bilinear
-        let pane = Picture.Glass.Pane(.capsule(.init(llx: 3, lly: 6, urx: 21, ury: 18)), glass: lit, thickness: 3, rim: 4)
+        let pane = Picture.Glass.Pane(
+            .capsule(.init(llx: 3, lly: 6, urx: 21, ury: 18)),
+            glass: lit,
+            thickness: 3,
+            rim: 4,
+            distance: 6,
+            surroundings: around,
+            shadows: [shadow]
+        )
         let wrapped = Picture.Image(
             Raster<Picture.Pixel>(width: 3, height: 2) { x, y in Tests.pixel(Float(Int(bitPattern: x)) / 3, Float(Int(bitPattern: y)) / 2, 0.6, 1) },
             placement: Picture.Transform(rows: [[2.5, 0.7, 1], [-0.5, 2.5, 2]]),
@@ -148,7 +167,7 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
         let ball = Picture.Scene.Model(
             .sphere(radius: 1.5, meridians: 8, parallels: 4),
             transform: Refraction.translation(0.5, 0, -5),
-            material: .glass(.init(refraction: .init(index: 1.5, distance: 8, abbe: 10)))
+            material: .glass(.init(.body(.init(index: 1.5, abbe: 10))), distance: 8)
         )
         let radial = Picture.Paint.radial(.init(center: Tests.at(10, 13), radius: 11, Picture.Gradient(evenly: [.white, Tests.red, .clear])))
         return [
@@ -166,8 +185,12 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
                     )
                 )
             ],
-            "glass lit": Picture(backdrop + [.scene(try Self.scene([.init(torus, transform: turn, material: .glass(lit))]))]),
-            "glass skin": Picture(backdrop + [.scene(try Self.scene([.init(torus, transform: turn, material: .glass(skin))]))]),
+            "glass lit": Picture(
+                backdrop + [
+                    .scene(try Self.scene([.init(torus, transform: turn, material: .glass(lit, distance: 6))], surroundings: around, shadows: [shadow]))
+                ]
+            ),
+            "glass skin": Picture(backdrop + [.scene(try Self.scene([.init(torus, transform: turn, material: .glass(skin))], shadows: [shadow]))]),
             "pane lit": Picture(backdrop + [.pane(pane)]),
             "pane in layer": Picture(backdrop + [.layer(Picture.Layer([.pane(pane)], opacity: 0.7))]),
             "radial": [.fill(Tests.rectangle(0, 0, 24, 24), radial)],

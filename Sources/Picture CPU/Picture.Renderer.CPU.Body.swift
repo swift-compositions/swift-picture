@@ -8,7 +8,7 @@ extension Picture.Renderer.CPU {
         /// makes it: the body's own thickness, which no turn of the camera changes.
         let thickness: Double
 
-        /// The depth in eye space of the plane the picture behind stands on: the refraction's distance, in units
+        /// The depth in eye space of the plane the picture behind stands on: the material's distance, in units
         /// of the picture, behind the body's farthest point from the eye.
         let plane: Double
     }
@@ -16,9 +16,9 @@ extension Picture.Renderer.CPU {
 
 extension Picture.Renderer.CPU.Body {
     /// The body of a scene's model under its camera, drawn through a lens into a picture whose units are `scale`
-    /// raster pixels; nil without a refraction or vertices.
+    /// raster pixels; nil without a body or vertices.
     init?(_ model: Picture.Scene.Model, eye: Matrix<4, 4, Double>, lens: Picture.Renderer.CPU.Lens, scale: Double) {
-        guard case .glass(let glass) = model.material, let refraction = glass.refraction else { return nil }
+        guard case .glass(let glass, let gap) = model.material, glass.body != nil else { return nil }
         let vertices = model.mesh.vertices
         guard let first = vertices.first else { return nil }
         var lower = (first[0], first[1], first[2])
@@ -48,7 +48,7 @@ extension Picture.Renderer.CPU.Body {
             farthest,
         ])
         let units = Self.pixels(at: middle, lens)
-        let distance = Swift.max(refraction.distance, 0)
+        let distance = Swift.max(gap, 0)
         let behind = units > 0 && units.isFinite && distance.isFinite ? distance * scale / units : 0
         self.init(thickness: positive.min() ?? 1, plane: farthest - behind)
     }

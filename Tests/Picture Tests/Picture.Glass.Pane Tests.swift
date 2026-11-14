@@ -1,3 +1,4 @@
+import Color_Standard
 import Numeric
 import Picture
 import Testing
@@ -10,17 +11,17 @@ extension `Picture Tests` {
 extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
     typealias Tests = `Picture Tests`
     typealias Pane = Picture.Glass.Pane
-    typealias Refraction = Picture.Glass.Refraction
 
     static let box = Picture.Plane.Rectangle(llx: 0, lly: 0, urx: 200, ury: 100)
 
-    static func pane(index: Refraction::Refraction.Index<Double> = 1.5, abbe: Double = .infinity, distance: Double = 0) -> Pane {
+    static func pane(index: Refraction.Index<Double> = 1.5, abbe: Double = .infinity, distance: Double = 0) -> Pane {
         Pane(
             .rectangle(box, radius: 30),
-            glass: Picture.Glass(refraction: .init(index: index, distance: distance, abbe: abbe)),
+            glass: Picture.Glass(.body(.init(index: index, abbe: abbe))),
             thickness: 20,
             rim: 25,
-            profile: 4
+            profile: 4,
+            distance: distance
         )
     }
 
@@ -68,7 +69,7 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
         for (x, y) in [(100.0, 50.0), (60.0, 40.0), (150.0, 70.0)] {
             let passage = pane.passage(at: Tests.at(x, y))
             #expect(passage.normal == Vector([0, 0, 1]))
-            for nanometres in [400.0, 550, 700] { #expect(passage.offset(for: pane.glass.refraction!.index(at: .init(nanometres: nanometres))) == .zero) }
+            for nanometres in [400.0, 550, 700] { #expect(passage.offset(for: pane.glass.body!.index(at: .init(nanometres: nanometres))) == .zero) }
             #expect(passage.length == 20)
         }
     }
@@ -101,13 +102,13 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
     @Test
     func `Shorter wavelengths read further in, and the glass's own index reads at the offset`() {
         let pane = Self.pane(abbe: 25, distance: 10)
-        let refraction = pane.glass.refraction!
+        let refraction = pane.glass.body!
         let passage = pane.passage(at: Tests.at(6, 50))
         #expect(passage.offset(for: refraction.index(at: .init(nanometres: 680)))[0] < passage.offset(for: refraction.index(at: .init(nanometres: 550)))[0])
         #expect(passage.offset(for: refraction.index(at: .init(nanometres: 550)))[0] < passage.offset(for: refraction.index(at: .init(nanometres: 420)))[0])
         #expect(passage.offset(for: refraction.index) == passage.offset)
         let plain = Self.pane(distance: 10).passage(at: Tests.at(6, 50))
-        #expect(plain.offset(for: Refraction(index: 1.5, abbe: .infinity).index(at: .init(nanometres: 420))) == plain.offset)
+        #expect(plain.offset(for: Picture.Glass.Body(index: 1.5, abbe: .infinity).index(at: .init(nanometres: 420))) == plain.offset)
     }
 
     @Test
@@ -124,7 +125,7 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
 
     @Test
     func `A skin without a body reads at the glass's offset of the normal`() {
-        let pane = Pane(.rectangle(Self.box, radius: 30), glass: Picture.Glass(bend: 12), thickness: 20, rim: 25)
+        let pane = Pane(.rectangle(Self.box, radius: 30), glass: Picture.Glass(.skin(bend: 12)), thickness: 20, rim: 25)
         let passage = pane.passage(at: Tests.at(5, 50))
         let offset = pane.glass.offset(for: passage.normal)
         #expect(passage.offset == offset)
@@ -162,10 +163,10 @@ extension `Picture Tests`.`A glass adapts to its backdrop and lights its rim` {
         #expect(toward.pixel(Picture.Color.white.pixel) == Picture.Color.white.pixel)
         let dark = Picture.Color(red: 0.05, green: 0.05, blue: 0.1).pixel
         let mid = Picture.Color(red: 0.5, green: 0.5, blue: 0.5).pixel
-        #expect(toward.share(for: dark) > toward.share(for: mid))
+        #expect(toward.pixel(dark).color.green - dark.color.green > toward.pixel(mid).color.green - mid.color.green)
         #expect(Picture.Glass.Adaptation(toward: .white, strength: 0).pixel(dark) == dark)
         let glass = Picture.Glass(tint: .clear, adaptation: toward)
-        #expect(glass.pixel(over: dark) == toward.pixel(dark))
+        #expect(Picture.Glass.Shading(glass).pixel(over: dark) == toward.pixel(dark))
         let dim = Picture.Glass.Adaptation(toward: .black, strength: 1)
         #expect(dim.pixel(Picture.Color.white.pixel).color.red < 1e-6)
     }
@@ -208,13 +209,13 @@ extension `Picture Tests`.`A glass adapts to its backdrop and lights its rim` {
     func `Adaptation moves a backdrop's lightness and keeps its hue and chroma`() {
         let toward = Picture.Glass.Adaptation(toward: .white, strength: 0.6)
         let navy = Picture.Color(red: 0.08, green: 0.08, blue: 0.2).pixel
-        let before = Picture.Glass.Adaptation.oklab(of: navy)
-        let after = Picture.Glass.Adaptation.oklab(of: toward.pixel(navy))
-        #expect(after.L > before.L + 0.2)
+        func oklab(_ pixel: Picture.Pixel) -> (l: Float, a: Float, b: Float) {
+            Color_Standard.Color.Oklab.coordinates(red: pixel.color.red, green: pixel.color.green, blue: pixel.color.blue)
+        }
+        let before = oklab(navy)
+        let after = oklab(toward.pixel(navy))
+        #expect(after.l > before.l + 0.2)
         #expect(Tests.close(after.a, before.a, within: 2e-3) && Tests.close(after.b, before.b, within: 2e-3))
-        let white = Picture.Color.white.pixel
-        #expect(Tests.close(Picture.Glass.Adaptation.lightness(of: white), 1, within: 1e-4))
-        let back = Picture.Glass.Adaptation.color(L: before.L, a: before.a, b: before.b)
-        #expect(Tests.close(back.red, navy.color.red, within: 1e-4) && Tests.close(back.blue, navy.color.blue, within: 1e-4))
+        #expect(toward.pixel(Picture.Color.white.pixel) == Picture.Color.white.pixel)
     }
 }

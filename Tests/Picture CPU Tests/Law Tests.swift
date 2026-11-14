@@ -66,14 +66,15 @@ extension `Picture CPU Tests`.`The CPU renderer keeps, refuses and draws back as
         let scene = Picture.Scene(camera: .init(projection: projection), viewport: .init(llx: 0, lly: 0, urx: 24, ury: 24), models: [])
         let lens = Picture.Renderer.CPU.Lens(scene, .identity)
         let far = Picture.Renderer.CPU.Far(Picture.Renderer.CPU.Stage(), eyes: [], over: .empty)
-        let refraction = Picture.Glass.Refraction(index: 1.5, distance: 4)
+        let body = Picture.Glass.Body(index: 1.5)
         func passage(_ cosine: Double) -> Picture.Renderer.CPU.Passage {
             let sine = (1 - cosine * cosine).squareRoot()
             return Picture.Renderer.CPU.Passage(
                 from: Vector([0, 0, -5]),
                 normal: Vector([sine, 0, cosine]),
                 at: .init(x: 12, y: 12),
-                through: refraction,
+                through: body,
+                surroundings: nil,
                 plane: -9,
                 lens: lens,
                 far: far
@@ -114,7 +115,7 @@ extension `Picture CPU Tests`.`The CPU renderer keeps, refuses and draws back as
             viewport: .init(llx: 0, lly: 0, urx: 24, ury: 24),
             models: [
                 .init(square, transform: .translation(Vector([0, 0, -8])), material: .flat(color)),
-                .init(square, transform: .translation(Vector([0, 0, -3])), material: .glass(.init(bend: 0, tint: tint))),
+                .init(square, transform: .translation(Vector([0, 0, -3])), material: .glass(.init(.skin(bend: 0), tint: tint))),
             ],
             haze: haze
         )

@@ -7,7 +7,7 @@ extension Picture.Glass {
     /// these shares, so a white edge seen through a dispersive rim fans into a smooth rainbow.
     public struct Spectrum: Sendable, Hashable {
         /// The wavelengths, from short to long.
-        public let wavelengths: [Refraction::Refraction.Wavelength<Double>]
+        public let wavelengths: [Refraction.Wavelength<Double>]
 
         /// For each wavelength, its share of red, green and blue; each colour's shares add up to 1.
         public let weights: [Weight]
@@ -31,8 +31,8 @@ extension Picture.Glass.Spectrum {
 
 extension Picture.Glass.Spectrum {
     /// The visible range sampled, 400 to 700 nanometres.
-    public static let range: ClosedRange<Refraction::Refraction.Wavelength<Double>> =
-        Refraction::Refraction.Wavelength(nanometres: 400)...Refraction::Refraction.Wavelength(nanometres: 700)
+    public static let range: ClosedRange<Refraction.Wavelength<Double>> =
+        Refraction.Wavelength(nanometres: 400)...Refraction.Wavelength(nanometres: 700)
 
     /// `count` wavelengths at the midpoints of as many equal parts of `range`, each weighted by `response(at:)`
     /// and every colour's weights divided by their sum, so a flat white is gathered back to white:
@@ -49,7 +49,7 @@ extension Picture.Glass.Spectrum {
             count: Cardinal(UInt(count)),
             observer: .analytic
         )
-        let wavelengths = spectrum.wavelengths.map { Refraction::Refraction.Wavelength(nanometres: $0) }
+        let wavelengths = spectrum.wavelengths.map { Refraction.Wavelength(nanometres: $0) }
         let weights = spectrum.weights.map { Weight(red: Float($0.red), green: Float($0.green), blue: Float($0.blue)) }
         self.init(wavelengths: wavelengths, weights: weights)
     }
@@ -58,7 +58,7 @@ extension Picture.Glass.Spectrum {
     /// swift-color-standard, the CIE 1931 colour matching functions of swift-iso-11664 in the multi-lobe fit of
     /// Wyman, Sloan and Shirley (2013), taken from XYZ into linear sRGB, each held at 0 or more.
     public static func response(
-        at wavelength: Refraction::Refraction.Wavelength<Double>
+        at wavelength: Refraction.Wavelength<Double>
     ) -> (red: Double, green: Double, blue: Double) {
         Color_Standard::Color.Spectrum.response(at: wavelength.nanometres, observer: .analytic)
     }

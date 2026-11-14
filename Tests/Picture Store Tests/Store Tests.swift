@@ -111,10 +111,10 @@ import Testing
             let image = Picture.Image(inner, in: rectangle, scale: 2)
             let picture: Picture = [.fill(Picture.Plane.Path(subpaths: []), .image(image))]
             let store = Picture.Store(try Self.directory(), edition: "fixed")
-            // Written by an earlier run, at the store's format 3: the image's source keeps a `Hasher` value that differs per process,
+            // Written by an earlier run, at the store's format 4: the image's source keeps a `Hasher` value that differs per process,
             // which its canonical value, the part it names, leaves out.
             let hex = try Self.key(store, picture).hex
-            #expect(hex == "a4c416eaec9a2cfccd504622061a90fe8f283237bd8257c4e19f079b271f895b")
+            #expect(hex == "ea9a6456f6aa863c21faa206e27996f90dd9cbfd434fc885cb51faab1b4e80f3")
         }
 
         @Test func `processes keeping one entry at once leave one whole entry`() async throws {

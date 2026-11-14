@@ -30,18 +30,34 @@ extension Picture.Glass {
         /// steeper at the boundary.
         public var profile: Double
 
+        /// How far below the flat bottom the picture behind stands, in picture units, for a glass with a body: as far
+        /// as a scene's model of the same glass stands it behind its farthest point.
+        public var distance: Double
+
+        /// What the top of a body mirrors, by the share Fresnel's equations give, or nothing.
+        public var surroundings: Picture.Glass.Surroundings?
+
+        /// The soft shadows the pane casts on the picture around it, drawn in order before it.
+        public var shadows: [Picture.Glass.Shadow]
+
         public init(
             _ region: Picture.Plane.Region,
             glass: Picture.Glass,
             thickness: Double = 24,
             rim: Double = 24,
-            profile: Double = 3
+            profile: Double = 3,
+            distance: Double = 1,
+            surroundings: Picture.Glass.Surroundings? = nil,
+            shadows: [Picture.Glass.Shadow] = []
         ) {
             self.region = region
             self.glass = glass
             self.thickness = thickness
             self.rim = rim
             self.profile = profile
+            self.distance = distance
+            self.surroundings = surroundings
+            self.shadows = shadows
         }
     }
 }

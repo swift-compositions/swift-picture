@@ -1,7 +1,8 @@
 import Numeric
+public import Vector
 
 extension Picture.Glass {
-    /// A soft shadow a glass casts on the picture around it: its outline as drawn, a pane's region or a body's
+    /// A soft shadow a glass casts, kept by where the glass stands (a pane's `shadows`, a scene's `shadows`) on the picture around it: its outline as drawn, a pane's region or a body's
     /// silhouette, moved by an offset and blurred by a softness, in a colour whose alpha is its strength. It falls
     /// only outside the glass, which shows the picture without it. A thin dark one hugging the outline is the
     /// glass's dark edge.
@@ -12,14 +13,16 @@ extension Picture.Glass {
         public var softness: Double
 
         /// How far the shadow is moved from the glass, in picture units.
-        public var x: Double
-        public var y: Double
+        public var offset: Vector<2, Double>
 
-        public init(color: Picture.Color = Picture.Color(red: 0, green: 0, blue: 0, alpha: 0.2), softness: Double = 16, x: Double = 0, y: Double = 6) {
+        public init(
+            color: Picture.Color = Picture.Color(red: 0, green: 0, blue: 0, alpha: 0.2),
+            softness: Double = 16,
+            offset: Vector<2, Double> = Vector([0, 6])
+        ) {
             self.color = color
             self.softness = softness
-            self.x = x
-            self.y = y
+            self.offset = offset
         }
     }
 }

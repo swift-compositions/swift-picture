@@ -68,14 +68,20 @@ extension `Picture CPU Tests`.`Timing` {
     }
 
     /// A torus of 96 × 48 quads, turned toward the camera, filling most of a full-HD viewport.
-    static func torus(_ material: Picture.Scene.Material) throws -> Picture.Scene {
+    static func torus(
+        _ material: Picture.Scene.Material,
+        surroundings: Picture.Glass.Surroundings? = nil,
+        shadows: [Picture.Glass.Shadow] = []
+    ) throws -> Picture.Scene {
         let projection = try Projection<Double>.perspective(fieldOfView: .init(0.9), aspect: 1920.0 / 1080, near: 0.5, far: 50, depth: .symmetric)
         let turn = Matrix<4, 4, Double>(rows: [[1, 0, 0, 0], [0, 0.6, -0.8, 0], [0, 0.8, 0.6, -6], [0, 0, 0, 1]])
         let mesh = Mesh<Point<3, Double>>.torus(major: 2, minor: 0.8, segments: 96, sides: 48)
         return Picture.Scene(
             camera: .init(projection: projection),
             viewport: .init(llx: 0, lly: 0, urx: 1920, ury: 1080),
-            models: [.init(mesh, transform: turn, material: material)]
+            models: [.init(mesh, transform: turn, material: material)],
+            surroundings: surroundings,
+            shadows: shadows
         )
     }
 
@@ -138,7 +144,7 @@ extension `Picture CPU Tests`.`Timing` {
             print("Timing: flat torus \(try Self.time([.scene(try Self.torus(.flat(color)))]))")
             print("Timing: wireframe torus \(try Self.time([.scene(try Self.torus(.wireframe(color, width: 1.5)))]))")
             print("Timing: points torus \(try Self.time([.scene(try Self.torus(.points(color, radius: 2)))]))")
-            let glass = Picture.Scene.Material.glass(.init(bend: 40, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1)))
+            let glass = Picture.Scene.Material.glass(.init(.skin(bend: 40), tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1)))
             print("Timing: glass torus over the flat frame \(try Self.time(Self.flat.appending([.scene(try Self.torus(glass))])))")
         }
 
@@ -151,18 +157,16 @@ extension `Picture CPU Tests`.`Timing` {
             let frame = Tests.rectangle(0, 0, 1920, 1080)
             print("Timing: image full frame \(try Self.time([.shape(.init(frame, fill: .init(.image(turned))))]))")
             let light = Picture.Glass.Light(direction: Vector([-0.4, -0.6, 1]), rim: 0.6, width: 2, sheen: 0.4)
-            let body = Picture.Glass(
-                tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1),
-                light: light,
-                refraction: .init(index: 1.5, distance: 2, abbe: 20, surroundings: .init(above: .white, below: .black)),
-                shadows: [.init()]
-            )
-            print("Timing: glass torus with a body over the flat frame \(try Self.time(Self.flat.appending([.scene(try Self.torus(.glass(body)))])))")
+            let body = Picture.Glass(.body(.init(index: 1.5, abbe: 20)), tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1), light: light)
+            let torus = try Self.torus(.glass(body, distance: 2), surroundings: .init(above: .white, below: .black), shadows: [.init()])
+            print("Timing: glass torus with a body over the flat frame \(try Self.time(Self.flat.appending([.scene(torus)])))")
             let pane = Picture.Glass.Pane(
                 .rectangle(.init(llx: 460, lly: 290, urx: 1460, ury: 790), radius: 80),
-                glass: Picture.Glass(light: light, refraction: .init(index: 1.5, distance: 8, abbe: 20), frost: 4, shadows: [.init()]),
+                glass: Picture.Glass(.body(.init(index: 1.5, abbe: 20)), light: light, frost: 4),
                 thickness: 24,
-                rim: 30
+                rim: 30,
+                distance: 8,
+                shadows: [.init()]
             )
             print("Timing: frosted pane over the flat frame \(try Self.time(Self.flat.appending([.pane(pane)])))")
         }

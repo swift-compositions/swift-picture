@@ -14,18 +14,18 @@ extension Picture.Renderer.CPU.Spectra {
         let indices: [Refraction.Index<Double>]
         let starts: [Int]
 
-        init(_ refraction: Picture.Glass.Refraction) {
+        init(_ body: Picture.Glass.Body) {
             let range = Picture.Glass.Spectrum.range
-            self.own = refraction.index
-            self.dispersive = refraction.medium.isDispersive
-            self.short = refraction.index(at: range.lowerBound)
-            self.long = refraction.index(at: range.upperBound)
+            self.own = body.index
+            self.dispersive = body.medium.isDispersive
+            self.short = body.index(at: range.lowerBound)
+            self.long = body.index(at: range.upperBound)
             var indices: [Refraction.Index<Double>] = []
             var starts: [Int] = []
             if dispersive {
                 for spectrum in Picture.Renderer.CPU.Spectra.table {
                     starts.append(indices.count)
-                    for wavelength in spectrum.wavelengths { indices.append(refraction.index(at: wavelength)) }
+                    for wavelength in spectrum.wavelengths { indices.append(body.index(at: wavelength)) }
                 }
             }
             self.indices = indices

@@ -36,24 +36,25 @@ extension `Picture CPU Tests`.`A frame drawn on several threads is the frame dra
         elements.append(small(flat.glow(deviation: 5)))
         elements.append(small(flat.backdrop([.blur(.init(deviation: 20))], clip: .init(Tests.rectangle(400, 200, 900, 500)))))
         elements.append(small([.sprites(.init(Array(Timing.swarm.sprites.prefix(2000)), profile: .soft))]))
-        let glass = Picture.Scene.Material.glass(.init(bend: 40, tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1)))
+        let glass = Picture.Scene.Material.glass(.init(.skin(bend: 40), tint: .init(red: 1, green: 1, blue: 1, alpha: 0.1)))
         elements.append(small([.scene(try torus(.flat(.init(red: 0.9, green: 0.5, blue: 0.3))))]))
         elements.append(small([.scene(try torus(glass))]))
         let around = Picture.Glass.Surroundings(above: .white, below: .init(gray: 0.2), width: 1.2)
-        let body = Picture.Glass.Refraction(index: 1.5, distance: 2, abbe: 20, surroundings: around)
-        elements.append(small([.scene(try torus(.glass(.init(bend: 0, tint: .init(red: 1, green: 0.4, blue: 0.5, alpha: 0.3), refraction: body))))]))
+        let body = Picture.Glass(.body(.init(index: 1.5, abbe: 20)), tint: .init(red: 1, green: 0.4, blue: 0.5, alpha: 0.3))
+        elements.append(small([.scene(try torus(.glass(body, distance: 2), surroundings: around))]))
         elements.append(small([.scene(try torus(.wireframe(.init(red: 0.2, green: 0.5, blue: 0.9), width: 1.5)))]))
         return Picture(elements)
     }
 
     /// The timing suite's torus with fewer quads.
-    static func torus(_ material: Picture.Scene.Material) throws -> Picture.Scene {
+    static func torus(_ material: Picture.Scene.Material, surroundings: Picture.Glass.Surroundings? = nil) throws -> Picture.Scene {
         let scene = try Timing.torus(material)
         let mesh = Mesh<Point<3, Double>>.torus(major: 2, minor: 0.8, segments: 24, sides: 12)
         return Picture.Scene(
             camera: scene.camera,
             viewport: scene.viewport,
-            models: [.init(mesh, transform: scene.models[0].transform, material: material)]
+            models: [.init(mesh, transform: scene.models[0].transform, material: material)],
+            surroundings: surroundings
         )
     }
 

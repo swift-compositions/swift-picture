@@ -86,7 +86,7 @@ extension Picture.Renderer.CPU.Stage {
                     }
                 }
 
-            case .glass(let glass):
+            case .glass(let glass, _):
                 for face in mesh.faces {
                     let polygon = Self.clipped(face.vertices.map { corners[Int(bitPattern: $0)] })
                     for triangle in Self.fan(polygon) {
@@ -107,7 +107,7 @@ extension Picture.Renderer.CPU.Stage {
                         )
                         self.glass.append([a, b, c])
                         surfaces.append(surface)
-                        if glass.refraction != nil, !surface.front {
+                        if glass.body != nil, !surface.front {
                             far.append([a, b, c])
                             exits.append(surface)
                         }
@@ -422,11 +422,11 @@ extension Picture.Renderer.CPU.Canvas {
         }
         let glass = Picture.Renderer.CPU.Stage.tiles(stage.glass, over: area)
         let eyes = scene.models.map { scene.camera.eye(of: $0.transform) }
-        let shadows = stage.surfaces.first { !$0.glass.shadows.isEmpty }?.glass.shadows ?? []
+        let shadows = scene.shadows
         let lined = stage.surfaces.contains { ($0.glass.light?.rim ?? 0) > 0 && ($0.glass.light?.width ?? 0) > 0 }
         var reachOfShadows = 0.0
         for shadow in shadows {
-            reachOfShadows = Swift.max(reachOfShadows, (abs(shadow.x) + abs(shadow.y) + 4 * Swift.max(shadow.softness, 0)) * scale)
+            reachOfShadows = Swift.max(reachOfShadows, (abs(shadow.offset[0]) + abs(shadow.offset[1]) + 4 * Swift.max(shadow.softness, 0)) * scale)
         }
         let outlined =
             shadows.isEmpty && !lined
@@ -443,8 +443,8 @@ extension Picture.Renderer.CPU.Canvas {
             for shadow in shadows where shadow.color.alpha > 0 {
                 let color = shadow.color.with(alpha: 1).pixel
                 let strength = shadow.color.alpha
-                let across = state.transform[0, 0] * shadow.x + state.transform[0, 1] * shadow.y
-                let down = state.transform[1, 0] * shadow.x + state.transform[1, 1] * shadow.y
+                let across = state.transform[0, 0] * shadow.offset[0] + state.transform[0, 1] * shadow.offset[1]
+                let down = state.transform[1, 0] * shadow.offset[0] + state.transform[1, 1] * shadow.offset[1]
                 update(outlined.box, state.workers) { x, y, old in
                     let distance = outlined.distance(Double(x) + 0.5 - across, Double(y) + 0.5 - down)
                     guard distance.isFinite else { return old }
@@ -455,19 +455,19 @@ extension Picture.Renderer.CPU.Canvas {
             }
         }
         let glasses = scene.models.map { model -> Picture.Glass? in
-            if case .glass(let glass) = model.material { return glass }
+            if case .glass(let glass, _) = model.material { return glass }
             return nil
         }
-        let shadings = glasses.map { $0?.shading ?? Picture.Glass().shading }
-        let tilts = glasses.map { $0?.refraction?.tilts ?? [1, 1, 1] }
-        let refractions = glasses.map { $0?.refraction }
-        let indices = glasses.map { $0?.refraction.map(Picture.Renderer.CPU.Spectra.Indices.init) }
+        let shadings = glasses.map { Picture.Glass.Shading($0 ?? Picture.Glass(), surroundings: scene.surroundings) }
+        let tilts = glasses.map { $0?.body?.tilts ?? [1, 1, 1] }
+        let bodies = glasses.map { $0?.body }
+        let indices = glasses.map { $0?.body.map(Picture.Renderer.CPU.Spectra.Indices.init) }
         let corners = stage.surfaces.map(\.corners)
         let models = stage.surfaces.map(\.model)
         let linear = Picture.Renderer.CPU.Affine(state.transform)
         let lens = Picture.Renderer.CPU.Lens(scene, state.transform)
         let far = Picture.Renderer.CPU.Far(stage, eyes: eyes, over: area)
-        let bodies = zip(scene.models, eyes).map { model, eye in Picture.Renderer.CPU.Body(model, eye: eye, lens: lens, scale: scale) }
+        let measures = zip(scene.models, eyes).map { model, eye in Picture.Renderer.CPU.Body(model, eye: eye, lens: lens, scale: scale) }
         unsafe tiles(glass.count, state.workers) { shared, box, part in
             let (tile, numbers) = glass[part]
             let covers = opaque[part].triangles
@@ -497,21 +497,21 @@ extension Picture.Renderer.CPU.Canvas {
                     if inward.isFinite {
                         outline = Picture.Glass.Outline(
                             inward: Swift.max(inward, 0),
-                            x: across > 0 ? normal[0] / across : 0,
-                            y: across > 0 ? normal[1] / across : 0
+                            outward: Vector([across > 0 ? normal[0] / across : 0, across > 0 ? normal[1] / across : 0])
                         )
                     }
                 }
                 func read(_ x: Double, _ y: Double) -> Picture.Pixel {
                     level >= 0 ? frosts[level].read(x, y, frosting: frosting) : .transparent
                 }
-                if let refraction = refractions[model], let spectra = indices[model] {
+                if let body = bodies[model], let spectra = indices[model] {
                     let passage = Picture.Renderer.CPU.Passage(
                         from: surface.place(hit.weights),
                         normal: normal,
                         at: .init(x: sampleX, y: sampleY),
-                        through: refraction,
-                        plane: bodies[model]?.plane ?? -.infinity,
+                        through: body,
+                        surroundings: scene.surroundings,
+                        plane: measures[model]?.plane ?? -.infinity,
                         lens: lens,
                         far: far
                     )
@@ -523,8 +523,8 @@ extension Picture.Renderer.CPU.Canvas {
                         }
                     ) { read($0, $1) }
                     return shading.pixel(
-                        over: [behind, behind, behind],
-                        through: passage.length / (bodies[model]?.thickness ?? 1),
+                        over: Picture.Renderer.CPU.Spectra.joined(behind),
+                        through: passage.length / (measures[model]?.thickness ?? 1),
                         leaving: passage.leaving,
                         beyond: passage.beyond,
                         mirroring: passage.mirrored,
@@ -541,7 +541,7 @@ extension Picture.Renderer.CPU.Canvas {
                     x: Double(x) + (Double(column % samples) + 0.5) / Double(samples) + across,
                     y: Double(y) + (Double(row % samples) + 0.5) / Double(samples) + down
                 )
-                return shading.lit(shading.coat(read(point.x, point.y)), facing: normal, outline: outline, tilts: [1, 1, 1])
+                return shading.pixel(over: read(point.x, point.y), facing: normal, outline: outline)
             } finish: { x, y, old, mean in
                 Picture.Renderer.CPU.limited(old, mean, state.share(x, y))
             }

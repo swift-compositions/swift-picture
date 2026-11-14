@@ -104,7 +104,7 @@ extension `Picture Tests`.`Short forms are the long forms they stand for` {
 
     @Test
     func `A shadow with another alpha keeps its colour, softness and offset`() {
-        let shadow = Picture.Glass.Shadow(color: Picture.Color(red: 0.1, green: 0.2, blue: 0.3, alpha: 0.4), softness: 3, x: 1, y: 2)
-        #expect(shadow.with(alpha: 0.9) == Picture.Glass.Shadow(color: Picture.Color(red: 0.1, green: 0.2, blue: 0.3, alpha: 0.9), softness: 3, x: 1, y: 2))
+        let shadow = Picture.Glass.Shadow(color: Picture.Color(red: 0.1, green: 0.2, blue: 0.3, alpha: 0.4), softness: 3, offset: Vector([1, 2]))
+        #expect(shadow.with(alpha: 0.9) == Picture.Glass.Shadow(color: Picture.Color(red: 0.1, green: 0.2, blue: 0.3, alpha: 0.9), softness: 3, offset: Vector([1, 2])))
     }
 }

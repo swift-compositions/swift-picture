@@ -54,7 +54,8 @@ extension Picture.Renderer.CPU.Passage {
         from place: Vector<3, Double>,
         normal: Vector<3, Double>,
         at point: Read,
-        through refraction: Picture.Glass.Refraction,
+        through body: Picture.Glass.Body,
+        surroundings: Picture.Glass.Surroundings?,
         plane: Double,
         lens: Picture.Renderer.CPU.Lens,
         far: Picture.Renderer.CPU.Far
@@ -62,7 +63,7 @@ extension Picture.Renderer.CPU.Passage {
         let sight = lens.sight(through: place)
         let toward = Self.dot(normal, sight) > 0 ? Self.scaled(normal, -1) : normal
         let cosine = -Self.dot(sight, toward)
-        let index = refraction.index
+        let index = body.index
         let inner = Refraction.Interface(from: .vacuum, into: index).refracted(sight, at: toward).transmission ?? sight
         let own = lens.raster(of: place)
 
@@ -100,12 +101,12 @@ extension Picture.Renderer.CPU.Passage {
             leaving: sight,
             beyond: 0,
             mirrored: Refraction.reflected(sight, at: toward),
-            share: refraction.surroundings == nil ? 0 : Refraction.Interface(from: .vacuum, into: index).reflectance(cosine: cosine)
+            share: surroundings == nil ? 0 : Refraction.Interface(from: .vacuum, into: index).reflectance(cosine: cosine)
         )
         let way = passage.way(within: inner, lens: lens)
         passage.read = way.read ?? point
         passage.leaving = way.out
-        passage.beyond = refraction.surroundings?.share(leaving: way.out, along: sight) ?? 0
+        passage.beyond = surroundings?.share(leaving: way.out, along: sight) ?? 0
         self = passage
     }
 

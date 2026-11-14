@@ -10,11 +10,28 @@ extension Picture {
         public var models: [Model]
         public var haze: Haze?
 
-        public init(camera: Camera, viewport: Picture.Plane.Rectangle, models: [Model], haze: Haze? = nil) {
+        /// What is around the scene, for the bodies of its glass to mirror and to show where light leaves them too
+        /// far aside to meet the picture behind, or nothing.
+        public var surroundings: Picture.Glass.Surroundings?
+
+        /// The soft shadows the scene's glass casts on the picture around it, from the outline of all its glass as
+        /// drawn, in order, after the opaque models and before the glass.
+        public var shadows: [Picture.Glass.Shadow]
+
+        public init(
+            camera: Camera,
+            viewport: Picture.Plane.Rectangle,
+            models: [Model],
+            haze: Haze? = nil,
+            surroundings: Picture.Glass.Surroundings? = nil,
+            shadows: [Picture.Glass.Shadow] = []
+        ) {
             self.camera = camera
             self.viewport = viewport
             self.models = models
             self.haze = haze
+            self.surroundings = surroundings
+            self.shadows = shadows
         }
     }
 }
