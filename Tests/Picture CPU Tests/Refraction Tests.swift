@@ -229,7 +229,6 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
 extension `Picture CPU Tests`.`A renderer draws glass with a body by the way light takes through it` {
     @Test
     func `A ball enlarges the picture behind its middle as the refraction's law says`() throws {
-        // A fine ball: on a coarse one the flat faces around the axis flatten what the middle reads.
         // A ramp from red at x 0 to blue at x 40: a pixel's blue in linear light is a fortieth of where it was read.
         let gradient = Picture.Paint.linear(
             .init(from: Tests.at(0, 0), to: Tests.at(40, 0), .init([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.blue)]))
@@ -244,6 +243,35 @@ extension `Picture CPU Tests`.`A renderer draws glass with a body by the way lig
             let law = refraction.enlargement(radius: 15)
             // The law is paraxial; a read 2.5 pixels off the axis of a ball 15 pixels in radius bends a few per cent more.
             #expect(abs(seen - law) <= 0.1 * abs(law), "distance \(distance): drawn \(seen), law \(law)")
+        }
+    }
+}
+
+extension `Picture CPU Tests`.`A renderer draws glass with a body by the way light takes through it` {
+    @Test
+    func `A coarse ball seen along its poles enlarges as the law says, its first ring leaning no further than the sphere`() throws {
+        // Issue 1: the first ring of vertex normals round a pole leaned a quarter too far, and a 48 × 24 ball at
+        // contact enlarged 4.55 times against the law's 3. Read one pixel across the axis, where the paraxial law
+        // holds to about 1 %; a ring step of π / parallels puts the flat faces up to (π / parallels)² / 8 of the
+        // radius off the sphere, under 1 % at 12 parallels. So 3 % holds the law and leaves room.
+        let gradient = Picture.Paint.linear(
+            .init(from: Tests.at(0, 0), to: Tests.at(40, 0), .init([.init(offset: 0, color: Tests.red), .init(offset: 1, color: Tests.blue)]))
+        )
+        let background: [Picture.Element] = [.shape(.init(Tests.rectangle(-20, -20, 80, 80), fill: .init(gradient)))]
+        for (meridians, parallels): (Cardinal, Cardinal) in [(48, 24), (24, 12)] {
+            for distance in [0.0, 3, 40] {
+                let refraction = Glass.Refraction(index: 1.5, distance: distance, abbe: .infinity)
+                let ball = Picture.Scene.Model(
+                    .sphere(radius: 1.5, meridians: meridians, parallels: parallels),
+                    transform: Self.translation(0, 0, -5),
+                    material: .glass(.init(refraction: refraction))
+                )
+                let raster = try Tests.drawn(Picture(background + [.scene(try Self.flat([ball]))]), on: Tests.canvas(40, 40))
+                func read(_ x: UInt) -> Double { 40 * Double(Tests.at(raster, x, 19).color.blue + Tests.at(raster, x, 20).color.blue) / 2 }
+                let seen = 1 / (read(20) - read(19))
+                let law = refraction.enlargement(radius: 15)
+                #expect(abs(seen - law) <= 0.03 * abs(law), "\(meridians) × \(parallels), distance \(distance): drawn \(seen), law \(law)")
+            }
         }
     }
 }

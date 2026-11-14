@@ -262,3 +262,24 @@ extension `Picture Tests`.`An effect reads the sheet at a point it names` {
         #expect(seen.lighter && seen.darker)
     }
 }
+
+extension `Picture Tests`.`An effect reads the sheet at a point it names` {
+    @Test
+    func `A grain's shares and a displacement's offsets are the values recorded, bit for bit`() {
+        // Golden values: a change in swift-threefry or swift-noise, or in how these read them, fails here.
+        let grain = Picture.Effect.Grain(seed: Threefry.Key(3, 9), amount: 0.2, size: 4)
+        #expect(grain.share(at: Tests.at(0.5, 0.5)).bitPattern == 13_819_737_663_767_960_468)
+        #expect(grain.share(at: Tests.at(13.5, -7.25)).bitPattern == 13_823_245_104_484_283_540)
+        #expect(grain.share(at: Tests.at(-101, 57.3)).bitPattern == 4_596_420_736_674_907_984)
+        let field = Picture.Effect.Displacement(seed: Threefry.Key(7, 11), frequency: 0.05, amplitude: 12, phase: 0.3)
+        let recorded: [(Double, Double, UInt64, UInt64)] = [
+            (0.5, 0.5, 13_828_841_375_918_692_656, 13_819_341_374_339_716_724),
+            (13.25, 40.75, 13_826_835_500_910_911_757, 4_604_319_684_113_623_566),
+            (-250.5, 19.5, 13_828_717_710_861_953_176, 13_826_602_545_813_454_359),
+        ]
+        for (x, y, across, down) in recorded {
+            let offset = field.offset(at: Tests.at(x, y))
+            #expect(offset[0].bitPattern == across && offset[1].bitPattern == down, "at (\(x), \(y))")
+        }
+    }
+}

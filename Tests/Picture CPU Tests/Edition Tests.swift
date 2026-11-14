@@ -20,20 +20,21 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
     typealias Texts = `Picture CPU Tests`.`A renderer never sees a font: text is drawn as its glyphs' paths`
 
     /// The edition the digests were recorded at.
-    static let recorded = 4
+    static let recorded = 5
 
     /// The digests of the pictures by name, at `recorded`.
     static let digests: [String: UInt64] = [
-        "blur": 16_365_094_295_220_398_297, "blur wide": 12_362_251_832_773_303_258, "body": 15_551_846_447_682_715_624,
+        "blur": 16_365_094_295_220_398_297, "blur wide": 12_362_251_832_773_303_258, "body": 5_695_001_110_681_494_359,
+        "body perspective": 11_939_111_699_142_671_703,
         "chromatic": 7_601_239_310_432_139_073, "clip": 9_197_774_706_600_063_139, "displacement": 40_796_383_757_729_642,
-        "fill": 13_478_648_827_929_281_320, "glass lit": 7_616_450_354_887_577_720, "glass skin": 9_959_662_602_774_493_380,
+        "fill": 13_478_648_827_929_281_320, "glass lit": 2_148_291_476_381_713_427, "glass skin": 6_094_913_968_729_550_855,
         "glow": 5_255_089_816_006_074_967, "gradient": 13_618_457_707_398_550_439, "grain": 6_616_373_746_132_311_705,
-        "haze": 9_813_762_815_853_622_397, "image": 17_824_492_936_900_664_916, "kaleidoscope": 7_307_888_135_593_406_063,
+        "haze": 9_813_762_815_853_622_397, "image": 17_824_492_936_900_664_916, "image wrap": 3_544_487_883_116_701_120, "kaleidoscope": 7_307_888_135_593_406_063,
         "kaleidoscope seam": 5_065_068_606_888_849_130, "layer": 6_504_368_761_510_991_401, "pane": 512_956_940_389_858_056,
         "pane in layer": 4_836_342_287_108_365_303, "pane lit": 9_874_146_188_651_585_072, "perspective": 8_970_295_728_383_599_765,
         "pixelation": 15_401_056_594_709_881_789, "points": 9_509_117_827_624_912_309, "radial": 5_047_031_188_845_464_965,
-        "scene": 13_778_693_326_194_718_988, "sprites": 16_374_441_649_486_050_100, "sprites hard": 17_357_968_471_778_099_155,
-        "stroke": 1_018_931_843_031_873_205, "swirl": 134_901_429_789_531_203, "text": 14_706_559_016_298_247_301,
+        "scene": 17_277_206_965_097_975_504, "sprites": 16_374_441_649_486_050_100, "sprites hard": 17_357_968_471_778_099_155,
+        "stroke": 1_018_931_843_031_873_205, "stroke miter": 4_817_715_692_923_771_485, "swirl": 134_901_429_789_531_203, "text": 14_706_559_016_298_247_301,
         "threshold": 15_865_724_926_579_864_926, "wireframe": 14_339_381_697_345_303_917, "zoom": 10_111_084_808_051_290_672,
         "zoom whole": 6_946_551_177_346_062_151,
     ]
@@ -47,6 +48,12 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
     /// A scene seen square-on through an orthographic camera, into a viewport of 24 × 24.
     static func scene(_ models: [Picture.Scene.Model]) throws -> Picture.Scene {
         let projection = try Projection<Double>.orthographic(width: 4, height: 4, near: 0, far: 10, depth: .unit)
+        return Picture.Scene(camera: .init(projection: projection), viewport: .init(llx: 0, lly: 0, urx: 24, ury: 24), models: models)
+    }
+
+    /// A scene seen through a perspective lens whose window at the near plane 1 is −1…1, into a viewport of 24 × 24.
+    static func deep(_ models: [Picture.Scene.Model]) throws -> Picture.Scene {
+        let projection = try Projection<Double>(.perspective, left: -1, right: 1, bottom: -1, top: 1, near: 1, far: 20, depth: .symmetric)
         return Picture.Scene(camera: .init(projection: projection), viewport: .init(llx: 0, lly: 0, urx: 24, ury: 24), models: models)
     }
 
@@ -132,6 +139,17 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
         )
         perspective.sampling = .bilinear
         let pane = Picture.Glass.Pane(.capsule(.init(llx: 3, lly: 6, urx: 21, ury: 18)), glass: lit, thickness: 3, rim: 4)
+        let wrapped = Picture.Image(
+            Raster<Picture.Pixel>(width: 3, height: 2) { x, y in Tests.pixel(Float(Int(bitPattern: x)) / 3, Float(Int(bitPattern: y)) / 2, 0.6, 1) },
+            placement: Picture.Transform(rows: [[2.5, 0.7, 1], [-0.5, 2.5, 2]]),
+            sampling: .nearest,
+            edge: .wrap
+        )
+        let ball = Picture.Scene.Model(
+            .sphere(radius: 1.5, meridians: 8, parallels: 4),
+            transform: Refraction.translation(0.5, 0, -5),
+            material: .glass(.init(refraction: .init(index: 1.5, distance: 8, abbe: 10)))
+        )
         let radial = Picture.Paint.radial(.init(center: Tests.at(10, 13), radius: 11, Picture.Gradient(evenly: [.white, Tests.red, .clear])))
         return [
             "sprites": [.sprites(sprites)],
@@ -173,6 +191,9 @@ extension `Picture CPU Tests`.`The edition names the drawing: a picture of each 
             "grain": under(.grain(.init(seed: .init(3, 4), amount: 0.3, size: 1.5))),
             "threshold": under(.threshold(.init(level: 0.3, knee: 0.2))),
             "blur wide": under(.blur(.init(deviation: 3))),
+            "body perspective": Picture(backdrop + [.scene(try Self.deep([ball]))]),
+            "image wrap": [.fill(Tests.rectangle(0, 0, 24, 24), .image(wrapped))],
+            "stroke miter": [.stroke(triangle, .solid(Tests.blue), pen: .init(width: 3, join: .miter(limit: 4), cap: .butt))],
         ]
     }
 

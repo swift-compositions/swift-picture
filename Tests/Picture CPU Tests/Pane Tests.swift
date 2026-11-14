@@ -104,6 +104,28 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
     }
 
     @Test
+    func `Frost kept coarser from a deviation of 6 on reads as the full blur, within a hundredth of a step`() throws {
+        // A black-to-white step under the level middle, where the whole frost is kept, against the layer blur of
+        // the same deviation. Factors 2, 3, 4 and 8: the coarse raster and its bilinear read stay within 0.01.
+        let step: [Picture.Element] = [
+            Tests.fill(Tests.rectangle(-40, -40, 200, 160), .black),
+            Tests.fill(Tests.rectangle(60, -40, 100, 160), .white),
+        ]
+        for deviation in [6.0, 9, 12, 24] {
+            let glass = Picture.Glass(refraction: .init(index: 1), frost: deviation)
+            let pane = Picture.Glass.Pane(.rectangle(.init(llx: 20, lly: 15, urx: 100, ury: 65), radius: 8), glass: glass, thickness: 6, rim: 10)
+            let frosted = try Tests.drawn(Picture(step + [.pane(pane)]), on: Tests.canvas(120, 80))
+            let blurred = try Tests.drawn([.layer(Picture.Layer(Picture(step), effects: [.blur(.init(deviation: deviation))]))], on: Tests.canvas(120, 80))
+            for x: UInt in 32..<88 {
+                for y: UInt in [32, 40, 48] {
+                    let apart = abs(Tests.at(frosted, x, y).color.red - Tests.at(blurred, x, y).color.red)
+                    #expect(apart <= 0.01, "deviation \(deviation) at (\(x), \(y)): \(apart)")
+                }
+            }
+        }
+    }
+
+    @Test
     func `Two panes that come close join by a neck that follows their distance`() throws {
         func drawn(_ gap: Double) throws -> Tests.Canvas {
             let a = Picture.Plane.Region.ball(.init(center: Tests.at(40 - 10 - gap / 2, 30), radius: .init(10)))

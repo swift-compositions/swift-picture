@@ -46,6 +46,23 @@ extension `Picture Tests`.`A pane is a slab of glass with a rounded rim` {
     }
 
     @Test
+    func `From a profile of 3 on the top meets the level middle with no bend, where a quarter circle bends`() {
+        // The bend is the slope's rate of change; a step ε short of the rim, slope / ε tends to it. A quarter
+        // circle's tends to thickness / rim², and from p = 3 on it falls with ε as (ε / rim)^(p − 2).
+        let full = 20.0 / (25 * 25)
+        for profile in [2.0, 3, 4, 6] {
+            let pane = Pane(.rectangle(Self.box, radius: 30), glass: Picture.Glass(), thickness: 20, rim: 25, profile: profile)
+            let epsilon = 25e-3
+            let bend = pane.slope(at: 25 - epsilon) / epsilon
+            if profile == 2 {
+                #expect(abs(bend - full) <= 1e-3 * full)
+            } else {
+                #expect(bend <= 1.01e-3 * full)
+            }
+        }
+    }
+
+    @Test
     func `Where the top is level the picture is read where it stands, under any index and dispersion`() {
         let pane = Self.pane(index: 1.7, abbe: 20, distance: 40)
         for (x, y) in [(100.0, 50.0), (60.0, 40.0), (150.0, 70.0)] {
