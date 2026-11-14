@@ -71,8 +71,14 @@ extension `Picture CPU Tests`.`The CPU renderer is the renderer a picture is dra
 
     @Test
     func `The same renderer on the same machine gives equal rasters for equal pictures`() throws {
-        let first = try Tests.drawn(Self.picture, on: Self.backdrop)
-        let second = try Tests.drawn(Self.picture, on: Self.backdrop)
+        // One renderer value, and a second picture built apart from the first, equal to it.
+        let renderer = Picture.Renderer.cpu(threads: 3)
+        let equal = Picture(Self.picture.elements.map { $0 })
+        #expect(equal == Self.picture)
+        var first = Self.backdrop
+        try renderer.render(Self.picture, into: &first)
+        var second = Self.backdrop
+        try renderer.render(equal, into: &second)
         #expect(first == second)
         #expect(first != Self.backdrop)
     }

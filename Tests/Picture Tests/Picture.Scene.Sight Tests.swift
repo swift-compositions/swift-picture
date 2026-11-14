@@ -107,3 +107,24 @@ extension `Picture Tests`.`A camera sees a point at a place with its distance, t
         #expect(scene.smear(since: now) == nil)
     }
 }
+
+extension `Picture Tests`.`A camera sees a point at a place with its distance, through haze, and mixes toward another` {
+    @Test
+    func `A view that is not rigid mixes entry by entry, and lenses of another kind switch at a share of one`() throws {
+        let lens = try Projection<Double>.perspective(fieldOfView: Radian(0.9), aspect: 16 / 9, near: 0.5, far: 200, depth: .unit)
+        let flat = try Projection<Double>.orthographic(width: 4, height: 3, near: 0, far: 100, depth: .unit)
+        let symmetric = try Projection<Double>.perspective(fieldOfView: Radian(0.9), aspect: 16 / 9, near: 0.5, far: 200, depth: .symmetric)
+        let stretched = Matrix<4, 4, Double>.scale(Vector([2, 1, 1]))
+        let moved = Matrix<4, 4, Double>.translation(Vector([1, -2, 3]))
+        let start = Picture.Scene.Camera(projection: lens, view: stretched)
+        let end = Picture.Scene.Camera(projection: lens, view: moved)
+        let quarter = start.mixed(to: end, at: 0.25)
+        #expect((0..<16).allSatisfy { quarter.view[$0 / 4, $0 % 4] == stretched[$0 / 4, $0 % 4] + (moved[$0 / 4, $0 % 4] - stretched[$0 / 4, $0 % 4]) * 0.25 })
+        for other in [flat, symmetric] {
+            let away = Picture.Scene.Camera(projection: other, view: moved)
+            #expect(start.mixed(to: away, at: 0.5).projection == lens)
+            #expect(start.mixed(to: away, at: 0.999).projection == lens)
+            #expect(start.mixed(to: away, at: 1).projection == other)
+        }
+    }
+}

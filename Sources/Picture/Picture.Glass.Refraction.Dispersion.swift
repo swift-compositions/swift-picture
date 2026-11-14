@@ -4,7 +4,8 @@ extension Picture.Glass.Refraction {
         /// One index for every wavelength: no colours part.
         public static let none: Double = .infinity
 
-        /// About crown glass: colours part only where the bend is steep, as a faint fringe. The default.
+        /// Between crown glass, about 60, and dense flint, about 30: colours part only where the bend is steep, as a
+        /// faint fringe. The default.
         public static let subtle: Double = 45
 
         /// Far past any optical glass: every lensed edge fans into a full rainbow.
