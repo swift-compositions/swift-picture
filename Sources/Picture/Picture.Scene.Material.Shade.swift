@@ -32,7 +32,7 @@ extension Picture.Scene.Material.Shade {
     /// The light a surface takes at a normal in eye space: `cosine(facing:)` plus `rim(facing:)`. Read from 0 on
     /// the dark side, 1 where the surface faces the lamp, and past 1 where the rim adds to it.
     public func light(facing normal: Vector<3, Double>) -> Double {
-        cosine(facing: normal) + rim(facing: normal)
+        Prepared(self).light(facing: normal)
     }
 
     /// The lamp's part of the light at a normal in eye space: Lambert's cosine to the lamp, held at 0 or more.

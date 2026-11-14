@@ -1,12 +1,13 @@
 import Picture
 
 extension Picture.Renderer.CPU {
-    /// What a shaded triangle shows: its model's shade, with the ramp taken out of sRGB once, the matrix into
-    /// eye space, and at each corner the mesh's normal and the fourth clip coordinate, by which the normals are
-    /// mixed so that they follow perspective.
+    /// What a shaded triangle shows: its model's shade made ready, the number of its ramp among the stage's,
+    /// taken out of sRGB once, the matrix into eye space, and at each corner the mesh's normal and the fourth
+    /// clip coordinate, by which the normals are mixed so that they follow perspective. It holds plain numbers
+    /// only, so a sample point reads it without copying a ramp.
     struct Shaded {
-        let shade: Picture.Scene.Material.Shade
-        let ramp: Picture.Gradient.Ramp
+        let shade: Picture.Scene.Material.Shade.Prepared
+        let ramp: Int
         let eye: Matrix<4, 4, Double>
         let normals: InlineArray<3, Vector<3, Double>>
         let divisors: InlineArray<3, Double>
@@ -17,7 +18,7 @@ extension Picture.Renderer.CPU.Shaded {
     /// The pixel at a point given by its weights on the corners in the raster's plane: the shade's pixel at
     /// the normal there, each corner's normal weighted by its weight over its own divisor, taken into eye space
     /// by `Camera.direction(_:through:)`.
-    func pixel(_ weights: InlineArray<3, Double>) -> Picture.Pixel {
+    func pixel(_ weights: InlineArray<3, Double>, _ ramp: Picture.Gradient.Ramp) -> Picture.Pixel {
         let a = weights[0] / divisors[0]
         let b = weights[1] / divisors[1]
         let c = weights[2] / divisors[2]

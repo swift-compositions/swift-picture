@@ -9,6 +9,7 @@ extension Picture.Renderer.CPU {
         var opaque: [InlineArray<3, Point<3, Double>>] = []
         var colors: [Picture.Pixel] = []
         var lights: [Picture.Renderer.CPU.Shaded?] = []
+        var ramps: [Picture.Gradient.Ramp] = []
         var glass: [InlineArray<3, Point<3, Double>>] = []
         var surfaces: [Surface] = []
 
@@ -67,13 +68,15 @@ extension Picture.Renderer.CPU.Stage {
                 }
 
             case .shaded(let shade):
-                let ramp = shade.ramp.ramp
+                let ramp = ramps.count
+                ramps.append(shade.ramp.ramp)
+                let prepared = Picture.Scene.Material.Shade.Prepared(shade)
                 for face in mesh.faces {
                     let polygon = Self.clipped(face.vertices.map { corners[Int(bitPattern: $0)] })
                     for triangle in Self.fan(polygon) {
                         guard let a = project(triangle.0), let b = project(triangle.1), let c = project(triangle.2) else { continue }
                         let shaded = Picture.Renderer.CPU.Shaded(
-                            shade: shade,
+                            shade: prepared,
                             ramp: ramp,
                             eye: eye,
                             normals: [triangle.0.normal, triangle.1.normal, triangle.2.normal],
@@ -407,7 +410,7 @@ extension Picture.Renderer.CPU.Canvas {
                 let position = row * tile.width * samples + column
                 let hit = hits[position]
                 var color = stage.colors[hit.triangle]
-                if shaded, let light = stage.lights[hit.triangle] { color = light.pixel(weighed[position].weights) }
+                if shaded, let light = stage.lights[hit.triangle] { color = light.pixel(weighed[position].weights, stage.ramps[light.ramp]) }
                 guard let haze else { return color.composited(over: old) }
                 let share = haze.haze.share(at: haze.distance(hit.depth))
                 guard share > 0 else { return color.composited(over: old) }
