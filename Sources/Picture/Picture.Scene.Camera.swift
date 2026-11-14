@@ -66,6 +66,7 @@ extension Picture.Scene.Camera {
     /// model, so that `direction(_:in:)` is this with the product made once per model instead of per call.
     /// The product is applied to (x, y, z, 0) row by row, each summed from zero in the order of the columns, as
     /// swift-matrix's `applied(to:)` sums it.
+    @inlinable
     public static func direction(_ vector: Vector<3, Double>, through eye: Matrix<4, 4, Double>) -> Vector<3, Double> {
         func row(_ row: Int) -> Double {
             0 + eye[row, 0] * vector[0] + eye[row, 1] * vector[1] + eye[row, 2] * vector[2] + eye[row, 3] * 0
@@ -260,6 +261,7 @@ extension Picture.Scene.Camera {
 
     /// How far ahead of the eye lies what the camera draws at a normalised depth: minus the z of the eye-space
     /// point `Projection.eye(_:)` gives for it, nil where the projection has none.
+    @inlinable
     public func distance(at depth: Double) -> Double? {
         projection.eye(Point::Point<3, Double>([0, 0, depth])).map { -$0[2] }
     }

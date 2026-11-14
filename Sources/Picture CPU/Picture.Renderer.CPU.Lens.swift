@@ -4,7 +4,7 @@ extension Picture.Renderer.CPU {
     /// A scene's camera as the glass pass needs it: from a place in eye space to the raster, and the line of
     /// sight through a place.
     struct Lens {
-        let rows: InlineArray<4, InlineArray<4, Double>>
+        let projection: Projection<Double>
         let viewport: Projection<Double>.Viewport?
         let transform: Picture.Transform
         let map: Picture.Renderer.CPU.Affine
@@ -16,17 +16,13 @@ extension Picture.Renderer.CPU {
 
 extension Picture.Renderer.CPU.Lens {
     init(_ scene: Picture.Scene, _ transform: Picture.Transform) {
-        let matrix = Matrix(scene.camera.projection)
-        func row(_ number: Int) -> InlineArray<4, Double> {
-            [matrix[number, 0], matrix[number, 1], matrix[number, 2], matrix[number, 3]]
-        }
-        let rows: InlineArray<4, InlineArray<4, Double>> = [row(0), row(1), row(2), row(3)]
+        let projection = scene.camera.projection
         self.init(
-            rows: rows,
+            projection: projection,
             viewport: Picture.Scene.viewport(of: scene.viewport),
             transform: transform,
             map: Picture.Renderer.CPU.Affine(transform),
-            converging: rows[3][0] != 0 || rows[3][1] != 0 || rows[3][2] != 0
+            converging: projection.kind == .perspective
         )
     }
 
@@ -39,21 +35,17 @@ extension Picture.Renderer.CPU.Lens {
         return Vector([place[0] / length, place[1] / length, place[2] / length])
     }
 
-    /// Where in the raster a place in eye space is drawn: its normalised x and y through the scene's viewport, as
-    /// `Projection.Viewport.point(_:)` of a viewport whose y grows downward puts them, bit for bit, and the group's
-    /// transform; nil for a place in the plane of the eye or behind it, and for a viewport with no area. The
-    /// viewport's map is written out from its fields: swift-projection marks nothing inlinable, and a generic call
-    /// at each of the body pass's reads costs it more than twice its time.
+    /// Where in the raster a place in eye space is drawn: `Projection.normalized(_:)` of its x and y, through
+    /// `Projection.Viewport.point(_:)` of a viewport whose y grows downward, and the group's transform; nil for a
+    /// place in the plane of the eye or behind it, where the fourth clip coordinate is not positive (minus z
+    /// through a perspective lens, 1 through an orthographic one), and for a viewport with no area.
     @inline(__always)
     func raster(of place: Vector<3, Double>) -> (x: Double, y: Double)? {
-        func clip(_ row: Int) -> Double {
-            rows[row][0] * place[0] + rows[row][1] * place[1] + rows[row][2] * place[2] + rows[row][3]
-        }
-        let divisor = clip(3)
-        guard divisor > 0, let viewport else { return nil }
-        let across = viewport.x + (clip(0) / divisor + 1) / 2 * viewport.width
-        let down = viewport.y + (1 - clip(1) / divisor) / 2 * viewport.height
-        let moved = (map.x(across, down), map.y(across, down))
+        guard !converging || place[2] < 0, let viewport,
+            let normalized = projection.normalized(Point(x: place[0], y: place[1], z: place[2]))
+        else { return nil }
+        let point = viewport.point(Point(x: normalized.x, y: normalized.y))
+        let moved = (map.x(point.x, point.y), map.y(point.x, point.y))
         guard moved.0.isFinite, moved.1.isFinite else { return nil }
         return moved
     }

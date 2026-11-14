@@ -239,27 +239,6 @@ extension Picture.Renderer.CPU.Stage {
     }
 }
 
-extension Picture.Renderer.CPU.Stage {
-    /// How far ahead of the eye lies what a lens draws at a normalised depth, as `Camera.distance(at:)` gives it
-    /// bit for bit, minus the z of `Projection.eye(_:)`, with the lens's coefficients taken once: written out here,
-    /// as swift-projection marks nothing inlinable and a generic call at each hazed sample would cost it dearly.
-    static func distance(_ projection: Projection<Double>) -> (_ depth: Double) -> Double {
-        let rows = projection.coefficients
-        let (scale, offset) = (rows[2][2], rows[2][3])
-        switch projection.kind {
-        case .perspective:
-            return { depth in
-                let denominator = depth + scale
-                guard denominator != 0 else { return .infinity }
-                return -(-offset / denominator)
-            }
-
-        case .orthographic:
-            return { depth in -((depth - offset) / scale) }
-        }
-    }
-}
-
 extension Picture.Renderer.CPU {
     /// The sample points of a scene along each side of a pixel: a pixel takes the mean of `samples` × `samples`.
     static let samples: Int = 4
@@ -392,7 +371,7 @@ extension Picture.Renderer.CPU.Canvas {
         let area = stage.bounds.intersection(state.reach(in: box))
         guard area.area > 0 else { return }
         let upper = scene.camera.projection.depth.range.upperBound
-        let haze = scene.haze.map { haze in (haze: haze, pixel: haze.color.pixel, distance: Picture.Renderer.CPU.Stage.distance(scene.camera.projection)) }
+        let haze = scene.haze.map { haze in (haze: haze, pixel: haze.color.pixel, camera: scene.camera) }
         let opaque = Picture.Renderer.CPU.Stage.tiles(stage.opaque, over: area)
         // A shaded triangle's colour changes across it, so where a scene has one its points are weighed on corners.
         let shaded = stage.lights.contains { $0 != nil }
@@ -413,7 +392,7 @@ extension Picture.Renderer.CPU.Canvas {
                 var color = stage.colors[hit.triangle]
                 if shaded, let light = stage.lights[hit.triangle] { color = light.pixel(weighed[position].weights, stage.ramps[light.ramp]) }
                 guard let haze else { return color.composited(over: old) }
-                let share = haze.haze.share(at: haze.distance(hit.depth))
+                let share = haze.haze.share(at: haze.camera.distance(at: hit.depth) ?? .infinity)
                 guard share > 0 else { return color.composited(over: old) }
                 return color.interpolated(to: haze.pixel, at: Float(share)).composited(over: old)
             } finish: { x, y, old, mean in
