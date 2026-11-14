@@ -12,6 +12,9 @@ extension Picture.Renderer {
         /// A stroke the geometry refuses: a negative or non-finite width, or a miter limit below 1.
         case path(Picture.Plane.Path.Error)
 
+        /// An image's drawing gave no raster for a reason of its own, which the failure carries.
+        case drawing(Picture.Image.Failure)
+
         /// The picture holds something this renderer does not draw.
         case unsupported
     }

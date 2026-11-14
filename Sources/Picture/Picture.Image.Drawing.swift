@@ -12,7 +12,8 @@ extension Picture.Image {
         /// draws first; none by default.
         var pictures: [Picture] { get }
 
-        /// The raster, drawn now; a renderer's failure is the drawing's.
+        /// The raster, drawn now; a renderer's failure is the drawing's, and a failure of the drawing's own is
+        /// `.drawing` of its error, which reaches whoever drew the picture unchanged.
         func raster(through renderer: Picture.Renderer) throws(Picture.Renderer.Error) -> Raster<Picture.Pixel>
     }
 }
