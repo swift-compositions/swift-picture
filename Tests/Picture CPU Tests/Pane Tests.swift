@@ -116,7 +116,7 @@ extension `Picture CPU Tests`.`A renderer draws a pane through its glass` {
             let pane = Picture.Glass.Pane(.rectangle(.init(llx: 20, lly: 15, urx: 100, ury: 65), radius: 8), glass: glass, thickness: 6, rim: 10)
             let frosted = try Tests.drawn(Picture(step + [.pane(pane)]), on: Tests.canvas(120, 80))
             let blurred = try Tests.drawn([.layer(Picture.Layer(Picture(step), effects: [.blur(.init(deviation: deviation))]))], on: Tests.canvas(120, 80))
-            for x: UInt in 32..<88 {
+            (UInt(32)..<88).forEach { x in
                 for y: UInt in [32, 40, 48] {
                     let apart = abs(Tests.at(frosted, x, y).color.red - Tests.at(blurred, x, y).color.red)
                     #expect(apart <= 0.01, "deviation \(deviation) at (\(x), \(y)): \(apart)")
