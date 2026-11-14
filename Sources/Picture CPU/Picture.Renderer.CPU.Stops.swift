@@ -18,9 +18,14 @@ extension Picture.Renderer.CPU.Stops {
         var reciprocals: [Float] = []
         bounds.reserveCapacity(count)
         reciprocals.reserveCapacity(count)
-        for stop in 0..<count {
-            let bound = stop == 0 ? ramp.offsets[0] : Swift.max(ramp.offsets[stop], bounds[stop - 1])
-            reciprocals.append(stop == 0 ? 0 : 1 / (bound - bounds[stop - 1]))
+        for offset in ramp.offsets.prefix(count) {
+            guard let previous = bounds.last else {
+                bounds.append(offset)
+                reciprocals.append(0)
+                continue
+            }
+            let bound = Swift.max(offset, previous)
+            reciprocals.append(1 / (bound - previous))
             bounds.append(bound)
         }
         let known = ramp.offsets.count >= ramp.pixels.count

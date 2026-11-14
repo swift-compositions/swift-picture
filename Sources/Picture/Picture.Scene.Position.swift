@@ -36,12 +36,16 @@ extension Picture.Scene {
     @usableFromInline
     package static func viewport(of rectangle: Picture.Plane.Rectangle) -> Projection<Double>.Viewport? {
         let (x, y) = (rectangle.llx.underlying, rectangle.lly.underlying)
-        return try? Projection<Double>.Viewport(
-            x: x,
-            y: y,
-            width: rectangle.urx.underlying - x,
-            height: rectangle.ury.underlying - y,
-            direction: .down
-        )
+        do throws(Projection<Double>.Error) {
+            return try Projection<Double>.Viewport(
+                x: x,
+                y: y,
+                width: rectangle.urx.underlying - x,
+                height: rectangle.ury.underlying - y,
+                direction: .down
+            )
+        } catch {
+            return nil
+        }
     }
 }
